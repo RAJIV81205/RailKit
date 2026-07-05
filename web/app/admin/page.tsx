@@ -1265,6 +1265,8 @@ export default function AdminPanel() {
   const issues = issuesData?.issues ?? [];
   const auditDailyUsage = logsData?.logs?.dailyUsage ?? [];
   const recentLogs = logsData?.logs?.recent ?? [];
+  const [recentIpLocations, setRecentIpLocations] = useState<Record<string, { city: string | null; country: string | null; status: string }>>({});
+  const [recentIpLocationsLoading, setRecentIpLocationsLoading] = useState(false);
   const filteredEmailUsers = users.filter((user) => matchesEmailAudienceFilter(user, emailAudienceFilter));
   const dataLoading = usersValidating || ordersValidating || topupsValidating || issuesValidating || logsValidating;
   const normalizedUserSearch = userSearch.trim().toLowerCase();
@@ -1291,6 +1293,58 @@ export default function AdminPanel() {
       setAdminApiKey(null);
     }
   };
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setRecentIpLocations({});
+      return;
+    }
+
+    const ips = Array.from(new Set(recentLogs.map((log) => String(log.ip || "").trim()).filter(Boolean))).slice(0, 100);
+    if (ips.length === 0) {
+      setRecentIpLocations({});
+      return;
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    setRecentIpLocationsLoading(true);
+
+    void fetch("/api/admin/ip-locations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ips }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          throw new Error(`Location lookup failed: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled || !data?.success || !data?.locations || typeof data.locations !== "object") {
+          return;
+        }
+        setRecentIpLocations(data.locations);
+      })
+      .catch((error) => {
+        if (!cancelled && error?.name !== "AbortError") {
+          console.error("Admin IP location lookup failed:", error);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setRecentIpLocationsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [isAdmin, recentLogs]);
 
   // ── Check session on mount ──────────────────────────────────────────────────
   useEffect(() => {
@@ -2806,7 +2860,7 @@ export default function AdminPanel() {
                           borderBottom: "1px solid #1e2330",
                         }}
                       >
-                        {["Time", "User", "Path", "Status", "Duration", "IP", "Source"].map((h) => (
+                        {["Time", "User", "Path", "Status", "Duration", "IP", "Location", "Source"].map((h) => (
                           <th
                             key={h}
                             style={{
@@ -2830,7 +2884,7 @@ export default function AdminPanel() {
                       {recentLogs.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={7}
+                            colSpan={8}
                             style={{
                               padding: 48,
                               textAlign: "center",
@@ -2921,6 +2975,21 @@ export default function AdminPanel() {
                               }}
                             >
                               {log.ip}
+                            </td>
+                            <td
+                              style={{
+                                padding: "12px 16px",
+                                color: "#cbd5e1",
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontSize: 11,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {recentIpLocationsLoading && !recentIpLocations[log.ip]
+                                ? "Resolving..."
+                                : recentIpLocations[log.ip]
+                                  ? `${recentIpLocations[log.ip].city ?? "Unknown"}, ${recentIpLocations[log.ip].country ?? "Unknown"}`
+                                  : "Unknown"}
                             </td>
                             <td style={{ padding: "12px 16px" }}>
                               <span

@@ -73,12 +73,15 @@ export async function GET(req: NextRequest) {
     const recentLogsRaw = await AuditLog.find()
       .sort({ createdAt: -1 })
       .limit(100)
-      .select("email statusCode path ip duration source createdAt")
+      .select("email trainNo userAgent referer statusCode path ip duration source createdAt")
       .lean();
 
     const recent = recentLogsRaw.map((log) => ({
       id: (log._id as { toString(): string }).toString(),
       email: log.email as string,
+      trainNo: (log.trainNo as string | null) || null,
+      userAgent: (log.userAgent as string | null) || null,
+      referer: (log.referer as string | null) || null,
       statusCode: log.statusCode as number,
       path: log.path as string,
       ip: log.ip as string,

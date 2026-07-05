@@ -7,6 +7,22 @@ const auditLogSchema = new mongoose.Schema({
     index: true,
     trim: true,
   },
+  trainNo: {
+    type: String,
+    default: null,
+    trim: true,
+    index: true,
+  },
+  userAgent: {
+    type: String,
+    default: null,
+    trim: true,
+  },
+  referer: {
+    type: String,
+    default: null,
+    trim: true,
+  },
   statusCode: {
     type: Number,
     required: true,
@@ -37,6 +53,8 @@ const auditLogSchema = new mongoose.Schema({
     default: Date.now,
   },
 });
+
+auditLogSchema.index({ email: 1, trainNo: 1, createdAt: -1 });
 
 const AuditLog = mongoose.models.AuditLog || mongoose.model('AuditLog', auditLogSchema);
 

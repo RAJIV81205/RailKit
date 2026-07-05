@@ -58,7 +58,9 @@ interface User {
   statusReasons?: Array<{ reason: string; by: string; at: string; note?: string | null }>;
   flaggedAt?: string | null;
   bannedAt?: string | null;
+  bannedUntil?: string | null;
   bannedBy?: string | null;
+  whitelisted?: boolean;
 }
 
 interface Order {
@@ -460,6 +462,36 @@ const UserStatusBadge = ({ status }: { status?: User["status"] }) => {
   );
 };
 
+const MiniBadge = ({
+  label,
+  bg,
+  border,
+  color,
+}: {
+  label: string;
+  bg: string;
+  border: string;
+  color: string;
+}) => (
+  <span
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 10,
+      fontFamily: "'JetBrains Mono', monospace",
+      background: bg,
+      border: `1px solid ${border}`,
+      color,
+      padding: "2px 7px",
+      borderRadius: 999,
+      whiteSpace: "nowrap",
+    }}
+  >
+    {label}
+  </span>
+);
+
 const displayEmail = (email: string, showSensitiveInfo: boolean) =>
   showSensitiveInfo ? email : maskEmail(email);
 
@@ -689,6 +721,50 @@ function EditUserModal({ user, onSave, onClose, showSensitiveInfo }: { user: Use
               <option value="flagged">Flagged (review)</option>
               <option value="banned">Banned (block access)</option>
             </select>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", paddingTop: 2 }}>
+              <div
+                onClick={() => setDraft({ ...draft, whitelisted: !draft.whitelisted })}
+                style={{
+                  width: 38,
+                  height: 20,
+                  borderRadius: 10,
+                  background: draft.whitelisted ? "#1f4731" : "#1e2330",
+                  border: `1px solid ${draft.whitelisted ? "#2d6b46" : "#2d3548"}`,
+                  position: "relative",
+                  cursor: "pointer",
+                  transition: "background 0.2s",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 2,
+                    left: draft.whitelisted ? 18 : 2,
+                    width: 14,
+                    height: 14,
+                    borderRadius: "50%",
+                    background: draft.whitelisted ? "#6ee7b7" : "#64748b",
+                    transition: "left 0.2s",
+                  }}
+                />
+              </div>
+              <span style={{ color: "#94a3b8", fontSize: 13 }}>Whitelisted for abuse worker</span>
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ color: "#64748b", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: "'JetBrains Mono', monospace" }}>Ban Until</span>
+              <input
+                type="datetime-local"
+                value={toDateTimeLocalValue(draft.bannedUntil)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setDraft({ ...draft, bannedUntil: value ? new Date(value).toISOString() : null });
+                }}
+                style={{ background: "#1a1f2e", border: "1px solid #2d3548", color: "#e2e8f0", borderRadius: 6, padding: "8px 10px", fontSize: 13 }}
+              />
+              <span style={{ color: "#64748b", fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>
+                Edit this to extend or shorten ban window.
+              </span>
+            </label>
             <input
               value={statusReason}
               onChange={(e) => setStatusReason(e.target.value)}
@@ -753,7 +829,9 @@ function EditUserModal({ user, onSave, onClose, showSensitiveInfo }: { user: Use
                 limit: draft.limit,
                 billingDate: draft.billingDate || null,
                 expirationDate: draft.expirationDate || null,
+                bannedUntil: draft.bannedUntil || null,
                 status: draft.status,
+                whitelisted: !!draft.whitelisted,
                 statusReason: statusReason.trim() || undefined,
                 statusNote: statusNote.trim() || undefined,
               });
@@ -2241,11 +2319,28 @@ export default function AdminPanel() {
                         <td style={{ padding: "14px 16px" }}><PlanBadge plan={u.plan} /></td>
                         <td style={{ padding: "14px 16px" }}>
                           <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
-                            <UserStatusBadge status={u.status} />
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                              <UserStatusBadge status={u.status} />
+                              {u.whitelisted && (
+                                <MiniBadge
+                                  label="Whitelisted"
+                                  bg="#102a1d"
+                                  border="#1f4731"
+                                  color="#6ee7b7"
+                                />
+                              )}
+                            </div>
                             {u.status === "banned" && u.bannedAt && (
-                              <span style={{ color: "#475569", fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>
-                                {new Date(u.bannedAt).toLocaleDateString()}
-                              </span>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                <span style={{ color: "#475569", fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>
+                                  Banned {new Date(u.bannedAt).toLocaleDateString("en-IN")}
+                                </span>
+                                <span style={{ color: "#64748b", fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>
+                                  {u.bannedUntil
+                                    ? `Until ${formatCompactDate(u.bannedUntil)}`
+                                    : "No ban expiry set"}
+                                </span>
+                              </div>
                             )}
                             {u.status === "flagged" && u.flaggedAt && (
                               <span style={{ color: "#475569", fontSize: 10, fontFamily: "'JetBrains Mono', monospace" }}>

@@ -91,10 +91,22 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    bannedUntil: {
+      type: Date,
+      default: null,
+    },
+
     bannedBy: {
       type: String,
       default: null,
       trim: true,
+    },
+
+    whitelisted: {
+      type: Boolean,
+      default: false,
+      required: true,
+      index: true,
     },
   },
   { timestamps: true },

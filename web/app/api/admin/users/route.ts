@@ -67,6 +67,8 @@ export async function PUT(req: Request) {
       "limit",
       "billingDate",
       "expirationDate",
+      "bannedUntil",
+      "whitelisted",
     ] as const;
 
     for (const field of allowedFields) {
@@ -92,8 +94,9 @@ export async function PUT(req: Request) {
     const reason = typeof rawUpdates.statusReason === "string" ? rawUpdates.statusReason.trim() : "";
     const note = typeof rawUpdates.statusNote === "string" ? rawUpdates.statusNote.trim() : "";
     const moderator = admin.email || admin.userId || "admin";
+    const now = new Date();
 
-    const existingUser = await User.findById(_id).select("status statusReasons flaggedAt bannedAt bannedBy");
+    const existingUser = await User.findById(_id).select("status statusReasons flaggedAt bannedAt bannedBy bannedUntil whitelisted");
     if (!existingUser) {
       return NextResponse.json(
         { success: false, message: "User not found" },
@@ -117,16 +120,21 @@ export async function PUT(req: Request) {
         updates.flaggedAt = existingUser.flaggedAt ?? null;
         updates.bannedAt = now;
         updates.bannedBy = moderator;
+        if (!("bannedUntil" in rawUpdates) && !("bannedUntil" in updates)) {
+          updates.bannedUntil = new Date(now.getTime() + 12 * 60 * 60 * 1000);
+        }
       } else if (nextStatus === "flagged") {
         updates.status = "flagged";
         updates.flaggedAt = now;
         updates.bannedAt = null;
+        updates.bannedUntil = null;
         updates.bannedBy = null;
       } else {
         // clean
         updates.status = "clean";
         updates.flaggedAt = null;
         updates.bannedAt = null;
+        updates.bannedUntil = null;
         updates.bannedBy = null;
       }
       updates.statusReasons = nextReasons;
@@ -170,6 +178,17 @@ export async function PUT(req: Request) {
         );
       }
       updates.expirationDate = normalized;
+    }
+
+    if ("bannedUntil" in updates) {
+      const normalized = normalizeNullableDate(updates.bannedUntil);
+      if (normalized === undefined) {
+        return NextResponse.json(
+          { success: false, message: "Invalid bannedUntil" },
+          { status: 400 },
+        );
+      }
+      updates.bannedUntil = normalized;
     }
 
     const user = await User.findByIdAndUpdate(_id, updates, {

@@ -19,6 +19,30 @@ type PopupMessage = {
   message?: string;
 };
 
+async function waitForAuthSession(maxAttempts = 5, delayMs = 200) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      const res = await fetch("/api/user/verify", {
+        method: "GET",
+        cache: "no-store",
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.success) return true;
+      }
+    } catch {
+      // Keep retrying for short cookie-commit race after popup closes.
+    }
+
+    if (attempt < maxAttempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  return false;
+}
+
 export default function AuthPage() {
   return (
     <Suspense fallback={null}>
@@ -136,7 +160,11 @@ function AuthPageInner() {
     setLoading(true);
     try {
       await openGooglePopup(redirectUri);
-      router.push(redirectTo);
+      const sessionReady = await waitForAuthSession();
+      if (!sessionReady) {
+        throw new Error("Signed in, but session is still syncing. Please try again.");
+      }
+      router.replace(redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google login failed");
     } finally {

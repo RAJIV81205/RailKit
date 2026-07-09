@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import useSWR from "swr";
@@ -79,6 +79,16 @@ type UserOrdersResponse = {
   message?: string;
 };
 
+class FetchError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "FetchError";
+    this.status = status;
+  }
+}
+
 type ApiCodeLanguage = "javascript" | "python" | "curl";
 type CashfreeCheckoutMode = "sandbox" | "production";
 type CashfreeCheckoutClient = {
@@ -96,8 +106,13 @@ type ActiveTab = "overview" | "apikey" | "apiendpoints" | "playground" | "logs" 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fetcher = async <T,>(url: string): Promise<T> => {
   const res = await fetch(url);
-  const data = await res.json();
-  if (!res.ok || !data?.success) throw new Error(data?.message || `Fetch failed: ${res.status}`);
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.success) {
+    throw new FetchError(
+      data?.message || `Fetch failed: ${res.status}`,
+      res.status
+    );
+  }
   return data as T;
 };
 
@@ -355,6 +370,8 @@ function OrderModal({ order, onClose }: { order: Order; onClose: () => void }) {
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const router = useRouter();
+  const authRetryRef = useRef<number | null>(null);
+  const authRetryCountRef = useRef(0);
   const [copied, setCopied] = useState(false);
   const [regeneratingKey, setRegeneratingKey] = useState(false);
   const [regenerateError, setRegenerateError] = useState<string | null>(null);
@@ -417,7 +434,41 @@ export default function DashboardPage() {
   const activeExpirationTimestamp = dbUser?.expirationDate ? new Date(dbUser.expirationDate).getTime() : NaN;
   const hasActiveExpirationOverride = Number.isFinite(activeExpirationTimestamp) && activeExpirationTimestamp > Date.now();
 
-  useEffect(() => { if (userError) router.replace("/"); }, [userError, router]);
+  useEffect(() => {
+    if (!userError) {
+      authRetryCountRef.current = 0;
+      if (authRetryRef.current) {
+        window.clearTimeout(authRetryRef.current);
+        authRetryRef.current = null;
+      }
+      return;
+    }
+
+    const status = userError instanceof FetchError ? userError.status : undefined;
+    const isAuthFailure = status === 401 || status === 403;
+
+    if (!isAuthFailure) {
+      return;
+    }
+
+    if (authRetryCountRef.current === 0) {
+      authRetryCountRef.current = 1;
+      authRetryRef.current = window.setTimeout(() => {
+        mutateUser();
+      }, 350);
+      return;
+    }
+
+    router.replace("/");
+  }, [userError, mutateUser, router]);
+
+  useEffect(() => {
+    return () => {
+      if (authRetryRef.current) {
+        window.clearTimeout(authRetryRef.current);
+      }
+    };
+  }, []);
 
   const refreshAll = () => { mutateUser(); mutateOrders(); };
 

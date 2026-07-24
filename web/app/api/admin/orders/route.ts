@@ -21,8 +21,7 @@ export async function GET() {
     // Use standard mongoose populate
     const orders = await Order.find({})
       .populate("userId", "name email")
-      .sort({ createdAt: -1 })
-      .limit(100);
+      .sort({ createdAt: -1 });
       
     return NextResponse.json({ success: true, orders }, { status: 200 });
   } catch (error) {

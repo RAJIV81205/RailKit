@@ -335,12 +335,14 @@ function useBillingTimer(user: DbUser | null) {
 function OrderModal({ order, onClose }: { order: Order; onClose: () => void }) {
   return (
     <div
+      className="db-modal-backdrop"
       role="presentation"
       onClick={onClose}
       onKeyDown={(e) => e.key === "Escape" && onClose()}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(8px)" }}
     >
       <div
+        className="db-modal"
         onClick={(e) => e.stopPropagation()}
         style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 24, padding: 32, width: "100%", maxWidth: 480, fontFamily: "var(--font-noto), 'Noto Sans', system-ui, sans-serif", boxShadow: "0 20px 56px rgba(0,0,0,0.12)" }}
       >
@@ -357,7 +359,7 @@ function OrderModal({ order, onClose }: { order: Order; onClose: () => void }) {
           ["Credited", order.credited ? "Yes" : "No"],
           ["Date", order.createdAt ? new Date(order.createdAt).toLocaleString("en-IN") : "—"],
         ].map(([k, v]) => (
-          <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
+          <div key={k} className="db-modal-row" style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
             <span style={{ color: "#9ca3af", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-noto), 'Noto Sans', system-ui, sans-serif", fontWeight: 600 }}>{k}</span>
             <span style={{ color: "#374151", fontSize: 13, fontFamily: "var(--font-noto), 'Noto Sans', system-ui, sans-serif" }}>{v}</span>
           </div>
@@ -854,6 +856,35 @@ export default function DashboardPage() {
           margin-bottom: 12px;
         }
         .row-hover:hover { background: #fafafa !important; }
+        .db-break-anywhere { overflow-wrap: anywhere; word-break: break-word; }
+        .db-code-block {
+          max-width: 100%;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        .db-code-block pre { min-width: max-content; }
+        .db-profile-copy { min-width: 0; }
+        .db-profile-copy p {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .db-key-field { width: 100%; }
+        .db-key-value {
+          min-width: 0;
+          scrollbar-width: thin;
+        }
+        .db-table-scroll {
+          width: 100%;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        .db-data-table { min-width: 700px; }
+        .db-modal-backdrop { padding: 16px; }
+        .db-modal {
+          max-height: calc(100vh - 32px);
+          overflow-y: auto;
+        }
 
         /* ── Mobile tab bar ── */
         .db-mobile-tabs {
@@ -1001,19 +1032,139 @@ export default function DashboardPage() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 4px; }
 
+        @media (max-width: 1100px) {
+          .db-sidebar { width: 200px; }
+          .db-main { padding: 24px 22px 32px; }
+          .db-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+          .db-playground-grid { grid-template-columns: minmax(0, 1fr) !important; }
+          .db-response-panel { min-height: 360px !important; }
+        }
         @media (max-width: 768px) {
+          .db-root { overflow-x: hidden; }
           .db-sidebar { display: none; }
           .db-layout { padding: 12px 12px 28px; }
           .db-mobile-tabs { display: grid; }
           .db-main { padding: 20px 16px 32px; }
           .db-stats-grid { grid-template-columns: 1fr 1fr !important; }
           .db-overview-grid { grid-template-columns: 1fr !important; }
-          .db-titlebar { margin-bottom: 6px; }
+          .db-titlebar {
+            align-items: flex-start;
+            margin-bottom: 16px;
+          }
+          .db-title-actions {
+            width: 100%;
+            justify-content: flex-start;
+          }
+          .db-card { padding: 20px; }
+          .db-key-row { flex-direction: column !important; }
+          .db-key-field { flex: none !important; }
+          .db-key-regen {
+            width: 100%;
+            justify-content: center;
+          }
+          .db-language-select .db-select { width: 100% !important; }
+          .db-form-grid { grid-template-columns: minmax(0, 1fr) !important; }
+          .db-form-grid > * { grid-column: 1 / -1 !important; min-width: 0; }
+          .db-input,
+          .db-select { min-height: 44px; }
+          .db-action-pills > button { min-height: 40px; }
+          .db-response-panel { min-height: 320px !important; }
+          .db-chart-wrap { height: 230px !important; padding: 8px !important; }
+          .db-table-heading {
+            gap: 8px;
+            flex-wrap: wrap;
+          }
+          .db-topup-overlay {
+            flex-direction: column;
+            text-align: center;
+          }
+        }
+        @media (max-width: 640px) {
+          .db-data-table,
+          .db-data-table tbody,
+          .db-data-table tr,
+          .db-data-table td {
+            display: block;
+            width: 100%;
+          }
+          .db-data-table { min-width: 0; }
+          .db-data-table thead { display: none; }
+          .db-data-table tbody {
+            display: grid;
+            gap: 10px;
+            padding: 10px;
+          }
+          .db-data-table tbody tr {
+            overflow: hidden;
+            border: 1px solid #ebebeb !important;
+            border-radius: 12px;
+            background: #fff;
+          }
+          .db-data-table tbody td {
+            display: flex;
+            min-width: 0;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 10px 12px !important;
+            border-bottom: 1px solid #f3f4f6;
+            text-align: right;
+            overflow-wrap: anywhere;
+            white-space: normal !important;
+          }
+          .db-data-table tbody td:last-child { border-bottom: 0; }
+          .db-data-table tbody td::before {
+            content: attr(data-label);
+            flex: 0 0 78px;
+            color: #9ca3af;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-align: left;
+            text-transform: uppercase;
+          }
+          .db-data-table tbody .db-empty-cell {
+            display: block;
+            padding: 28px 16px !important;
+            text-align: center;
+          }
+          .db-data-table tbody .db-empty-cell::before { display: none; }
+          .db-modal { padding: 22px !important; border-radius: 18px !important; }
+          .db-modal-row {
+            flex-direction: column;
+            gap: 5px;
+          }
+          .db-modal-row > :last-child {
+            max-width: 100%;
+            overflow-wrap: anywhere;
+          }
         }
         @media (max-width: 480px) {
           .db-layout { padding: 8px 8px 24px; }
           .db-stats-grid { grid-template-columns: 1fr !important; }
           .db-main { padding: 14px 12px 28px; }
+          .db-main { border-radius: 14px; }
+          .db-card { padding: 16px; border-radius: 13px; }
+          .db-title { font-size: 18px; }
+          .db-mobile-tabs { gap: 5px; margin-bottom: 14px; }
+          .db-mobile-tab {
+            min-width: 0;
+            min-height: 42px;
+            padding: 8px 6px;
+            font-size: 11px;
+          }
+          .db-mobile-tab svg { flex-shrink: 0; }
+          .db-profile-head { align-items: flex-start !important; }
+          .db-profile-copy { padding-top: 3px; }
+          .db-billing-summary { grid-template-columns: 1fr !important; }
+          .db-install-copy { overflow-wrap: anywhere; }
+          .db-key-warning { align-items: flex-start !important; }
+          .db-key-field { padding: 10px 11px !important; }
+          .db-key-value { font-size: 12px !important; }
+          .db-code-block { padding: 12px !important; border-radius: 11px !important; }
+          .db-chart-wrap { height: 210px !important; }
+          .db-table-heading { padding: 12px 14px !important; }
+          .db-response-panel { min-height: 280px !important; border-radius: 13px; }
           .db-price-popup {
             width: 100%;
             grid-template-columns: 58px minmax(0, 1fr);
@@ -1147,7 +1298,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="db-title-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <PlanBadge plan={dbUser.plan} />
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: dbUser.active ? "#16a34a" : "#9ca3af", background: dbUser.active ? "#f0fdf4" : "#f9fafb", border: `1px solid ${dbUser.active ? "#bbf7d0" : "#e5e7eb"}`, padding: "3px 8px", borderRadius: 6, fontWeight: 600 }}>
                   <span style={{ width: 6, height: 6, borderRadius: "50%", background: dbUser.active ? "#22c55e" : "#d1d5db" }} />
@@ -1202,9 +1353,9 @@ export default function DashboardPage() {
                   {/* Profile */}
                   <div className="db-card">
                     <p className="db-section-label">Profile</p>
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+                    <div className="db-profile-head" style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
                       <img src={dicebearUrl} alt={dbUser.name || dbUser.email} style={{ width: 48, height: 48, borderRadius: 14, border: "1px solid #e5e7eb", flexShrink: 0, background: "#f3f4f6" }} />
-                      <div>
+                      <div className="db-profile-copy">
                         <p style={{ fontSize: 15, fontWeight: 700, color: "#000" }}>{dbUser.name || "—"}</p>
                         <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{dbUser.email}</p>
                       </div>
@@ -1248,7 +1399,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     )}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div className="db-billing-summary" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                       {[
                         { label: "Paid Orders", value: paidOrders.length, color: "#16a34a" },
                         { label: "Total Spent",  value: `₹${totalSpent.toFixed(0)}`, color: "#d97706" },
@@ -1295,6 +1446,7 @@ export default function DashboardPage() {
                     )}
                     {!canBuyLimitTopup && (
                       <div
+                        className="db-topup-overlay"
                         data-topup-overlay
                         style={{
                           position: "absolute",
@@ -1347,19 +1499,19 @@ export default function DashboardPage() {
                   </div>
                   <p style={{ fontSize: 16, fontWeight: 700, color: "#000" }}>Secret API Key</p>
                 </div>
-                <p style={{ fontSize: 12, color: "#9ca3af", marginBottom: 20, lineHeight: 1.7 }}>
+                <p className="db-install-copy" style={{ fontSize: 12, color: "#9ca3af", marginBottom: 20, lineHeight: 1.7 }}>
                   Install{" "}
                   <span style={{ color: "#16a34a", background: "#f0fdf4", padding: "1px 7px", borderRadius: 5, border: "1px solid #bbf7d0", fontSize: 12 }}>npm install railkit</span>
                   {" "}→ configure your key → call any function
                 </p>
-                <div style={{ background: "#f8f8f8", border: "1px solid #f0f0f0", borderRadius: 10, padding: "10px 14px", marginBottom: 18, display: "flex", alignItems: "center", gap: 8 }}>
+                <div className="db-key-warning" style={{ background: "#f8f8f8", border: "1px solid #f0f0f0", borderRadius: 10, padding: "10px 14px", marginBottom: 18, display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ color: "#6b7280", flexShrink: 0 }}><IconShield /></span>
                   <span style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>Your key grants full package access. Rotate it immediately if you believe it has been compromised.</span>
                 </div>
                 {/* Key row */}
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <div style={{ flex: 1, minWidth: 0, background: "#fafafa", border: "1px solid #e5e7eb", borderRadius: 10, padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <span style={{ fontFamily: "var(--font-noto), 'Noto Sans', monospace", fontSize: 13, color: "#374151", overflowX: "auto", whiteSpace: "nowrap", flex: 1 }}>
+                <div className="db-key-row" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div className="db-key-field" style={{ flex: 1, minWidth: 0, background: "#fafafa", border: "1px solid #e5e7eb", borderRadius: 10, padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span className="db-key-value" style={{ fontFamily: "var(--font-noto), 'Noto Sans', monospace", fontSize: 13, color: "#374151", overflowX: "auto", whiteSpace: "nowrap", flex: 1 }}>
                       {regeneratingKey ? <ApiKeySkeleton /> : keyVisible ? dbUser.apiKey : maskedKey}
                     </span>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
@@ -1371,14 +1523,14 @@ export default function DashboardPage() {
                       </button>
                     </div>
                   </div>
-                  <button type="button" onClick={regenerateApiKey} disabled={regeneratingKey} style={{ background: regeneratingKey ? "#e5e7eb" : "#000", border: "none", color: regeneratingKey ? "#9ca3af" : "#fff", borderRadius: 10, padding: "0 20px", cursor: regeneratingKey ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", height: 44, transition: "background 0.2s" }}>
+                  <button className="db-key-regen" type="button" onClick={regenerateApiKey} disabled={regeneratingKey} style={{ background: regeneratingKey ? "#e5e7eb" : "#000", border: "none", color: regeneratingKey ? "#9ca3af" : "#fff", borderRadius: 10, padding: "0 20px", cursor: regeneratingKey ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", height: 44, transition: "background 0.2s" }}>
                     <span style={{ display: "inline-flex", animation: regeneratingKey ? "spin 0.9s linear infinite" : "none" }}><IconRefresh /></span>
                     {regeneratingKey ? "Regenerating..." : "Regenerate Key"}
                   </button>
                 </div>
                 {regenerateError && <p style={{ marginTop: 10, color: "#dc2626", fontSize: 12 }}>{regenerateError}</p>}
                 {/* Code example */}
-                <div style={{ marginTop: 24, background: "#0d1117", border: "1px solid #21262d", borderRadius: 14, padding: "16px 20px" }}>
+                <div className="db-code-block" style={{ marginTop: 24, background: "#0d1117", border: "1px solid #21262d", borderRadius: 14, padding: "16px 20px" }}>
                   <p style={{ color: "#6b7280", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12, fontWeight: 600 }}>Example Usage</p>
                   <SyntaxHighlighter language="typescript" style={nightOwl} customStyle={{ margin: 0, background: "transparent", fontSize: 12, lineHeight: 1.8, padding: 0 }}>
                     {usageExampleCode}
@@ -1395,18 +1547,18 @@ export default function DashboardPage() {
                 </div>
                 <div className="db-card">
                   <p style={{ fontSize: 15, fontWeight: 700, color: "#000", marginBottom: 10 }}>How to call endpoints</p>
-                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+                  <div className="db-language-select" style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
                     <select value={apiCodeLanguage} onChange={(e) => setApiCodeLanguage(e.target.value as ApiCodeLanguage)} className="db-select" style={{ width: "auto" }}>
                       {(Object.keys(apiLanguageMeta) as ApiCodeLanguage[]).map((lang) => (
                         <option key={lang} value={lang}>{apiLanguageMeta[lang].label}</option>
                       ))}
                     </select>
                   </div>
-                  <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.7, marginBottom: 14 }}>
+                  <p className="db-break-anywhere" style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.7, marginBottom: 14 }}>
                     Base URL: <span style={{ color: "#2563eb" }}>{directApiBaseUrl}</span><br />
                     Required header: <span style={{ color: "#16a34a" }}>x-api-key: YOUR_API_KEY</span>
                   </p>
-                  <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 12, padding: 14, overflowX: "auto" }}>
+                  <div className="db-code-block" style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 12, padding: 14, overflowX: "auto" }}>
                     <SyntaxHighlighter language={apiLanguageMeta[apiCodeLanguage].syntax} style={nightOwl} customStyle={{ margin: 0, background: "transparent", fontSize: 12, lineHeight: 1.7, padding: 0 }}>
                       {buildApiSnippet("/api/checkPNRStatus/1234567890", apiCodeLanguage)}
                     </SyntaxHighlighter>
@@ -1421,7 +1573,7 @@ export default function DashboardPage() {
                     <p style={{ fontSize: 12, color: "#374151", marginBottom: 4, wordBreak: "break-all" }}>{endpoint.path}</p>
                     <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4, wordBreak: "break-all" }}>Example: {directApiBaseUrl}{endpoint.examplePath}</p>
                     <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>{endpoint.notes}</p>
-                    <div style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 12, padding: 14, overflowX: "auto" }}>
+                    <div className="db-code-block" style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 12, padding: 14, overflowX: "auto" }}>
                       <SyntaxHighlighter language={apiLanguageMeta[apiCodeLanguage].syntax} style={nightOwl} customStyle={{ margin: 0, background: "transparent", fontSize: 12, lineHeight: 1.7, padding: 0 }}>
                         {buildApiSnippet(endpoint.examplePath, apiCodeLanguage)}
                       </SyntaxHighlighter>
@@ -1433,7 +1585,7 @@ export default function DashboardPage() {
 
             {/* ── Playground ────────────────────────────────────────────── */}
             {activeTab === "playground" && (
-              <div style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 16 }}>
+              <div className="db-playground-grid" style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 16 }}>
                 <div className="db-card">
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
                     <p style={{ fontSize: 15, fontWeight: 700, color: "#000" }}>API Playground</p>
@@ -1441,7 +1593,7 @@ export default function DashboardPage() {
                   </div>
                   <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.7, marginBottom: 16 }}>Run live requests without leaving your workspace.</p>
                   {/* Action pills */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+                  <div className="db-action-pills" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                     {[{ id: "pnr", label: "PNR" }, { id: "train", label: "Train" }, { id: "track", label: "Track" }, { id: "history", label: "History" }, { id: "station", label: "Station" }, { id: "search", label: "Search" }, { id: "seat", label: "Seat" }, { id: "fare", label: "Fare" }].map((item) => (
                       <button type="button" key={item.id} onClick={() => { setPlaygroundAction(item.id as typeof playgroundAction); resetPlaygroundMeta(); }}
                         style={{ background: playgroundAction === item.id ? "#000" : "#f3f4f6", border: `1px solid ${playgroundAction === item.id ? "#000" : "#e5e7eb"}`, color: playgroundAction === item.id ? "#fff" : "#6b7280", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "background 0.15s, color 0.15s" }}>
@@ -1450,7 +1602,7 @@ export default function DashboardPage() {
                     ))}
                   </div>
                   {/* Inputs */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div className="db-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                     {playgroundAction === "pnr" && <input value={pnrInput} onChange={(e) => setPnrInput(e.target.value.replace(/\D/g, ""))} maxLength={10} placeholder="PNR number (10 digits)" className="db-input" style={{ gridColumn: "1 / -1" }} />}
                     {playgroundAction === "train" && <input value={trainInput} onChange={(e) => setTrainInput(e.target.value.replace(/\D/g, ""))} maxLength={5} placeholder="Train number (5 digits)" className="db-input" style={{ gridColumn: "1 / -1" }} />}
                     {playgroundAction === "track" && (<>
@@ -1513,7 +1665,7 @@ export default function DashboardPage() {
                   {playgroundError && <p style={{ marginTop: 10, color: "#dc2626", fontSize: 12 }}>{playgroundError}</p>}
                 </div>
                 {/* Response panel */}
-                <div className="db-card-dark" style={{ minHeight: 420, overflow: "hidden" }}>
+                <div className="db-card-dark db-response-panel" style={{ minHeight: 420, overflow: "hidden" }}>
                   <div style={{ background: "#161b22", borderBottom: "1px solid #21262d", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ color: "#8b949e", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>Response</span>
                     <span style={{ color: "#6b7280", fontSize: 11 }}>JSON</span>
@@ -1543,7 +1695,7 @@ export default function DashboardPage() {
                       ))}
                     </div>
                   </div>
-                  <div style={{ background: "#fafafa", border: "1px solid #f0f0f0", borderRadius: 12, padding: 12, height: 260 }}>
+                  <div className="db-chart-wrap" style={{ background: "#fafafa", border: "1px solid #f0f0f0", borderRadius: 12, padding: 12, height: 260 }}>
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={chartData} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
                         <defs>
@@ -1568,12 +1720,12 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="db-card" style={{ padding: 0, overflow: "hidden" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa" }}>
+                  <div className="db-table-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa" }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>Recent API Logs</span>
                     <span style={{ fontSize: 11, color: "#9ca3af" }}>{recentLogs.length} entries</span>
                   </div>
-                  <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <div className="db-table-scroll" style={{ overflowX: "auto" }}>
+                    <table className="db-data-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                       <thead>
                         <tr style={{ background: "#fafafa", borderBottom: "1px solid #f3f4f6" }}>
                           {["Time", "Path", "Status", "Duration", "IP"].map((h) => (
@@ -1583,14 +1735,14 @@ export default function DashboardPage() {
                       </thead>
                       <tbody>
                         {recentLogs.length === 0 ? (
-                          <tr><td colSpan={5} style={{ padding: 48, textAlign: "center", color: "#d1d5db", fontSize: 12 }}>No logs yet for this account.</td></tr>
+                          <tr><td className="db-empty-cell" colSpan={5} style={{ padding: 48, textAlign: "center", color: "#d1d5db", fontSize: 12 }}>No logs yet for this account.</td></tr>
                         ) : recentLogs.map((log) => (
                           <tr key={log.id} className="row-hover" style={{ borderBottom: "1px solid #f9f9f9", transition: "background 0.1s" }}>
-                            <td style={{ padding: "11px 16px", color: "#9ca3af", fontSize: 11, whiteSpace: "nowrap" }}>{new Date(log.createdAt).toLocaleString("en-IN")}</td>
-                            <td style={{ padding: "11px 16px", color: "#374151", fontSize: 12, maxWidth: 420, wordBreak: "break-all" }}>{log.path}</td>
-                            <td style={{ padding: "11px 16px" }}><span style={{ color: log.statusCode >= 200 && log.statusCode < 400 ? "#16a34a" : "#dc2626", fontSize: 12, fontWeight: 700 }}>{log.statusCode}</span></td>
-                            <td style={{ padding: "11px 16px", color: "#2563eb", fontSize: 12, fontWeight: 600 }}>{Number(log.duration).toFixed(2)} ms</td>
-                            <td style={{ padding: "11px 16px", color: "#9ca3af", fontSize: 11 }}>{log.ip}</td>
+                            <td data-label="Time" style={{ padding: "11px 16px", color: "#9ca3af", fontSize: 11, whiteSpace: "nowrap" }}>{new Date(log.createdAt).toLocaleString("en-IN")}</td>
+                            <td data-label="Path" style={{ padding: "11px 16px", color: "#374151", fontSize: 12, maxWidth: 420, wordBreak: "break-all" }}>{log.path}</td>
+                            <td data-label="Status" style={{ padding: "11px 16px" }}><span style={{ color: log.statusCode >= 200 && log.statusCode < 400 ? "#16a34a" : "#dc2626", fontSize: 12, fontWeight: 700 }}>{log.statusCode}</span></td>
+                            <td data-label="Duration" style={{ padding: "11px 16px", color: "#2563eb", fontSize: 12, fontWeight: 600 }}>{Number(log.duration).toFixed(2)} ms</td>
+                            <td data-label="IP" style={{ padding: "11px 16px", color: "#9ca3af", fontSize: 11 }}>{log.ip}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1603,7 +1755,7 @@ export default function DashboardPage() {
             {/* ── Orders ────────────────────────────────────────────────── */}
             {activeTab === "orders" && (
               <div className="db-card" style={{ padding: 0, overflow: "hidden" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa" }}>
+                <div className="db-table-heading" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa" }}>
                   <span style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>
                     All orders · <span style={{ color: "#16a34a" }}>{paidOrders.length} paid</span>
                   </span>
@@ -1611,8 +1763,8 @@ export default function DashboardPage() {
                     Total: <span style={{ color: "#d97706", fontWeight: 700 }}>₹{totalSpent.toFixed(2)}</span>
                   </span>
                 </div>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <div className="db-table-scroll" style={{ overflowX: "auto" }}>
+                  <table className="db-data-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
                       <tr style={{ background: "#fafafa", borderBottom: "1px solid #f3f4f6" }}>
                         {["Order ID", "Amount", "Status", "Credited", "Date", ""].map((h) => (
@@ -1622,22 +1774,22 @@ export default function DashboardPage() {
                     </thead>
                     <tbody>
                       {orders.length === 0 ? (
-                        <tr><td colSpan={6} style={{ padding: 48, textAlign: "center", color: "#d1d5db", fontSize: 12 }}>No orders found. Subscribe to a plan to get started.</td></tr>
+                        <tr><td className="db-empty-cell" colSpan={6} style={{ padding: 48, textAlign: "center", color: "#d1d5db", fontSize: 12 }}>No orders found. Subscribe to a plan to get started.</td></tr>
                       ) : orders.map((o) => (
                         <tr key={o._id} className="row-hover" style={{ borderBottom: "1px solid #f9f9f9", transition: "background 0.1s" }}>
-                          <td style={{ padding: "13px 16px", color: "#9ca3af", fontSize: 11 }}>{o.orderId}</td>
-                          <td style={{ padding: "13px 16px" }}>
+                          <td data-label="Order ID" style={{ padding: "13px 16px", color: "#9ca3af", fontSize: 11 }}>{o.orderId}</td>
+                          <td data-label="Amount" style={{ padding: "13px 16px" }}>
                             <span style={{ color: "#16a34a", fontWeight: 700, fontSize: 13 }}>₹{o.amount.toFixed(2)}</span>
                             <span style={{ color: "#c0c0c0", fontSize: 10, marginLeft: 4 }}>{o.currency}</span>
                           </td>
-                          <td style={{ padding: "13px 16px" }}><StatusBadge status={o.status} /></td>
-                          <td style={{ padding: "13px 16px" }}>
+                          <td data-label="Status" style={{ padding: "13px 16px" }}><StatusBadge status={o.status} /></td>
+                          <td data-label="Credited" style={{ padding: "13px 16px" }}>
                             <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12 }}>
                               {o.credited ? (<><span style={{ color: "#16a34a" }}><IconCheck /></span><span style={{ color: "#16a34a", fontWeight: 600 }}>Yes</span></>) : (<><span style={{ color: "#d1d5db" }}><IconX /></span><span style={{ color: "#9ca3af" }}>No</span></>)}
                             </span>
                           </td>
-                          <td style={{ padding: "13px 16px", color: "#9ca3af", fontSize: 11 }}>{o.createdAt ? new Date(o.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
-                          <td style={{ padding: "13px 16px" }}>
+                          <td data-label="Date" style={{ padding: "13px 16px", color: "#9ca3af", fontSize: 11 }}>{o.createdAt ? new Date(o.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+                          <td data-label="Details" style={{ padding: "13px 16px" }}>
                             <button type="button" onClick={() => setViewOrder(o)} style={{ display: "flex", alignItems: "center", gap: 5, background: "#f3f4f6", border: "1px solid #e5e7eb", color: "#6b7280", borderRadius: 8, padding: "5px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "background 0.15s" }}>
                               <IconEye /><span>View</span>
                             </button>

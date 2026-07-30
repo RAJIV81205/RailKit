@@ -1581,15 +1581,27 @@ export default function AdminPanel() {
           break;
       }
 
+      const resultRecord =
+        typeof result === "object" && result !== null
+          ? (result as { success?: unknown; error?: unknown; message?: unknown; statusCode?: unknown })
+          : null;
       const codeGuess =
-        typeof result === "object" &&
-        result !== null &&
-        "statusCode" in result &&
-        typeof (result as { statusCode?: unknown }).statusCode === "number"
-          ? ((result as { statusCode: number }).statusCode ?? 200)
-          : 200;
+        typeof resultRecord?.statusCode === "number"
+          ? resultRecord.statusCode
+          : resultRecord?.success === false
+            ? 400
+            : 200;
       setPlaygroundStatus(codeGuess);
       setPlaygroundResponse(JSON.stringify(result, null, 2) || "{}");
+      if (resultRecord?.success === false) {
+        const resultError =
+          typeof resultRecord.error === "string"
+            ? resultRecord.error
+            : typeof resultRecord.message === "string"
+              ? resultRecord.message
+              : "Request failed";
+        setPlaygroundError(resultError);
+      }
     } catch (error: unknown) {
       const err = error as { message?: string; status?: number; response?: { status?: number } };
       setPlaygroundError(err?.message || "Something went wrong");

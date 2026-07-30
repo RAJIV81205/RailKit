@@ -611,10 +611,27 @@ export default function DashboardPage() {
           if (!/^\d{2}-\d{2}-\d{4}$/.test(fareDateInput)) throw new Error("Date must be in DD-MM-YYYY format");
           result = await fareLookup(fareTrainInput, fareFromInput.trim().toUpperCase(), fareToInput.trim().toUpperCase(), fareDateInput, fareClassInput, fareQuotaInput); break;
       }
-      const codeGuess = typeof result === "object" && result !== null && "statusCode" in result && typeof (result as { statusCode?: unknown }).statusCode === "number"
-        ? ((result as { statusCode: number }).statusCode ?? 200) : 200;
+      const resultRecord =
+        typeof result === "object" && result !== null
+          ? (result as { success?: unknown; error?: unknown; message?: unknown; statusCode?: unknown })
+          : null;
+      const codeGuess =
+        typeof resultRecord?.statusCode === "number"
+          ? resultRecord.statusCode
+          : resultRecord?.success === false
+            ? 400
+            : 200;
       setPlaygroundStatusCode(codeGuess);
       setPlaygroundResultText(JSON.stringify(result, null, 2) || "{}");
+      if (resultRecord?.success === false) {
+        const resultError =
+          typeof resultRecord.error === "string"
+            ? resultRecord.error
+            : typeof resultRecord.message === "string"
+              ? resultRecord.message
+              : "Request failed";
+        setPlaygroundError(resultError);
+      }
     } catch (error: unknown) {
       const err = error as { message?: string; status?: number; response?: { status?: number } };
       setPlaygroundError(err?.message || "Something went wrong");

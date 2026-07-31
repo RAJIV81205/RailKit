@@ -387,7 +387,6 @@ export default function DashboardPage() {
   const [apiCodeLanguage, setApiCodeLanguage] = useState<ApiCodeLanguage>("javascript");
   const [viewOrder, setViewOrder] = useState<Order | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [showPricingNotice, setShowPricingNotice] = useState(false);
   const [playgroundAction, setPlaygroundAction] = useState<"pnr" | "train" | "track" | "history" | "station" | "search" | "seat" | "fare">("pnr");
   const [playgroundLoading, setPlaygroundLoading] = useState(false);
   const [playgroundStatusCode, setPlaygroundStatusCode] = useState<number | null>(null);
@@ -425,22 +424,11 @@ export default function DashboardPage() {
     useSWR<UserOrdersResponse>("/api/user/orders", fetcher, { revalidateOnFocus: true });
 
   const dbUser = userData?.user ?? null;
-  const dbUserId = dbUser?.id;
   const auditDailyUsage = userData?.logs?.dailyUsage ?? [];
   const recentLogs = userData?.logs?.recent ?? [];
   const orders = ordersData?.orders ?? [];
   const loading = userLoading || ordersLoading;
   const refreshing = userValidating || ordersValidating;
-
-  useEffect(() => {
-    if (!dbUserId) {
-      setShowPricingNotice(false);
-      return;
-    }
-
-    const priceChangeAt = new Date("2026-08-01T00:00:00+05:30").getTime();
-    setShowPricingNotice(Date.now() < priceChangeAt);
-  }, [dbUserId]);
 
   const selectedTopup = TOPUP_OPTIONS[topupSelection] || TOPUP_OPTIONS[0];
   const billing = useBillingTimer(dbUser);
@@ -933,111 +921,9 @@ export default function DashboardPage() {
         }
         .db-mobile-toggle { display: none; }
 
-        .db-price-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 60;
-          display: grid;
-          place-items: center;
-          padding: 20px;
-          background: rgba(17, 24, 39, 0.42);
-          backdrop-filter: blur(6px);
-          -webkit-backdrop-filter: blur(6px);
-          animation: noticeBackdrop 0.2s ease both;
-        }
-        .db-price-popup {
-          position: relative;
-          width: min(560px, calc(100vw - 32px));
-          display: grid;
-          grid-template-columns: 76px minmax(0, 1fr) 30px;
-          gap: 20px;
-          align-items: start;
-          padding: 26px;
-          color: #111827;
-          background: #fff;
-          border: 1px solid #e5e7eb;
-          border-radius: 20px;
-          box-shadow: 0 24px 70px rgba(17, 24, 39, 0.2);
-          animation: noticeArrive 0.32s cubic-bezier(.2,.8,.2,1) both;
-        }
-        .db-price-date {
-          display: flex;
-          min-height: 84px;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          color: #fff;
-          background: #111827;
-          border-radius: 14px;
-        }
-        .db-price-date strong {
-          font-size: 31px;
-          line-height: 0.9;
-          letter-spacing: -0.04em;
-        }
-        .db-price-date span {
-          margin-top: 7px;
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.12em;
-        }
-        .db-price-copy { min-width: 0; }
-        .db-price-kicker {
-          margin: 1px 0 5px;
-          color: #16a34a;
-          font-size: 10px;
-          font-weight: 800;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-        }
-        .db-price-title {
-          color: #111827;
-          font-size: 21px;
-          font-weight: 750;
-          line-height: 1.2;
-          letter-spacing: -0.02em;
-        }
-        .db-price-text {
-          margin-top: 9px;
-          color: #6b7280;
-          font-size: 13px;
-          line-height: 1.6;
-        }
-        .db-price-actions {
-          display: flex;
-          align-items: center;
-          margin-top: 14px;
-        }
-        .db-price-link {
-          padding: 8px 12px;
-          border: 0;
-          border-radius: 8px;
-          background: #111827;
-          color: #fff;
-          font-size: 12px;
-          font-weight: 650;
-          cursor: pointer;
-        }
-        .db-price-close {
-          display: inline-flex;
-          width: 30px;
-          height: 30px;
-          align-items: center;
-          justify-content: center;
-          border: 1px solid #e5e7eb;
-          border-radius: 50%;
-          background: #fff;
-          color: #9ca3af;
-          cursor: pointer;
-          transition: background 0.15s ease, color 0.15s ease;
-        }
-        .db-price-close:hover { background: #f3f4f6; color: #111827; }
-
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes noticeArrive { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        @keyframes noticeBackdrop { from { opacity: 0; } to { opacity: 1; } }
 
         .db-stat { animation: fadeUp 0.35s ease both; }
         .db-stat:nth-child(1) { animation-delay: 0.03s; }
@@ -1182,66 +1068,12 @@ export default function DashboardPage() {
           .db-chart-wrap { height: 210px !important; }
           .db-table-heading { padding: 12px 14px !important; }
           .db-response-panel { min-height: 280px !important; border-radius: 13px; }
-          .db-price-popup {
-            width: 100%;
-            grid-template-columns: 58px minmax(0, 1fr);
-            gap: 13px;
-            padding: 18px 44px 18px 16px;
-            border-radius: 16px;
-          }
-          .db-price-date { min-height: 66px; border-radius: 11px; }
-          .db-price-date strong { font-size: 25px; }
-          .db-price-title { font-size: 18px; }
-          .db-price-close {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-          }
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .db-price-overlay,
-          .db-price-popup {
-            animation: none;
-          }
         }
       `}</style>
 
       {viewOrder && <OrderModal order={viewOrder} onClose={() => setViewOrder(null)} />}
 
       <div className="db-root">
-        {showPricingNotice && (
-          <div className="db-price-overlay" role="presentation">
-            <aside className="db-price-popup" role="dialog" aria-modal="true" aria-labelledby="pricing-notice-title">
-              <div className="db-price-date" aria-hidden="true">
-                <strong>01</strong>
-                <span>AUG</span>
-              </div>
-              <div className="db-price-copy">
-                <p className="db-price-kicker">Pricing update</p>
-                <h2 className="db-price-title" id="pricing-notice-title">Thank you for building with RailKit.</h2>
-                <p className="db-price-text">
-                  Your support and growing usage are helping RailKit reach more developers. To keep service reliable as demand grows, we are expanding and updating our infrastructure.
-                </p>
-                <p className="db-price-text">
-                  From 1 August, paid plans increase by ₹10 and request-pack prices will also change. Current prices remain available until 31 July, 11:59 PM IST.
-                </p>
-                <div className="db-price-actions">
-                  <button type="button" className="db-price-link" onClick={() => router.push("/pricing")}>
-                    View current pricing
-                  </button>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="db-price-close"
-                onClick={() => setShowPricingNotice(false)}
-                aria-label="Dismiss pricing update"
-              >
-                <IconX />
-              </button>
-            </aside>
-          </div>
-        )}
         <div className="db-layout">
 
           {/* ── Left Sidebar ─────────────────────────────────────────────── */}

@@ -72,8 +72,8 @@ export const PLAN_CONFIG: PlanConfigShape = {
     {
       id: "pro",
       name: "Pro Tier",
-      originalPrice: 79,
-      price: 49,
+      originalPrice: 89,
+      price: 59,
       period: "/month",
       description:
         "For active developers building projects and scaling applications.",
@@ -94,7 +94,7 @@ export const PLAN_CONFIG: PlanConfigShape = {
       id: "advance",
       name: "Advance Plan",
       originalPrice: 99,
-      price: 79,
+      price: 89,
       period: "/month",
       description:
         "For heavy users needing massive request limits and reliability.",
@@ -163,10 +163,10 @@ export const PRICING_PLANS: PricingPlan[] = PLAN_CONFIG.plans.map((plan) => ({
 }));
 
 export const TOPUP_OPTIONS = [
-  { requests: 20000, price: 149, perReq: 0.007 },
-  { requests: 30000, price: 209, perReq: 0.007 },
-  { requests: 50000, price: 349, perReq: 0.007 },
-  { requests: 100000, price: 699, perReq: 0.007 },
+  { requests: 20000, price: 159, perReq: 0.008 },
+  { requests: 30000, price: 229, perReq: 0.008 },
+  { requests: 50000, price: 399, perReq: 0.008 },
+  { requests: 100000, price: 799, perReq: 0.008 },
 ] as const;
 
 

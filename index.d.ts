@@ -114,3 +114,11 @@ export function fareLookup(
   travelClass: string,
   quota: string
 ): Promise<any>;
+
+/**
+ * Get all fully and partially cancelled trains.
+ *
+ * @example
+ * const result = await cancelList();
+ */
+export function cancelList(): Promise<any>;

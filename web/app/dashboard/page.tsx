@@ -17,6 +17,7 @@ import {
   YAxis,
 } from "recharts";
 import {
+  cancelList,
   checkPNRStatus,
   configure,
   fareLookup,
@@ -387,7 +388,7 @@ export default function DashboardPage() {
   const [apiCodeLanguage, setApiCodeLanguage] = useState<ApiCodeLanguage>("javascript");
   const [viewOrder, setViewOrder] = useState<Order | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [playgroundAction, setPlaygroundAction] = useState<"pnr" | "train" | "track" | "history" | "station" | "search" | "seat" | "fare">("pnr");
+  const [playgroundAction, setPlaygroundAction] = useState<"pnr" | "train" | "track" | "history" | "station" | "search" | "seat" | "fare" | "cancelled">("pnr");
   const [playgroundLoading, setPlaygroundLoading] = useState(false);
   const [playgroundStatusCode, setPlaygroundStatusCode] = useState<number | null>(null);
   const [playgroundResponseTime, setPlaygroundResponseTime] = useState<number | null>(null);
@@ -598,6 +599,8 @@ export default function DashboardPage() {
           if (!fareFromInput.trim() || !fareToInput.trim()) throw new Error("From and To station codes are required");
           if (!/^\d{2}-\d{2}-\d{4}$/.test(fareDateInput)) throw new Error("Date must be in DD-MM-YYYY format");
           result = await fareLookup(fareTrainInput, fareFromInput.trim().toUpperCase(), fareToInput.trim().toUpperCase(), fareDateInput, fareClassInput, fareQuotaInput); break;
+        case "cancelled":
+          result = await cancelList(); break;
       }
       const resultRecord =
         typeof result === "object" && result !== null
@@ -672,6 +675,7 @@ export default function DashboardPage() {
     { name: "Search Trains Between Stations", method: "GET", path: "/api/searchTrainBetweenStations/:fromStnCode/:toStnCode?date=DD-MM-YYYY", examplePath: "/api/searchTrainBetweenStations/NDLS/BCT?date=28-03-2026", notes: "Date query param is optional." },
     { name: "Get Seat Availability", method: "GET", path: "/api/getAvailability/:trainNo/:fromStnCode/:toStnCode/:date/:coach/:quota", examplePath: "/api/getAvailability/12496/ASN/DDU/27-12-2025/2A/GN", notes: "Date format: DD-MM-YYYY." },
     { name: "Fare Lookup", method: "GET", path: "/api/fareLookup/:trainNo/:date/:fromStation/:toStation/:class/:quota", examplePath: "/api/fareLookup/12313/06-06-2026/ASN/NDLS/3A/GN", notes: "Returns full fare breakdown — base fare, GST, dynamic fare, total. Date format: DD-MM-YYYY." },
+    { name: "Cancelled Trains", method: "GET", path: "/api/cancelled", examplePath: "/api/cancelled", notes: "Returns fully and partially cancelled trains. No parameters are required." },
   ] as const;
 
   const navItems: { id: ActiveTab; label: string; icon: React.ReactNode; badge?: string }[] = [
@@ -1443,7 +1447,7 @@ export default function DashboardPage() {
                   <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.7, marginBottom: 16 }}>Run live requests without leaving your workspace.</p>
                   {/* Action pills */}
                   <div className="db-action-pills" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-                    {[{ id: "pnr", label: "PNR" }, { id: "train", label: "Train" }, { id: "track", label: "Track" }, { id: "history", label: "History" }, { id: "station", label: "Station" }, { id: "search", label: "Search" }, { id: "seat", label: "Seat" }, { id: "fare", label: "Fare" }].map((item) => (
+                    {[{ id: "pnr", label: "PNR" }, { id: "train", label: "Train" }, { id: "track", label: "Track" }, { id: "history", label: "History" }, { id: "station", label: "Station" }, { id: "search", label: "Search" }, { id: "seat", label: "Seat" }, { id: "fare", label: "Fare" }, { id: "cancelled", label: "Cancelled" }].map((item) => (
                       <button type="button" key={item.id} onClick={() => { setPlaygroundAction(item.id as typeof playgroundAction); resetPlaygroundMeta(); }}
                         style={{ background: playgroundAction === item.id ? "#000" : "#f3f4f6", border: `1px solid ${playgroundAction === item.id ? "#000" : "#e5e7eb"}`, color: playgroundAction === item.id ? "#fff" : "#6b7280", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "background 0.15s, color 0.15s" }}>
                         {item.label}
@@ -1499,6 +1503,11 @@ export default function DashboardPage() {
                         {["GN","TQ","PT","LD","DF","FT","LB","YU","DP","HP","PH","SS"].map((q) => <option key={q} value={q}>{q}</option>)}
                       </select>
                     </>)}
+                    {playgroundAction === "cancelled" && (
+                      <div style={{ gridColumn: "1 / -1", padding: "11px 12px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#6b7280", fontSize: 12, lineHeight: 1.6 }}>
+                        No input required. Run the request to fetch all fully and partially cancelled trains.
+                      </div>
+                    )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
                     <button type="button" onClick={runPlayground} disabled={playgroundLoading} style={{ background: playgroundLoading ? "#e5e7eb" : "#000", border: "none", color: playgroundLoading ? "#9ca3af" : "#fff", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 700, cursor: playgroundLoading ? "not-allowed" : "pointer", transition: "background 0.15s" }}>

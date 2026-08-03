@@ -7,6 +7,7 @@ import useSWR from "swr";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import {
+  cancelList,
   checkPNRStatus,
   configure,
   fareLookup,
@@ -1251,7 +1252,7 @@ export default function AdminPanel() {
   const [userSearch, setUserSearch] = useState("");
   const [adminApiKey, setAdminApiKey] = useState<string | null>(null);
   const [playgroundAction, setPlaygroundAction] = useState<
-    "pnr" | "train" | "track" | "history" | "station" | "search" | "availability" | "fare"
+    "pnr" | "train" | "track" | "history" | "station" | "search" | "availability" | "fare" | "cancelled"
   >("pnr");
   const [playgroundInput, setPlaygroundInput] = useState({
     pnr: "",
@@ -1578,6 +1579,9 @@ export default function AdminPanel() {
             playgroundInput.classCode,
             playgroundInput.quota,
           );
+          break;
+        case "cancelled":
+          result = await cancelList();
           break;
       }
 
@@ -3283,6 +3287,7 @@ export default function AdminPanel() {
                     { id: "search", label: "Search" },
                     { id: "availability", label: "Availability" },
                     { id: "fare", label: "Fare" },
+                    { id: "cancelled", label: "Cancelled" },
                   ].map((item) => (
                     <button
                       type="button"
@@ -3753,6 +3758,23 @@ export default function AdminPanel() {
                         ))}
                       </select>
                     </>
+                  )}
+                  {playgroundAction === "cancelled" && (
+                    <div
+                      style={{
+                        gridColumn: "1 / -1",
+                        padding: "11px 12px",
+                        borderRadius: 8,
+                        border: "1px solid #2d3548",
+                        background: "#0a0d13",
+                        color: "#64748b",
+                        fontSize: 12,
+                        lineHeight: 1.6,
+                        fontFamily: "'JetBrains Mono', monospace",
+                      }}
+                    >
+                      No input required. Run the request to fetch all fully and partially cancelled trains.
+                    </div>
                   )}
                 </div>
 

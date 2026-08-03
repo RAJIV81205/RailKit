@@ -182,7 +182,7 @@ export default async function LandingPage() {
     { label: "API Requests", value: "3M+" },
     { label: "Uptime", value: "99.9%" },
     { label: "Live Train Data", value: "✓" },
-    { label: "SDK", value: "v4.0.3" },
+    { label: "SDK", value: "v4.1.0" },
   ];
 
   // Stable @id anchors so schema nodes reference one another (entity consolidation).
@@ -238,7 +238,7 @@ export default async function LandingPage() {
     operatingSystem: "Node.js",
     url: absoluteUrl("/"),
     description: SITE_DESCRIPTION,
-    softwareVersion: "4.0.3",
+    softwareVersion: "4.1.0",
     downloadUrl: "https://www.npmjs.com/package/railkit",
     codeRepository: "https://github.com/RAJIV81205/railkit",
     featureList: [

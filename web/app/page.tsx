@@ -4,6 +4,7 @@ import Image from "next/image";
 import { headers } from "next/headers";
 import {
   ArrowRight,
+  CircleX,
   CheckCircle2,
   Github,
   IndianRupee,
@@ -29,7 +30,7 @@ export const metadata: Metadata = {
   ...buildMetadata({
     title: undefined,
     description:
-      "RailKit is a Node.js SDK and Indian Railways API for PNR status, live train tracking, train search, station boards, and seat availability.",
+      "RailKit is a Node.js SDK and Indian Railways API for PNR status, live train tracking, cancelled trains, train search, station boards, and seat availability.",
     path: "/",
   }),
 };
@@ -161,6 +162,13 @@ const endpoints = [
     description:
       "Persisted historical journey record by train number and date.",
   },
+  {
+    icon: CircleX,
+    title: "Cancelled Trains",
+    method: "cancelList",
+    description:
+      "Fully and partially cancelled trains, including affected route segments.",
+  },
 ];
 
 /* ─────────────────────────────────────────────
@@ -174,7 +182,7 @@ export default async function LandingPage() {
     { label: "API Requests", value: "3M+" },
     { label: "Uptime", value: "99.9%" },
     { label: "Live Train Data", value: "✓" },
-    { label: "SDK", value: "v3.3.0" },
+    { label: "SDK", value: "v4.0.3" },
   ];
 
   // Stable @id anchors so schema nodes reference one another (entity consolidation).
@@ -230,7 +238,7 @@ export default async function LandingPage() {
     operatingSystem: "Node.js",
     url: absoluteUrl("/"),
     description: SITE_DESCRIPTION,
-    softwareVersion: "3.3.0",
+    softwareVersion: "4.0.3",
     downloadUrl: "https://www.npmjs.com/package/railkit",
     codeRepository: "https://github.com/RAJIV81205/railkit",
     featureList: [
@@ -240,6 +248,7 @@ export default async function LandingPage() {
       "Train Search Between Stations",
       "Station Live Board",
       "Train Schedule and Route Info",
+      "Fully and Partially Cancelled Trains",
     ],
     author: {
       "@type": "Person",
@@ -333,7 +342,7 @@ export default async function LandingPage() {
           <div className="lp-section-head">
             <p className="lp-eyebrow">What it includes</p>
             <h2 className="lp-h2">
-              Eight methods.
+              Nine methods.
               <br />
               Every use case.
             </h2>
@@ -372,7 +381,7 @@ export default async function LandingPage() {
               </h2>
               <p className="lp-body">
                 Works in API routes, background jobs, support tools, or mobile
-                app backends. One key, one import, Eight methods.
+                app backends. One key, one import, nine methods.
               </p>
               <ul className="lp-checklist">
                 {[

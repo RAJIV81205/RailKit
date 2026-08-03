@@ -186,7 +186,7 @@ export type LegalDocument = {
 
 export const TERMS_AND_CONDITIONS: LegalDocument = {
   title: "Terms and Conditions",
-  lastUpdated: "2026-06-02",
+  lastUpdated: "2026-08-03",
   sections: [
     {
       heading: "Acceptance of Terms",
@@ -292,6 +292,21 @@ export const TERMS_AND_CONDITIONS: LegalDocument = {
         "Rate limits may be enforced per API key, account, IP address, application, organization, or other identifiers.",
         "RailKit may throttle, restrict, suspend, or terminate access where usage adversely affects service stability or violates fair usage policies.",
         "Unused request quotas do not carry over unless explicitly stated."
+      ]
+    },
+
+    {
+      heading: "Subscription Plans & Request Packs",
+      items: [
+        "Paid subscription plans remain valid for the duration specified at the time of purchase, typically thirty (30) days unless otherwise stated.",
+        "Request Packs are add-ons available only for an active paid subscription and are not standalone products.",
+        "Purchasing a Request Pack increases the API request quota available under the associated active paid subscription.",
+        "A Request Pack purchase does not renew, extend, or otherwise modify the subscription's validity period.",
+        "All unused requests from a Request Pack automatically expire when the associated paid subscription expires.",
+        "When a paid subscription expires, the account reverts to the Free plan and all remaining Request Pack requests are permanently forfeited.",
+        "Purchasing a new subscription does not restore or carry forward Request Pack requests that expired with a previous subscription.",
+        "Users are responsible for ensuring that sufficient subscription validity remains before purchasing a Request Pack.",
+        "Request Pack purchases are non-refundable after successful payment, except where required by applicable law."
       ]
     },
 

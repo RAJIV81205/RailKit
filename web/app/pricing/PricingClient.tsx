@@ -845,7 +845,7 @@ function PricingPageContent({
             </div>
 
             <p className="mt-4 text-xs text-[#9ca3af]">
-              Request packs are available for purchase alongside any subscription plan, and can be bought multiple times as needed. They provide additional request capacity on top of your plan limits, without any expiration.
+              Request packs are add-ons for active paid subscriptions and may be purchased multiple times. Unused pack requests expire with the associated subscription; packs do not extend or renew subscription validity.
             </p>
           </section>
 

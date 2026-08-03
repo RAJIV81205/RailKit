@@ -13,6 +13,7 @@ import {
   Building2,
   CheckCircle,
   ChevronRight,
+  CircleX,
   Gamepad2,
   History,
   IndianRupee,
@@ -188,6 +189,33 @@ if (result.success) {
   console.log(\`Base: ₹\${d.baseFare}  GST: ₹\${d.gst}  Total: ₹\${d.totalFare}\`);
 }`,
   },
+  {
+    id: "cancelled-trains",
+    title: "Cancelled Trains",
+    icon: CircleX,
+    description: "Get the complete list of fully and partially cancelled trains, with route details and the affected segment for partial cancellations.",
+    signature: "cancelList(): Promise<Result>",
+    params: [],
+    example: `const result = await cancelList();
+
+if (result.success) {
+  console.log("Total:", result.summary.total);
+  console.log("Fully cancelled:", result.summary.fullyCancelled);
+  console.log("Partially cancelled:", result.summary.partiallyCancelled);
+
+  result.data.fullyCancelledTrains.forEach((train) => {
+    console.log(train.trainNo + " — " + train.trainName);
+  });
+
+  result.data.partiallyCancelledTrains.forEach((train) => {
+    console.log(
+      train.trainNo + ": " +
+      train.cancelledSegment.from.name + " → " +
+      train.cancelledSegment.to.name
+    );
+  });
+}`,
+  },
 ];
 
 const installSnippet = "npm install railkit";
@@ -201,7 +229,8 @@ const quickStartSnippet = `import {
   liveAtStation,
   searchTrainBetweenStations,
   getAvailability,
-  fareLookup
+  fareLookup,
+  cancelList
 } from "railkit";
 
 configure(process.env.RAILKIT_API_KEY);
@@ -213,7 +242,8 @@ const hist   = await getTrainHistory("12345", "06-12-2025");
 const stn    = await liveAtStation("NDLS");
 const search = await searchTrainBetweenStations("NDLS", "BCT");
 const seats  = await getAvailability("12496","ASN","DDU","27-12-2025","2A","GN");
-const fare   = await fareLookup("12313","ASN","NDLS","06-06-2026","3A","GN");`;
+const fare   = await fareLookup("12313","ASN","NDLS","06-06-2026","3A","GN");
+const cancelled = await cancelList();`;
 
 const docsBaseUrl = "https://railkit.rajivdubey.dev/docs";
 
@@ -228,11 +258,13 @@ export default function DocsPage() {
 
   const aiDocsMarkdown = useMemo(() => {
     const endpointDetails = endpointSections.map((ep) => {
-      const params = ep.params.map((p) => `- \`${p.name}\` (\`${p.type}\`): ${p.desc}`).join("\n");
+      const params = ep.params.length
+        ? ep.params.map((p) => `- \`${p.name}\` (\`${p.type}\`): ${p.desc}`).join("\n")
+        : "- None";
       return `### ${ep.title}\nLink: [${docsBaseUrl}#${ep.id}](${docsBaseUrl}#${ep.id})\nSignature: \`${ep.signature}\`\nParameters:\n${params}\n\nExample:\n\`\`\`javascript\n${ep.example}\n\`\`\``;
     }).join("\n\n");
 
-    const sectionLinks = ["installation","quickstart","pnr-status","train-info","live-tracking","train-history","station-live","train-search","seat-availability","fare-lookup","validation","errors"]
+    const sectionLinks = ["installation","quickstart","pnr-status","train-info","live-tracking","train-history","station-live","train-search","seat-availability","fare-lookup","cancelled-trains","validation","errors"]
       .map((id) => { const s = flatSections.find((i) => i.id === id); return s ? `- [${s.label}](${docsBaseUrl}#${s.id})` : null; })
       .filter(Boolean).join("\n");
 
@@ -488,7 +520,7 @@ export default function DocsPage() {
               </h1>
               <p style={{ fontSize: 15, fontWeight: 300, lineHeight: 1.75, color: "#6F6F6F", maxWidth: 560, marginBottom: 28 }}>
                 Install the Node.js SDK, configure your API key, and call typed methods for PNR status,
-                train info, live tracking, station boards, train search, and seat availability.
+                train info, live tracking, station boards, train search, seat availability, and cancellations.
               </p>
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 32 }}>
@@ -508,7 +540,7 @@ export default function DocsPage() {
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
                 {[
-                  { label: "Endpoints", value: "7" },
+                  { label: "Endpoints", value: "9" },
                   { label: "Runtime", value: "Node 14+" },
                   { label: "Auth", value: "API Key" },
                   { label: "Package", value: "railkit" },
@@ -566,15 +598,17 @@ export default function DocsPage() {
                   <code style={{ display: "block", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#000", background: "#f5f5f5", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 8, padding: "9px 12px", marginBottom: 14, overflowX: "auto" }}>
                     {ep.signature}
                   </code>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginBottom: 14 }}>
-                    {ep.params.map((param) => (
-                      <div key={param.name} className="docs-param">
-                        <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, color: "#000", marginBottom: 3 }}>{param.name}</p>
-                        <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280", marginBottom: 5 }}>{param.type}</p>
-                        <p style={{ fontSize: 12, lineHeight: 1.55, color: "#6F6F6F", fontWeight: 300 }}>{param.desc}</p>
-                      </div>
-                    ))}
-                  </div>
+                  {ep.params.length > 0 && (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginBottom: 14 }}>
+                      {ep.params.map((param) => (
+                        <div key={param.name} className="docs-param">
+                          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, color: "#000", marginBottom: 3 }}>{param.name}</p>
+                          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280", marginBottom: 5 }}>{param.type}</p>
+                          <p style={{ fontSize: 12, lineHeight: 1.55, color: "#6F6F6F", fontWeight: 300 }}>{param.desc}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <DocsCodePanel language="javascript" code={ep.example} />
                 </div>
               </section>

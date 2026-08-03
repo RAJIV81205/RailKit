@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   ...buildMetadata({
     title: "Documentation",
     description:
-      "RailKit API documentation with endpoint references, request and response examples, Node.js SDK integration guides, authentication, and rate-limit details.",
+      "RailKit API documentation with endpoint references for PNR status, live tracking, cancelled trains, seat availability, and Node.js SDK integration.",
     path: "/docs",
     keywords: [
       "irctc api documentation",
@@ -22,6 +22,7 @@ export const metadata: Metadata = {
       "pnr status api example",
       "live train tracking api example",
       "seat availability api example",
+      "cancelled trains api example",
       "irctc api getting started",
     ],
   }),

@@ -8,19 +8,20 @@ import {
   Building2,
   Search,
   CheckCircle,
+  CircleX,
   BarChart3,
   AlertTriangle,
   Gamepad2,
   History,
   type LucideIcon,
   Armchair,
-  IndianRupee
+  IndianRupee,
 } from "lucide-react";
 
 export const packageInfo = {
   name: 'RailKit',
   tagline: 'Node.js SDK for Indian Railways',
-  description: 'Comprehensive Node.js SDK for Indian Railways with real-time PNR status, live train tracking, station updates, and complete route information.',
+  description: 'Comprehensive Node.js SDK for Indian Railways with real-time PNR status, live train tracking, cancellations, station updates, and complete route information.',
   stats: {
     downloads: '251',
     license: 'MIT',
@@ -64,6 +65,7 @@ export const sidebarGroups: SidebarGroup[] = [
       { id: "train-search", label: "Train Search", icon: Search },
       { id: "seat-availability", label: "Seat Availability", icon: Armchair },
       { id: "fare-lookup", label: "Fare Lookup", icon: IndianRupee },
+      { id: "cancelled-trains", label: "Cancelled Trains", icon: CircleX },
     ],
   },
   {
@@ -96,6 +98,7 @@ export const sections: Array<{ id: string; label: string; icon: LucideIcon }> = 
   { id: "train-search", label: "Train Search", icon: Search },
   { id: "seat-availability", label: "Seat Availability", icon: Armchair },
   { id: "fare-lookup", label: "Fare Lookup", icon: IndianRupee },
+  { id: "cancelled-trains", label: "Cancelled Trains", icon: CircleX },
   { id: "playground", label: "Playground", icon: Gamepad2 },
   { id: "validation", label: "Input Validation", icon: CheckCircle },
   { id: "status-codes", label: "Status Codes", icon: BarChart3 },
@@ -127,6 +130,11 @@ export const features = [
     icon: '🔍',
     title: 'Train Search',
     desc: 'Find trains between stations with classes and availability info'
+  },
+  {
+    icon: '⛔',
+    title: 'Cancelled Trains',
+    desc: 'Fully and partially cancelled trains with affected route segments'
   },
   {
     icon: '⚡',

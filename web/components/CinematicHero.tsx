@@ -1,6 +1,3 @@
-"use client";
-
-import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
@@ -13,69 +10,28 @@ interface CinematicHeroProps {
   stats: Stat[];
 }
 
-const VIDEO_URL =
-  "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_083109_283f3553-e28f-428b-a723-d639c617eb2b.mp4";
-
-const FADE_DURATION = 0.5;
-
 export function CinematicHero({ stats }: CinematicHeroProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const rafRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    function tick() {
-      if (!video) return;
-      const { currentTime, duration } = video;
-      if (!duration || isNaN(duration)) {
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-      let opacity = 1;
-      if (currentTime < FADE_DURATION) {
-        opacity = currentTime / FADE_DURATION;
-      } else if (currentTime > duration - FADE_DURATION) {
-        opacity = (duration - currentTime) / FADE_DURATION;
-      }
-      video.style.opacity = String(Math.max(0, Math.min(1, opacity)));
-      rafRef.current = requestAnimationFrame(tick);
-    }
-
-    function handleEnded() {
-      if (!video) return;
-      video.style.opacity = "0";
-      setTimeout(() => {
-        if (!video) return;
-        video.currentTime = 0;
-        video.play().catch(() => {});
-      }, 100);
-    }
-
-    video.addEventListener("ended", handleEnded);
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      video.removeEventListener("ended", handleEnded);
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
-    };
-  }, []);
-
   return (
     <section className="ch-root">
       {/* Background video */}
       <video
-        ref={videoRef}
-        src={VIDEO_URL}
         autoPlay
+        loop
         muted
         playsInline
+        preload="metadata"
+        poster="/hero-poster.jpg"
         className="ch-video"
-      />
+      >
+        <source
+          src="/hero-video.mp4"
+          type="video/mp4"
+          media="(min-width: 769px)"
+        />
+      </video>
 
-      {/* Gradient overlays */}
+      {/* Gradient overlay */}
       <div className="ch-grad-main" aria-hidden />
-      <div className="ch-grad-radial" aria-hidden />
 
       {/* Content */}
       <div className="ch-content">
@@ -155,8 +111,6 @@ export function CinematicHero({ stats }: CinematicHeroProps) {
       </div>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&display=swap');
-
         /* ── Root ── */
         .ch-root {
           position: relative;
@@ -176,7 +130,7 @@ export function CinematicHero({ stats }: CinematicHeroProps) {
           width: 100%;
           height: calc(100% - 300px);
           object-fit: cover;
-          opacity: 0;
+          opacity: 1;
           pointer-events: none;
           z-index: 0;
         }
@@ -196,14 +150,6 @@ export function CinematicHero({ stats }: CinematicHeroProps) {
           z-index: 1;
           pointer-events: none;
         }
-        .ch-grad-radial {
-          position: absolute;
-          inset: 0;
-          background: radial-gradient(ellipse 80% 50% at 50% 30%, rgba(255,255,255,0.5) 0%, transparent 70%);
-          z-index: 2;
-          pointer-events: none;
-        }
-
         /* ── Content wrapper ── */
         .ch-content {
           position: relative;
@@ -217,7 +163,7 @@ export function CinematicHero({ stats }: CinematicHeroProps) {
 
         /* ── Eyebrow ── */
         .ch-eyebrow {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 11px;
           font-weight: 500;
           letter-spacing: 0.12em;
@@ -229,7 +175,7 @@ export function CinematicHero({ stats }: CinematicHeroProps) {
 
         /* ── Headline ── */
         .ch-h1 {
-          font-family: 'Instrument Serif', Georgia, serif;
+          font-family: var(--font-landing-serif), Georgia, serif;
           font-size: clamp(38px, 7vw, 96px);
           font-weight: 400;
           line-height: 0.97;
@@ -246,7 +192,7 @@ export function CinematicHero({ stats }: CinematicHeroProps) {
 
         /* ── Description ── */
         .ch-desc {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: clamp(14px, 1.6vw, 17px);
           font-weight: 300;
           line-height: 1.7;
@@ -273,7 +219,7 @@ export function CinematicHero({ stats }: CinematicHeroProps) {
           background: #000;
           color: #fff;
           border-radius: 100px;
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 14px;
           font-weight: 500;
           text-decoration: none;
@@ -290,7 +236,7 @@ export function CinematicHero({ stats }: CinematicHeroProps) {
           color: #000;
           border: 1px solid rgba(0,0,0,0.1);
           border-radius: 100px;
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 14px;
           font-weight: 500;
           text-decoration: none;
@@ -331,14 +277,14 @@ export function CinematicHero({ stats }: CinematicHeroProps) {
           flex-shrink: 0;
         }
         .ch-stat-val {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 13px;
           font-weight: 600;
           color: #000;
           white-space: nowrap;
         }
         .ch-stat-lbl {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 12px;
           font-weight: 400;
           color: #9ca3af;
@@ -372,7 +318,7 @@ export function CinematicHero({ stats }: CinematicHeroProps) {
         .ch-dot-y { background: #febc2e; }
         .ch-dot-g { background: #28c840; }
         .ch-fname {
-          font-family: 'Inter', monospace;
+          font-family: var(--font-landing-sans), monospace;
           font-size: 12px;
           color: #9ca3af;
           font-weight: 500;
@@ -380,7 +326,7 @@ export function CinematicHero({ stats }: CinematicHeroProps) {
         .ch-pre {
           margin: 0;
           padding: 18px 20px;
-          font-family: 'JetBrains Mono', 'Fira Code', monospace;
+          font-family: var(--font-code), 'Fira Code', monospace;
           font-size: 12px;
           line-height: 1.85;
           color: #1a1a1a;

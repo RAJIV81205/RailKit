@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const SOURCE_WIDTH = 192;
 const SOURCE_HEIGHT = 208;
@@ -33,10 +33,23 @@ function clampPoint(clientX: number, clientY: number) {
 }
 
 export function MoochiFollower() {
+  const [enabled, setEnabled] = useState(false);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const spriteRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    const pointerQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (!pointerQuery.matches || motionQuery.matches) return;
+
+    // Cursor pet is decorative. Keep its 1.7 MB sprite off touch devices and
+    // out of the critical loading window on desktop.
+    const timer = window.setTimeout(() => setEnabled(true), 2000);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
     const shell = shellRef.current;
     const sprite = spriteRef.current;
     const pointerQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
@@ -99,7 +112,9 @@ export function MoochiFollower() {
       if (waitingTimer !== null) window.clearTimeout(waitingTimer);
       if (rafId !== null) window.cancelAnimationFrame(rafId);
     };
-  }, []);
+  }, [enabled]);
+
+  if (!enabled) return null;
 
   return (
     <div

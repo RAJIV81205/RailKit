@@ -88,8 +88,6 @@ async function getEnterpriseShowcaseUsers(): Promise<EnterpriseShowcaseUser[]> {
       headerStore.get("x-forwarded-proto") ||
       (host?.includes("localhost") ? "http" : "https");
     const base = host ? `${proto}://${host}` : absoluteUrl("/");
-    // No `revalidate`: the upstream API now randomizes per request, and we
-    // want the landing page to reflect a fresh ordering on every render.
     const res = await fetch(`${base}/api/public/enterprise-users`, {
       cache: "no-store",
     });
@@ -97,9 +95,12 @@ async function getEnterpriseShowcaseUsers(): Promise<EnterpriseShowcaseUser[]> {
       success?: boolean;
       users?: EnterpriseShowcaseUser[];
     };
-    if (!res.ok || !data?.success || !Array.isArray(data.users))
+    if (!res.ok || !data?.success || !Array.isArray(data.users)) {
       return shuffleUsers(enterpriseUsersFallback);
-    return data.users.length > 0 ? data.users : shuffleUsers(enterpriseUsersFallback);
+    }
+    return data.users.length > 0
+      ? data.users
+      : shuffleUsers(enterpriseUsersFallback);
   } catch {
     return shuffleUsers(enterpriseUsersFallback);
   }
@@ -175,8 +176,10 @@ const endpoints = [
    Page
 ───────────────────────────────────────────── */
 export default async function LandingPage() {
-  const stats = await getStats();
-  const enterpriseUsers = await getEnterpriseShowcaseUsers();
+  const [stats, enterpriseUsers] = await Promise.all([
+    getStats(),
+    getEnterpriseShowcaseUsers(),
+  ]);
 
   const heroStats = [
     { label: "API Requests", value: "3M+" },
@@ -630,10 +633,12 @@ export default async function LandingPage() {
       </footer>
 
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-
         /* ── Layout ── */
         .lp-section { padding: 80px 40px; }
+        .lp-section, .lp-footer {
+          content-visibility: auto;
+          contain-intrinsic-size: auto 700px;
+        }
         .lp-section-tinted {
           background: #fafafa;
           border-top: 1px solid #f3f4f6;
@@ -647,7 +652,7 @@ export default async function LandingPage() {
         /* ── Section heading ── */
         .lp-section-head { margin-bottom: 48px; }
         .lp-eyebrow {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 11px;
           font-weight: 600;
           letter-spacing: 0.1em;
@@ -656,7 +661,7 @@ export default async function LandingPage() {
           margin-bottom: 10px;
         }
         .lp-h2 {
-          font-family: 'Instrument Serif', Georgia, serif;
+          font-family: var(--font-landing-serif), Georgia, serif;
           font-size: clamp(28px, 4vw, 52px);
           font-weight: 400;
           line-height: 1.05;
@@ -665,7 +670,7 @@ export default async function LandingPage() {
           margin: 0 0 14px;
         }
         .lp-body {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 15px;
           font-weight: 300;
           line-height: 1.7;
@@ -706,14 +711,14 @@ export default async function LandingPage() {
         }
         .lp-ep-card:hover .lp-ep-icon { background: #000; color: #fff; }
         .lp-ep-title {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 14px;
           font-weight: 600;
           color: #000;
           margin-bottom: 5px;
         }
         .lp-ep-method {
-          font-family: 'JetBrains Mono', monospace;
+          font-family: var(--font-code), monospace;
           font-size: 11px;
           color: #6b7280;
           background: #f9fafb;
@@ -724,7 +729,7 @@ export default async function LandingPage() {
           margin-bottom: 9px;
         }
         .lp-ep-desc {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 13px;
           line-height: 1.6;
           color: #6F6F6F;
@@ -752,7 +757,7 @@ export default async function LandingPage() {
           display: flex;
           align-items: center;
           gap: 10px;
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 14px;
           color: #374151;
         }
@@ -780,14 +785,14 @@ export default async function LandingPage() {
         .lp-dot-y { background: #febc2e; }
         .lp-dot-g { background: #28c840; }
         .lp-code-fname {
-          font-family: 'JetBrains Mono', monospace;
+          font-family: var(--font-code), monospace;
           font-size: 12px;
           color: #6b7280;
         }
         .lp-pre {
           margin: 0;
           padding: 20px;
-          font-family: 'JetBrains Mono', monospace;
+          font-family: var(--font-code), monospace;
           font-size: 12.5px;
           line-height: 1.85;
           color: #c9d1d9;
@@ -833,13 +838,13 @@ export default async function LandingPage() {
           margin-bottom: 18px;
         }
         .lp-users-title {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 14px;
           font-weight: 600;
           color: #000;
         }
         .lp-users-sub {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 12px;
           color: #9ca3af;
           margin-top: 2px;
@@ -861,7 +866,7 @@ export default async function LandingPage() {
         }
         .lp-user-chip:hover { border-color: #e5e7eb; }
         .lp-user-name {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 12px;
           font-weight: 500;
           color: #000;
@@ -871,7 +876,7 @@ export default async function LandingPage() {
           text-overflow: ellipsis;
         }
         .lp-user-email {
-          font-family: 'JetBrains Mono', monospace;
+          font-family: var(--font-code), monospace;
           font-size: 10px;
           color: #9ca3af;
           white-space: nowrap;
@@ -899,7 +904,7 @@ export default async function LandingPage() {
           pointer-events: none;
         }
         .lp-cta-label {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 11px;
           font-weight: 600;
           letter-spacing: 0.1em;
@@ -908,7 +913,7 @@ export default async function LandingPage() {
           margin-bottom: 10px;
         }
         .lp-cta-title {
-          font-family: 'Instrument Serif', Georgia, serif;
+          font-family: var(--font-landing-serif), Georgia, serif;
           font-size: clamp(20px, 2.5vw, 28px);
           font-weight: 400;
           color: #fff;
@@ -916,7 +921,7 @@ export default async function LandingPage() {
           margin: 0 0 12px;
         }
         .lp-cta-desc {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 13px;
           font-weight: 300;
           line-height: 1.65;
@@ -932,7 +937,7 @@ export default async function LandingPage() {
           background: #fff;
           color: #000;
           border-radius: 10px;
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 14px;
           font-weight: 600;
           text-decoration: none;
@@ -950,7 +955,7 @@ export default async function LandingPage() {
           color: #6b7280;
           border: 1px solid #21262d;
           border-radius: 10px;
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 14px;
           font-weight: 500;
           text-decoration: none;
@@ -978,7 +983,7 @@ export default async function LandingPage() {
           justify-content: space-between;
           gap: 16px;
           padding: 20px 24px;
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 15px;
           font-weight: 500;
           color: #000;
@@ -999,7 +1004,7 @@ export default async function LandingPage() {
         .lp-faq-a {
           margin: 0;
           padding: 0 24px 22px;
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 14px;
           font-weight: 300;
           line-height: 1.7;
@@ -1054,7 +1059,7 @@ export default async function LandingPage() {
           flex-shrink: 0;
         }
         .lp-footer-logo-name {
-          font-family: 'Instrument Serif', Georgia, serif;
+          font-family: var(--font-landing-serif), Georgia, serif;
           font-size: 24px;
           font-weight: 400;
           letter-spacing: -0.02em;
@@ -1062,7 +1067,7 @@ export default async function LandingPage() {
           line-height: 1;
         }
         .lp-footer-kicker {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 11px;
           font-weight: 600;
           letter-spacing: 0.14em;
@@ -1071,7 +1076,7 @@ export default async function LandingPage() {
           margin: 0 0 12px;
         }
         .lp-footer-copy {
-          font-family: 'Instrument Serif', Georgia, serif;
+          font-family: var(--font-landing-serif), Georgia, serif;
           font-size: clamp(22px, 2.5vw, 30px);
           line-height: 1.18;
           color: #000;
@@ -1079,7 +1084,7 @@ export default async function LandingPage() {
           max-width: 520px;
         }
         .lp-footer-meta {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 13px;
           line-height: 1.6;
           color: #6f6256;
@@ -1112,7 +1117,7 @@ export default async function LandingPage() {
           min-width: 0;
         }
         .lp-footer-title {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 11px;
           font-weight: 600;
           letter-spacing: 0.1em;
@@ -1125,7 +1130,7 @@ export default async function LandingPage() {
           align-items: center;
           gap: 8px;
           width: fit-content;
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 14px;
           color: #3d342b;
           text-decoration: none;

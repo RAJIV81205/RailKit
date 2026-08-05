@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans } from "next/font/google";
+import { Inter, Instrument_Serif, JetBrains_Mono, Noto_Sans } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import { SidebarProvider } from "./SidebarProvider";
@@ -24,6 +24,27 @@ const notoSans = Noto_Sans({
   variable: "--font-noto",
   subsets: ["latin"],
   display: "swap",
+});
+
+const landingSans = Inter({
+  variable: "--font-landing-sans",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const landingSerif = Instrument_Serif({
+  variable: "--font-landing-serif",
+  subsets: ["latin"],
+  weight: "400",
+  style: ["normal", "italic"],
+  display: "swap",
+});
+
+const codeFont = JetBrains_Mono({
+  variable: "--font-code",
+  subsets: ["latin"],
+  display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -109,18 +130,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en-IN" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-WCXRHWZD');`,
-          }}
-        />
-      </head>
-      <body className={`${notoSans.variable} antialiased`}>
+      <body className={`${notoSans.variable} ${landingSans.variable} ${landingSerif.variable} ${codeFont.variable} antialiased`}>
         <noscript>
           <iframe
             src="https://www.googletagmanager.com/ns.html?id=GTM-WCXRHWZD"
@@ -134,11 +144,18 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           {children}
         </SidebarProvider>
         <Analytics />
+        <Script id="google-tag-manager" strategy="lazyOnload">
+          {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-WCXRHWZD');`}
+        </Script>
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-1SFQ77RRP2"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
-        <Script id="google-analytics" strategy="afterInteractive">
+        <Script id="google-analytics" strategy="lazyOnload">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}

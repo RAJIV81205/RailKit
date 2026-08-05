@@ -70,8 +70,6 @@ export function Header() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&display=swap');
-
         .hdr {
           position: fixed;
           top: 0; left: 0; right: 0;
@@ -112,7 +110,7 @@ export function Header() {
           flex-shrink: 0;
         }
         .hdr-logo-name {
-          font-family: 'Instrument Serif', Georgia, serif;
+          font-family: var(--font-landing-serif), Georgia, serif;
           font-size: 17px;
           font-weight: 400;
           color: #000;
@@ -121,7 +119,7 @@ export function Header() {
           white-space: nowrap;
         }
         .hdr-logo-name sup {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 9px;
           font-weight: 400;
           color: #aaa;
@@ -137,7 +135,7 @@ export function Header() {
         }
         @media (max-width: 768px) { .hdr-nav { display: none; } }
         .hdr-nav-link {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 13.5px;
           font-weight: 400;
           color: #6F6F6F;
@@ -161,7 +159,7 @@ export function Header() {
           flex-shrink: 0;
         }
         .hdr-btn-primary {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 13px;
           font-weight: 500;
           color: #fff;
@@ -179,7 +177,7 @@ export function Header() {
         }
         .hdr-btn-primary:hover { background: #222; transform: scale(1.02); }
         .hdr-btn-ghost {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 13px;
           font-weight: 400;
           color: #000;
@@ -197,7 +195,7 @@ export function Header() {
         }
         .hdr-btn-ghost:hover { background: #f5f5f5; }
         .hdr-btn-signout {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 13px;
           font-weight: 400;
           color: #9ca3af;
@@ -278,7 +276,7 @@ export function Header() {
           border-bottom: 1px solid rgba(0,0,0,0.06);
         }
         .hdr-drawer-title {
-          font-family: 'Instrument Serif', Georgia, serif;
+          font-family: var(--font-landing-serif), Georgia, serif;
           font-size: 16px;
           color: #000;
         }
@@ -300,7 +298,7 @@ export function Header() {
           flex: 1;
         }
         .hdr-drawer-link {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 14px;
           color: #374151;
           text-decoration: none;
@@ -331,7 +329,7 @@ export function Header() {
           border-top: 1px solid rgba(0,0,0,0.06);
         }
         .hdr-drawer-cta {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 14px;
           font-weight: 500;
           color: #fff;
@@ -346,7 +344,7 @@ export function Header() {
         }
         .hdr-drawer-cta:hover { background: #222; }
         .hdr-drawer-secondary {
-          font-family: 'Inter', system-ui, sans-serif;
+          font-family: var(--font-landing-sans), system-ui, sans-serif;
           font-size: 13px;
           color: #9ca3af;
           background: transparent;

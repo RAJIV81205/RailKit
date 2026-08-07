@@ -7,12 +7,12 @@ import {
   type ReactNode,
 } from "react";
 
-interface SidebarContextType {
+interface SidebarContextValue {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
 }
 
-const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
+const SidebarContext = createContext<SidebarContextValue | undefined>(undefined);
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);

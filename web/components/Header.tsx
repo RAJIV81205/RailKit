@@ -5,7 +5,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChevronRight, LogOut, Menu, X } from "lucide-react";
-import { useSidebar } from "../app/SidebarProvider";
+import { useSidebar } from "./SidebarProvider";
 
 type VerifiedUser = {
   id: string;

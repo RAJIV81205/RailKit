@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Instrument_Serif, JetBrains_Mono, Noto_Sans } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
-import { SidebarProvider } from "./SidebarProvider";
+import { SidebarProvider } from "../components/SidebarProvider";
 import { Header } from "../components/Header";
 import { Analytics } from "@vercel/analytics/next"
 import {

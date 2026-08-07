@@ -30,6 +30,7 @@ import {
 } from "railkit";
 import { auth } from "../../lib/firebase";
 import { TOPUP_OPTIONS } from "../../lib/constants";
+import { apiEndpointDocs } from "../../components/docs/apiEndpointDocs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type DbUser = {
@@ -665,18 +666,6 @@ export default function DashboardPage() {
   };
 
   const usageExampleCode = `import {\n  configure,\n  checkPNRStatus,\n  getTrainInfo,\n  trackTrain,\n  getTrainHistory,\n} from "railkit";\n\n// Step 1: configure once with your API key\nconfigure(process.env.RAILKIT_API_KEY);\n\n// Check PNR status\nconst pnrResult = await checkPNRStatus("1234567890");\n\n// Get train information\nconst trainResult = await getTrainInfo("12345");\n\n// Track Live Train\nconst liveTrainResult = await trackTrain("12345", "28-03-2026");\n\n// Get Train History (for completed journeys)\nconst historyResult = await getTrainHistory("12345", "28-03-2026");`;
-
-  const endpointDocs = [
-    { name: "Check PNR Status", method: "GET", path: "/api/checkPNRStatus/:pnr", examplePath: "/api/checkPNRStatus/1234567890", notes: "PNR must be 10 digits." },
-    { name: "Get Train Info", method: "GET", path: "/api/getTrainInfo/:trainNumber", examplePath: "/api/getTrainInfo/12345", notes: "Train number must be 5 digits." },
-    { name: "Track Train", method: "GET", path: "/api/trackTrain/:trainNumber/:date", examplePath: "/api/trackTrain/12345/28-03-2026", notes: "Date format: DD-MM-YYYY. You can also pass `today` as date." },
-    { name: "Live At Station", method: "GET", path: "/api/liveAtStation/:stnCode?hrs=2|4|8", examplePath: "/api/liveAtStation/NDLS?hrs=4", notes: "Use station code in uppercase. Optional ?hrs= query param accepts 2, 4, or 8 (default 2)." },
-    { name: "Get Train History", method: "GET", path: "/api/trainHistory/:trainNo/:journeyDate", examplePath: "/api/trainHistory/12345/15-04-2025", notes: "Date format: DD-MM-YYYY. Returns 404 if the train has not yet completed the journey for that date." },
-    { name: "Search Trains Between Stations", method: "GET", path: "/api/searchTrainBetweenStations/:fromStnCode/:toStnCode?date=DD-MM-YYYY", examplePath: "/api/searchTrainBetweenStations/NDLS/BCT?date=28-03-2026", notes: "Date query param is optional." },
-    { name: "Get Seat Availability", method: "GET", path: "/api/getAvailability/:trainNo/:fromStnCode/:toStnCode/:date/:coach/:quota", examplePath: "/api/getAvailability/12496/ASN/DDU/27-12-2025/2A/GN", notes: "Date format: DD-MM-YYYY." },
-    { name: "Fare Lookup", method: "GET", path: "/api/fareLookup/:trainNo/:date/:fromStation/:toStation/:class/:quota", examplePath: "/api/fareLookup/12313/06-06-2026/ASN/NDLS/3A/GN", notes: "Returns full fare breakdown — base fare, GST, dynamic fare, total. Date format: DD-MM-YYYY." },
-    { name: "Cancelled Trains", method: "GET", path: "/api/cancelled", examplePath: "/api/cancelled", notes: "Returns fully and partially cancelled trains. No parameters are required." },
-  ] as const;
 
   const navItems: { id: ActiveTab; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: "overview",     label: "Overview",       icon: <IconOverview /> },
@@ -1417,7 +1406,7 @@ export default function DashboardPage() {
                     </SyntaxHighlighter>
                   </div>
                 </div>
-                {endpointDocs.map((endpoint) => (
+                {apiEndpointDocs.map((endpoint) => (
                   <div key={endpoint.path} className="db-card">
                     <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
                       <span style={{ color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>{endpoint.method}</span>

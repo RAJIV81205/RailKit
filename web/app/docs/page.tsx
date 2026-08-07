@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import DocsPage from "../DocsPage";
+import DocsPage from "../../components/docs/DocsPage";
 import { buildMetadata, absoluteUrl } from "../../lib/seo";
 
 export const metadata: Metadata = {

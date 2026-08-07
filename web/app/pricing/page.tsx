@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getPublicPlanConfig } from "../../lib/constants";
 import { buildMetadata, absoluteUrl } from "../../lib/seo";
-import PricingClient from "./PricingClient";
+import PricingClient from "../../components/pricing/PricingClient";
 
 export const dynamic = "force-dynamic";
 

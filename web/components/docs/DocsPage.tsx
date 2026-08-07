@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { packageInfo, responseFormats, sidebarGroups } from "./docsData";
-import { useSidebar } from "./SidebarProvider";
+import { apiEndpointDocs, type ApiEndpointDoc } from "./apiEndpointDocs";
+import { useSidebar } from "../SidebarProvider";
 import {
   AlertTriangle,
   Armchair,
@@ -35,6 +36,43 @@ type EndpointSection = {
   params: Array<{ name: string; type: string; desc: string }>;
   example: string;
 };
+
+type IntegrationView = "sdk" | "rest";
+type ApiCodeLanguage = "javascript" | "python" | "curl";
+
+const apiEndpointById = new Map(apiEndpointDocs.map((endpoint) => [endpoint.id, endpoint]));
+const apiEndpointIds = new Set(apiEndpointDocs.map((endpoint) => endpoint.id));
+
+const apiLanguageMeta: Record<ApiCodeLanguage, { label: string; syntax: string }> = {
+  javascript: { label: "JavaScript", syntax: "javascript" },
+  python: { label: "Python", syntax: "python" },
+  curl: { label: "cURL", syntax: "bash" },
+};
+
+function buildRestSnippet(baseUrl: string, examplePath: string, language: ApiCodeLanguage) {
+  const url = `${baseUrl}${examplePath}`;
+  if (language === "python") return `import requests
+
+response = requests.get(
+    "${url}",
+    headers={"x-api-key": "YOUR_API_KEY", "accept": "application/json"},
+)
+
+print(response.json())`;
+  if (language === "curl") return `curl -X GET "${url}" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -H "accept: application/json"`;
+  return `const response = await fetch("${url}", {
+  method: "GET",
+  headers: {
+    "x-api-key": process.env.RAILKIT_API_KEY,
+    "accept": "application/json",
+  },
+});
+
+const data = await response.json();
+console.log(data);`;
+}
 
 const endpointSections: EndpointSection[] = [
   {
@@ -253,23 +291,31 @@ export default function DocsPage() {
   const [copiedInstall, setCopiedInstall] = useState(false);
   const [copiedAIMarkdown, setCopiedAIMarkdown] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [setupView, setSetupView] = useState<IntegrationView>("sdk");
+  const [quickStartLanguage, setQuickStartLanguage] = useState<ApiCodeLanguage>("javascript");
+
+  const directApiBaseUrl = process.env.NEXT_PUBLIC_DIRECT_API_BASE_URL || "https://railkit-api.rajivdubey.dev";
 
   const flatSections = useMemo(() => sidebarGroups.flatMap((g) => g.items), []);
 
   const aiDocsMarkdown = useMemo(() => {
     const endpointDetails = endpointSections.map((ep) => {
+      const rest = apiEndpointById.get(ep.id);
       const params = ep.params.length
         ? ep.params.map((p) => `- \`${p.name}\` (\`${p.type}\`): ${p.desc}`).join("\n")
         : "- None";
-      return `### ${ep.title}\nLink: [${docsBaseUrl}#${ep.id}](${docsBaseUrl}#${ep.id})\nSignature: \`${ep.signature}\`\nParameters:\n${params}\n\nExample:\n\`\`\`javascript\n${ep.example}\n\`\`\``;
+      const restContract = rest
+        ? `\nREST: \`${rest.method} ${rest.path}\`\nRequired header: \`x-api-key: YOUR_API_KEY\``
+        : "";
+      return `### ${ep.title}\nLink: [${docsBaseUrl}#${ep.id}](${docsBaseUrl}#${ep.id})\nSDK: \`${ep.signature}\`${restContract}\nParameters:\n${params}\n\nSDK example:\n\`\`\`javascript\n${ep.example}\n\`\`\``;
     }).join("\n\n");
 
     const sectionLinks = ["installation","quickstart","pnr-status","train-info","live-tracking","train-history","station-live","train-search","seat-availability","fare-lookup","cancelled-trains","validation","errors"]
       .map((id) => { const s = flatSections.find((i) => i.id === id); return s ? `- [${s.label}](${docsBaseUrl}#${s.id})` : null; })
       .filter(Boolean).join("\n");
 
-    return `# RailKit - Implementation Essentials\n\n## Official Links\n- Docs: [${docsBaseUrl}](${docsBaseUrl})\n- NPM: [${packageInfo.links.npm}](${packageInfo.links.npm})\n- GitHub: [${packageInfo.links.github}](${packageInfo.links.github})\n\n## Quick Setup\n\`\`\`bash\n${installSnippet}\n\`\`\`\n\n\`\`\`javascript\n${quickStartSnippet}\n\`\`\`\n\n## Section Links\n${sectionLinks}\n\n## Endpoint Contracts\n${endpointDetails}\n\n## Required Input Rules\n- PNR: exactly 10 digits\n- Train number: exactly 5 digits (string)\n- Date: DD-MM-YYYY\n- Station code: uppercase\n\n## Response Handling\nSuccess: \`{ success: true, data: { ... } }\`\nError: \`{ success: false, message: "..." }\`\n\nAlso handle:\n\`\`\`ts\n${responseFormats.error}\n\`\`\``;
-  }, [flatSections]);
+    return `# RailKit - Implementation Essentials\n\n## Official Links\n- Docs: [${docsBaseUrl}](${docsBaseUrl})\n- NPM: [${packageInfo.links.npm}](${packageInfo.links.npm})\n- GitHub: [${packageInfo.links.github}](${packageInfo.links.github})\n\n## REST API\n- Base URL: \`${directApiBaseUrl}\`\n- Auth header: \`x-api-key: YOUR_API_KEY\`\n- Direct REST access requires the Advance plan.\n\n## SDK Quick Setup\n\`\`\`bash\n${installSnippet}\n\`\`\`\n\n\`\`\`javascript\n${quickStartSnippet}\n\`\`\`\n\n## Section Links\n${sectionLinks}\n\n## Endpoint Contracts\n${endpointDetails}\n\n## Required Input Rules\n- PNR: exactly 10 digits\n- Train number: exactly 5 digits (string)\n- Date: DD-MM-YYYY\n- Station code: uppercase\n\n## Response Handling\nSuccess: \`{ success: true, data: { ... } }\`\nError: \`{ success: false, message: "..." }\`\n\nAlso handle:\n\`\`\`ts\n${responseFormats.error}\n\`\`\``;
+  }, [directApiBaseUrl, flatSections]);
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
@@ -371,6 +417,24 @@ export default function DocsPage() {
           font-weight: 500;
         }
         .docs-sidebar-btn-active:hover { background: #111; color: #fff; }
+        .docs-method-badge {
+          margin-left: auto;
+          border: 1px solid #bbf7d0;
+          border-radius: 5px;
+          background: #f0fdf4;
+          color: #15803d;
+          padding: 1px 5px;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 8px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          line-height: 1.5;
+        }
+        .docs-sidebar-btn-active .docs-method-badge {
+          border-color: rgba(255,255,255,0.28);
+          background: rgba(255,255,255,0.12);
+          color: #bbf7d0;
+        }
 
         /* ── Main content ── */
         .docs-main { min-width: 0; max-width: 100%; overflow-x: hidden; }
@@ -396,6 +460,8 @@ export default function DocsPage() {
 
         /* ── Code block ── */
         .docs-code-wrap pre { background: transparent !important; margin: 0 !important; }
+        @keyframes docs-code-fade { from { opacity: 0.35; } to { opacity: 1; } }
+        .docs-code-swap { animation: docs-code-fade 0.18s ease-out both; }
 
         /* ── Chip buttons ── */
         .docs-chip {
@@ -422,6 +488,44 @@ export default function DocsPage() {
           border-color: #000;
         }
         .docs-chip-primary:hover { background: #1a1a1a; border-color: #1a1a1a; }
+
+        .docs-integration-tabs {
+          display: inline-flex;
+          gap: 3px;
+          padding: 3px;
+          border: 1px solid rgba(0,0,0,0.08);
+          border-radius: 10px;
+          background: #f5f5f5;
+        }
+        .docs-integration-tab {
+          border: 0;
+          border-radius: 7px;
+          background: transparent;
+          color: #6b7280;
+          padding: 7px 12px;
+          font-family: 'Inter', system-ui, sans-serif;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+        }
+        .docs-integration-tab:hover { color: #000; }
+        .docs-integration-tab-active {
+          background: #fff;
+          color: #000;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.09);
+        }
+        .docs-language-tab {
+          border: 0;
+          background: transparent;
+          color: #6b7280;
+          padding: 4px 8px;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 10px;
+          cursor: pointer;
+          transition: color 0.15s ease, background 0.15s ease;
+        }
+        .docs-language-tab-active { color: #fff; }
 
         /* ── Section header ── */
         .docs-section-title {
@@ -460,7 +564,7 @@ export default function DocsPage() {
         .docs-reveal { animation: docs-rise 0.6s ease both; }
 
         @media (prefers-reduced-motion: reduce) {
-          .docs-reveal, .docs-card-lift, .docs-chip { animation: none; transform: none; transition: none; }
+          .docs-reveal, .docs-card-lift, .docs-chip, .docs-code-swap { animation: none; transform: none; transition: none; }
         }
       `}</style>
 
@@ -497,7 +601,8 @@ export default function DocsPage() {
                         className={`docs-sidebar-btn ${isActive ? "docs-sidebar-btn-active" : ""}`}
                       >
                         <Icon size={14} style={{ flexShrink: 0 }} />
-                        {section.label}
+                        <span>{section.label}</span>
+                        {apiEndpointIds.has(section.id) && <span className="docs-method-badge">GET</span>}
                       </button>
                     );
                   })}
@@ -512,16 +617,23 @@ export default function DocsPage() {
             {/* ── Introduction ── */}
             <section id="introduction" className="docs-section docs-reveal">
               <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 12 }}>
-                RailKit SDK
+                RailKit developer platform
               </p>
               <h1 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: "clamp(32px, 4vw, 52px)", fontWeight: 400, lineHeight: 1.05, letterSpacing: "-0.025em", color: "#000", marginBottom: 16, maxWidth: 640 }}>
                 Railway API documentation,{" "}
                 <em style={{ fontStyle: "italic", color: "#6F6F6F" }}>built for production.</em>
               </h1>
               <p style={{ fontSize: 15, fontWeight: 300, lineHeight: 1.75, color: "#6F6F6F", maxWidth: 560, marginBottom: 28 }}>
-                Install the Node.js SDK, configure your API key, and call typed methods for PNR status,
+                Use the typed Node.js SDK or call the REST API directly. Both integrations cover PNR status,
                 train info, live tracking, station boards, train search, seat availability, and cancellations.
               </p>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
+                <IntegrationTabs value={setupView} onChange={setSetupView} />
+                <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                  {setupView === "sdk" ? "Typed package for Node.js" : "Direct HTTP access for Advance plan"}
+                </span>
+              </div>
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 32 }}>
                 <Link href="/dashboard" className="docs-chip docs-chip-primary">
@@ -543,7 +655,7 @@ export default function DocsPage() {
                   { label: "Endpoints", value: "9" },
                   { label: "Runtime", value: "Node 14+" },
                   { label: "Auth", value: "API Key" },
-                  { label: "Package", value: "railkit" },
+                  { label: "Access", value: "SDK + REST" },
                 ].map((stat) => (
                   <div key={stat.label} className="docs-card docs-card-lift" style={{ padding: "14px 16px" }}>
                     <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 6 }}>{stat.label}</p>
@@ -555,64 +667,68 @@ export default function DocsPage() {
 
             {/* ── Installation ── */}
             <section id="installation" className="docs-section">
-              <DocsSectionHeader title="Installation" icon={Package} />
-              <div className="docs-card" style={{ marginBottom: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 16px", borderBottom: "1px solid #21262d", background: "#0d1117" }}>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57", display: "block" }} />
-                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#febc2e", display: "block" }} />
-                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840", display: "block" }} />
+              <DocsSectionHeader title={setupView === "sdk" ? "SDK Installation" : "REST API Access"} icon={Package} />
+              {setupView === "sdk" ? (
+                <>
+                  <div className="docs-card" style={{ marginBottom: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 16px", borderBottom: "1px solid #21262d", background: "#0d1117" }}>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57", display: "block" }} />
+                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#febc2e", display: "block" }} />
+                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840", display: "block" }} />
+                      </div>
+                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280" }}>Terminal</span>
+                      <button type="button" onClick={copyInstall}
+                        style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#9ca3af", background: "transparent", border: "1px solid #374151", borderRadius: 6, padding: "3px 10px", cursor: "pointer" }}>
+                        {copiedInstall ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                    <div style={{ background: "#0d1117", padding: "14px 18px" }}>
+                      <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: "#6ee7b7" }}>{installSnippet}</code>
+                    </div>
                   </div>
-                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280" }}>Terminal</span>
-                  <button type="button" onClick={copyInstall}
-                    style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#9ca3af", background: "transparent", border: "1px solid #374151", borderRadius: 6, padding: "3px 10px", cursor: "pointer" }}>
-                    {copiedInstall ? "Copied" : "Copy"}
-                  </button>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
+                    <DocsInfoPanel title="Requirements" items={["Node.js 14+", "Active internet connection", "Valid API key in environment variables"]} />
+                    <DocsInfoPanel title="Supported Platforms" items={["Node.js apps and scripts", "Express servers", "Next.js App Router projects", "React Native environments"]} />
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
+                  <DocsInfoPanel title="Base URL" items={[directApiBaseUrl]} />
+                  <DocsInfoPanel title="Authentication" items={["Send x-api-key with every request", "Keep API keys on your server", "Direct REST access requires the Advance plan"]} />
                 </div>
-                <div style={{ background: "#0d1117", padding: "14px 18px" }}>
-                  <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: "#6ee7b7" }}>{installSnippet}</code>
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
-                <DocsInfoPanel title="Requirements" items={["Node.js 14+", "Active internet connection", "Valid API key in environment variables"]} />
-                <DocsInfoPanel title="Supported Platforms" items={["Node.js apps and scripts", "Express servers", "Next.js App Router projects", "React Native environments"]} />
-              </div>
+              )}
             </section>
 
             {/* ── Quick Start ── */}
             <section id="quickstart" className="docs-section">
               <DocsSectionHeader title="Quick Start" icon={Rocket} />
               <div style={{ marginBottom: 10, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.07)", background: "#fafafa", fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
-                Call <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, background: "rgba(0,0,0,0.05)", padding: "1px 5px", borderRadius: 4 }}>configure(apiKey)</code> once at app startup before any request method.
+                {setupView === "sdk" ? (
+                  <>Call <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, background: "rgba(0,0,0,0.05)", padding: "1px 5px", borderRadius: 4 }}>configure(apiKey)</code> once at app startup before any request method.</>
+                ) : (
+                  <>Send <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, background: "rgba(0,0,0,0.05)", padding: "1px 5px", borderRadius: 4 }}>x-api-key</code> with every request. Never expose keys in browser code.</>
+                )}
               </div>
-              <DocsCodePanel language="javascript" code={quickStartSnippet} />
+              {setupView === "rest" && <LanguageTabs value={quickStartLanguage} onChange={setQuickStartLanguage} />}
+              <DocsCodePanel
+                key={setupView === "sdk" ? "sdk" : quickStartLanguage}
+                language={setupView === "sdk" ? "javascript" : apiLanguageMeta[quickStartLanguage].syntax}
+                code={setupView === "sdk" ? quickStartSnippet : buildRestSnippet(directApiBaseUrl, apiEndpointDocs[0].examplePath, quickStartLanguage)}
+                bodyMinHeight={setupView === "rest" ? 276 : undefined}
+                swapping
+              />
             </section>
 
             {/* ── Endpoints ── */}
-            {endpointSections.map((ep) => (
-              <section key={ep.id} id={ep.id} className="docs-section">
-                <DocsSectionHeader title={ep.title} icon={ep.icon} />
-                <div className="docs-card" style={{ padding: "20px 20px 20px" }}>
-                  <p style={{ fontSize: 14, fontWeight: 300, lineHeight: 1.7, color: "#6F6F6F", marginBottom: 14 }}>{ep.description}</p>
-                  <code style={{ display: "block", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#000", background: "#f5f5f5", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 8, padding: "9px 12px", marginBottom: 14, overflowX: "auto" }}>
-                    {ep.signature}
-                  </code>
-                  {ep.params.length > 0 && (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginBottom: 14 }}>
-                      {ep.params.map((param) => (
-                        <div key={param.name} className="docs-param">
-                          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, color: "#000", marginBottom: 3 }}>{param.name}</p>
-                          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280", marginBottom: 5 }}>{param.type}</p>
-                          <p style={{ fontSize: 12, lineHeight: 1.55, color: "#6F6F6F", fontWeight: 300 }}>{param.desc}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <DocsCodePanel language="javascript" code={ep.example} />
-                </div>
-              </section>
-            ))}
+            {endpointSections.map((ep) => {
+              return (
+                <section key={ep.id} id={ep.id} className="docs-section">
+                  <DocsSectionHeader title={ep.title} icon={ep.icon} />
+                  <EndpointDocsCard endpoint={ep} baseUrl={directApiBaseUrl} />
+                </section>
+              );
+            })}
 
             {/* ── Playground ── */}
             <section id="playground" className="docs-section">
@@ -705,6 +821,144 @@ export default function DocsPage() {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+function IntegrationTabs({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: IntegrationView;
+  onChange: (value: IntegrationView) => void;
+  compact?: boolean;
+}) {
+  return (
+    <div className="docs-integration-tabs" aria-label="Integration method">
+      {(["sdk", "rest"] as const).map((option) => (
+        <button
+          key={option}
+          type="button"
+          aria-pressed={value === option}
+          className={`docs-integration-tab ${value === option ? "docs-integration-tab-active" : ""}`}
+          style={compact ? { padding: "5px 9px", fontSize: 11 } : undefined}
+          onClick={() => onChange(option)}
+        >
+          {option === "sdk" ? "SDK" : "REST API"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function LanguageTabs({
+  value,
+  onChange,
+}: {
+  value: ApiCodeLanguage;
+  onChange: (value: ApiCodeLanguage) => void;
+}) {
+  return (
+    <div style={{ display: "flex", justifyContent: "flex-end", gap: 2, marginBottom: 8 }} aria-label="Code language">
+      {(Object.keys(apiLanguageMeta) as ApiCodeLanguage[]).map((language) => (
+        <button
+          key={language}
+          type="button"
+          aria-pressed={value === language}
+          className={`docs-language-tab ${value === language ? "docs-language-tab-active" : ""}`}
+          style={value === language ? { background: "#0d1117", borderRadius: 6 } : undefined}
+          onClick={() => onChange(language)}
+        >
+          {apiLanguageMeta[language].label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function EndpointParams({ params }: { params: EndpointSection["params"] }) {
+  if (!params.length) return null;
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginBottom: 14 }}>
+      {params.map((param) => (
+        <div key={param.name} className="docs-param">
+          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, color: "#000", marginBottom: 3 }}>{param.name}</p>
+          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280", marginBottom: 5 }}>{param.type}</p>
+          <p style={{ fontSize: 12, lineHeight: 1.55, color: "#6F6F6F", fontWeight: 300 }}>{param.desc}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EndpointDocsCard({ endpoint, baseUrl }: { endpoint: EndpointSection; baseUrl: string }) {
+  const [view, setView] = useState<IntegrationView>("sdk");
+  const [language, setLanguage] = useState<ApiCodeLanguage>("javascript");
+  const rest = apiEndpointById.get(endpoint.id);
+
+  return (
+    <div className="docs-card" style={{ padding: "20px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
+        <p style={{ fontSize: 14, fontWeight: 300, lineHeight: 1.7, color: "#6F6F6F", maxWidth: 620 }}>{endpoint.description}</p>
+        <IntegrationTabs value={view} onChange={setView} compact />
+      </div>
+
+      {view === "sdk" ? (
+        <div key="sdk" className="docs-code-swap">
+          <code style={{ display: "block", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#000", background: "#f5f5f5", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 8, padding: "9px 12px", marginBottom: 14, overflowX: "auto" }}>
+            {endpoint.signature}
+          </code>
+          <EndpointParams params={endpoint.params} />
+          <DocsCodePanel language="javascript" code={endpoint.example} />
+        </div>
+      ) : rest ? (
+        <div key="rest" className="docs-code-swap">
+          <RestEndpointPanel
+            endpoint={rest}
+            params={endpoint.params}
+            baseUrl={baseUrl}
+            language={language}
+            onLanguageChange={setLanguage}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function RestEndpointPanel({
+  endpoint,
+  params,
+  baseUrl,
+  language,
+  onLanguageChange,
+}: {
+  endpoint: ApiEndpointDoc;
+  params: EndpointSection["params"];
+  baseUrl: string;
+  language: ApiCodeLanguage;
+  onLanguageChange: (value: ApiCodeLanguage) => void;
+}) {
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", marginBottom: 8, overflowX: "auto", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 8, background: "#f5f5f5" }}>
+        <span className="docs-method-badge" style={{ marginLeft: 0, fontSize: 9, padding: "2px 6px" }}>{endpoint.method}</span>
+        <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#000", whiteSpace: "nowrap" }}>{endpoint.path}</code>
+      </div>
+      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280", overflowWrap: "anywhere", marginBottom: 6 }}>
+        {baseUrl}{endpoint.examplePath}
+      </p>
+      <p style={{ fontSize: 12, lineHeight: 1.6, color: "#6F6F6F", marginBottom: 14 }}>{endpoint.notes}</p>
+      <EndpointParams params={params} />
+      <LanguageTabs value={language} onChange={onLanguageChange} />
+      <DocsCodePanel
+        key={language}
+        language={apiLanguageMeta[language].syntax}
+        code={buildRestSnippet(baseUrl, endpoint.examplePath, language)}
+        bodyMinHeight={276}
+        swapping
+      />
+    </>
+  );
+}
+
 function DocsSectionHeader({ title, icon: Icon }: { title: string; icon: LucideIcon }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
@@ -742,16 +996,26 @@ function DocsResponsePanel({ title, code, tone }: { title: string; code: string;
   );
 }
 
-function DocsCodePanel({ language, code }: { language: string; code: string }) {
+function DocsCodePanel({
+  language,
+  code,
+  bodyMinHeight,
+  swapping = false,
+}: {
+  language: string;
+  code: string;
+  bodyMinHeight?: number;
+  swapping?: boolean;
+}) {
   return (
-    <div className="docs-card docs-code-wrap">
+    <div className={`docs-card docs-code-wrap ${swapping ? "docs-code-swap" : ""}`}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", borderBottom: "1px solid #21262d", background: "#0d1117" }}>
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57" }} />
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#febc2e" }} />
         <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840" }} />
         <span style={{ marginLeft: 8, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280" }}>{language}</span>
       </div>
-      <div style={{ background: "#0d1117", overflowX: "auto" }}>
+      <div style={{ background: "#0d1117", overflowX: "auto", minHeight: bodyMinHeight }}>
         <SyntaxHighlighter
           language={language}
           style={nightOwl}

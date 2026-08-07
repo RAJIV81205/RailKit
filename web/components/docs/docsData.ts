@@ -1,3 +1,4 @@
+// Content model shared by the public documentation UI.
 import {
   BookOpen,
   Package,

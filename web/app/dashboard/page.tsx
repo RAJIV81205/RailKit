@@ -94,16 +94,36 @@ class FetchError extends Error {
 type ApiCodeLanguage = "javascript" | "python" | "curl";
 type CashfreeCheckoutMode = "sandbox" | "production";
 type CashfreeCheckoutClient = {
-  checkout: (options: { paymentSessionId: string; redirectTarget: "_modal" }) => Promise<unknown>;
+  checkout: (options: {
+    paymentSessionId: string;
+    redirectTarget: "_modal";
+  }) => Promise<unknown>;
 };
 
 declare global {
   interface Window {
-    Cashfree?: (options: { mode: CashfreeCheckoutMode }) => CashfreeCheckoutClient;
+    Cashfree?: (options: {
+      mode: CashfreeCheckoutMode;
+    }) => CashfreeCheckoutClient;
   }
 }
 
-type ActiveTab = "overview" | "apikey" | "apiendpoints" | "playground" | "logs" | "orders";
+type ActiveTab =
+  | "overview"
+  | "apikey"
+  | "apiendpoints"
+  | "playground"
+  | "logs"
+  | "orders";
+
+const dashboardInputClass =
+  "w-full rounded-[10px] border border-[#e5e7eb] bg-[#fafafa] px-3 py-2.5 font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] text-[13px] text-[#111827] outline-none transition-[border-color,box-shadow,background] duration-150 focus:border-black focus:bg-white focus:shadow-[0_0_0_3px_rgba(0,0,0,0.06)] max-[768px]:min-h-11";
+const dashboardSelectClass =
+  "w-full rounded-[10px] border border-[#e5e7eb] bg-[#fafafa] px-3 py-2.5 font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] text-[13px] text-[#111827] outline-none max-[768px]:min-h-11";
+const dashboardCardClass =
+  "rounded-2xl border border-[#ebebeb] bg-white p-6 max-[768px]:p-5 max-[480px]:rounded-[13px] max-[480px]:p-4";
+const dashboardTableClass =
+  "w-full min-w-[700px] border-collapse text-[13px] max-[640px]:block max-[640px]:min-w-0 max-[640px]:[&_thead]:hidden max-[640px]:[&_tbody]:grid max-[640px]:[&_tbody]:w-full max-[640px]:[&_tbody]:gap-2.5 max-[640px]:[&_tbody]:p-2.5 max-[640px]:[&_tbody_tr]:block max-[640px]:[&_tbody_tr]:w-full max-[640px]:[&_tbody_tr]:overflow-hidden max-[640px]:[&_tbody_tr]:rounded-xl max-[640px]:[&_tbody_tr]:border max-[640px]:[&_tbody_tr]:border-[#ebebeb] max-[640px]:[&_tbody_tr]:bg-white max-[640px]:[&_tbody_td]:flex max-[640px]:[&_tbody_td]:w-full max-[640px]:[&_tbody_td]:min-w-0 max-[640px]:[&_tbody_td]:items-start max-[640px]:[&_tbody_td]:justify-between max-[640px]:[&_tbody_td]:gap-4 max-[640px]:[&_tbody_td]:border-b max-[640px]:[&_tbody_td]:border-[#f3f4f6] max-[640px]:[&_tbody_td]:px-3 max-[640px]:[&_tbody_td]:py-2.5 max-[640px]:[&_tbody_td]:text-right max-[640px]:[&_tbody_td]:whitespace-normal max-[640px]:[&_tbody_td]:[overflow-wrap:anywhere] max-[640px]:[&_tbody_td:last-child]:border-b-0 max-[640px]:[&_tbody_td::before]:block max-[640px]:[&_tbody_td::before]:[content:attr(data-label)] max-[640px]:[&_tbody_td::before]:[flex:0_0_78px] max-[640px]:[&_tbody_td::before]:text-left max-[640px]:[&_tbody_td::before]:text-[10px] max-[640px]:[&_tbody_td::before]:font-bold max-[640px]:[&_tbody_td::before]:tracking-[0.06em] max-[640px]:[&_tbody_td::before]:text-[#9ca3af] max-[640px]:[&_tbody_td::before]:uppercase";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fetcher = async <T,>(url: string): Promise<T> => {
@@ -112,7 +132,7 @@ const fetcher = async <T,>(url: string): Promise<T> => {
   if (!res.ok || !data?.success) {
     throw new FetchError(
       data?.message || `Fetch failed: ${res.status}`,
-      res.status
+      res.status,
     );
   }
   return data as T;
@@ -121,16 +141,23 @@ const fetcher = async <T,>(url: string): Promise<T> => {
 let cashfreeLoadPromise: Promise<void> | null = null;
 
 function loadCashfreeSdk(): Promise<void> {
-  if (typeof window === "undefined") return Promise.reject(new Error("Cashfree checkout is unavailable"));
+  if (typeof window === "undefined")
+    return Promise.reject(new Error("Cashfree checkout is unavailable"));
   if (window.Cashfree) return Promise.resolve();
   if (cashfreeLoadPromise) return cashfreeLoadPromise;
   cashfreeLoadPromise = new Promise<void>((resolve, reject) => {
     const CASHFREE_SDK_URL = "https://sdk.cashfree.com/js/v3/cashfree.js";
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${CASHFREE_SDK_URL}"]`);
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${CASHFREE_SDK_URL}"]`,
+    );
     if (existing) {
       if (window.Cashfree) return resolve();
       existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Failed to load Cashfree SDK")), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("Failed to load Cashfree SDK")),
+        { once: true },
+      );
       return;
     }
     const script = document.createElement("script");
@@ -140,7 +167,9 @@ function loadCashfreeSdk(): Promise<void> {
     script.onerror = () => reject(new Error("Failed to load Cashfree SDK"));
     document.head.appendChild(script);
   });
-  cashfreeLoadPromise.catch(() => { cashfreeLoadPromise = null; });
+  cashfreeLoadPromise.catch(() => {
+    cashfreeLoadPromise = null;
+  });
   return cashfreeLoadPromise;
 }
 
@@ -155,134 +184,308 @@ function Loader({ text = "Loading..." }: { text?: string }) {
   return (
     <div className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
       <div className="relative mb-6">
-        <div style={{ width: 40, height: 40, borderRadius: "50%", border: "2px solid #e5e7eb", borderTop: "2px solid #000", animation: "spin 0.8s linear infinite" }} />
+        <div className="size-10 animate-spin rounded-full border-2 border-[#e5e7eb] border-t-black" />
       </div>
-      <p style={{ color: "#9ca3af", fontFamily: "var(--font-noto), 'Noto Sans', system-ui, sans-serif", fontSize: 13, letterSpacing: "0.04em" }}>{text}</p>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <p className="font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] text-[13px] tracking-[0.04em] text-[#9ca3af]">
+        {text}
+      </p>
     </div>
   );
 }
 
 function PlaygroundResponseSkeleton() {
-  const lineWidths = ["92%", "84%", "88%", "66%", "90%", "72%", "58%"];
+  const lines = [
+    ["w-[92%]", "[animation-delay:0s]"],
+    ["w-[84%]", "[animation-delay:0.08s]"],
+    ["w-[88%]", "[animation-delay:0.16s]"],
+    ["w-[66%]", "[animation-delay:0.24s]"],
+    ["w-[90%]", "[animation-delay:0.32s]"],
+    ["w-[72%]", "[animation-delay:0.4s]"],
+    ["w-[58%]", "[animation-delay:0.48s]"],
+  ];
   return (
-    <div style={{ minHeight: 320, overflow: "hidden", padding: "2px 0" }}>
-      <div style={{ width: 96, height: 10, borderRadius: 999, marginBottom: 14, background: "linear-gradient(90deg, #e5e7eb 25%, #e5e7eb 50%, #e5e7eb 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite" }} />
-      {lineWidths.map((width, index) => (
-        <div key={`${width}-${index}`} style={{ width, height: 10, borderRadius: 999, marginBottom: index === lineWidths.length - 1 ? 0 : 10, background: "linear-gradient(90deg, #f9fafb 25%, #e5e7eb 50%, #f9fafb 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.4s ease-in-out infinite", animationDelay: `${index * 0.08}s` }} />
+    <div className="min-h-80 overflow-hidden py-0.5">
+      <div className="mb-3.5 h-2.5 w-24 animate-dashboard-shimmer rounded-full bg-[linear-gradient(90deg,#e5e7eb_25%,#e5e7eb_50%,#e5e7eb_75%)] bg-[length:200%_100%]" />
+      {lines.map(([widthClass, delayClass], index) => (
+        <div
+          key={`${widthClass}-${index}`}
+          className={`${widthClass} ${delayClass} h-2.5 animate-dashboard-shimmer rounded-full bg-[linear-gradient(90deg,#f9fafb_25%,#e5e7eb_50%,#f9fafb_75%)] bg-[length:200%_100%] ${index === lines.length - 1 ? "mb-0" : "mb-2.5"}`}
+        />
       ))}
     </div>
   );
 }
 
 function ApiKeySkeleton() {
-  return <div style={{ width: "100%", height: 14, borderRadius: 999, background: "linear-gradient(90deg, #e5e7eb 25%, #e5e7eb 50%, #e5e7eb 75%)", backgroundSize: "200% 100%", animation: "shimmer 1.3s ease-in-out infinite" }} />;
+  return (
+    <div className="h-3.5 w-full animate-dashboard-shimmer-fast rounded-full bg-[linear-gradient(90deg,#e5e7eb_25%,#e5e7eb_50%,#e5e7eb_75%)] bg-[length:200%_100%]" />
+  );
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const IconCopy = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="9" y="9" width="13" height="13" rx="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
   </svg>
 );
 const IconCheck = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <polyline points="20 6 9 17 4 12" />
   </svg>
 );
 const IconX = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
 const IconKey = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
   </svg>
 );
 const IconRefresh = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="23 4 23 10 17 10" />
+    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
   </svg>
 );
 const IconEye = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
   </svg>
 );
 const IconEyeOff = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.76 21.76 0 0 1 5.06-6.94" />
     <path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.78 21.78 0 0 1-3.31 4.53" />
-    <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" />
+    <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+    <line x1="1" y1="1" x2="23" y2="23" />
   </svg>
 );
 const IconShield = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
   </svg>
 );
 
 // Sidebar nav icons
 const IconOverview = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
   </svg>
 );
 const IconCode = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="16 18 22 12 16 6" />
+    <polyline points="8 6 2 12 8 18" />
   </svg>
 );
 const IconTerminal = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="4 17 10 11 4 5" />
+    <line x1="12" y1="19" x2="20" y2="19" />
   </svg>
 );
 const IconActivity = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
   </svg>
 );
 const IconReceipt = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="16" y1="13" x2="8" y2="13" />
+    <line x1="16" y1="17" x2="8" y2="17" />
   </svg>
 );
 const IconEndpoints = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+  <svg
+    width="15"
+    height="15"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
   </svg>
 );
 
 // ─── Plan / Status Badges ─────────────────────────────────────────────────────
 const PlanBadge = ({ plan }: { plan: string }) => {
-  const styles: Record<string, { bg: string; text: string; border: string }> = {
-    free:       { bg: "#f9fafb", text: "#6b7280", border: "#e5e7eb" },
-    pro:        { bg: "#f0fdf4", text: "#16a34a", border: "#bbf7d0" },
-    enterprise: { bg: "#faf5ff", text: "#7c3aed", border: "#e9d5ff" },
-    advance:    { bg: "#faf5ff", text: "#7c3aed", border: "#e9d5ff" },
+  const styles: Record<string, string> = {
+    free: "border-[#e5e7eb] bg-[#f9fafb] text-[#6b7280]",
+    pro: "border-[#bbf7d0] bg-[#f0fdf4] text-[#16a34a]",
+    enterprise: "border-[#e9d5ff] bg-[#faf5ff] text-[#7c3aed]",
+    advance: "border-[#e9d5ff] bg-[#faf5ff] text-[#7c3aed]",
   };
   const s = styles[plan?.toLowerCase()] ?? styles.free;
   return (
-    <span style={{ background: s.bg, color: s.text, border: `1px solid ${s.border}`, padding: "2px 8px", borderRadius: 6, fontSize: 11, fontFamily: "var(--font-noto), 'Noto Sans', system-ui, sans-serif", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+    <span
+      className={`${s} rounded-md border px-2 py-0.5 font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] text-[11px] font-bold tracking-[0.04em] uppercase`}
+    >
       {plan}
     </span>
   );
 };
 
 const StatusBadge = ({ status }: { status: string }) => {
-  const styles: Record<string, { bg: string; text: string; border: string; dot: string }> = {
-    paid:      { bg: "#f0fdf4", text: "#16a34a", border: "#bbf7d0", dot: "#22c55e" },
-    created:   { bg: "#f9fafb", text: "#6b7280", border: "#e5e7eb", dot: "#9ca3af" },
-    failed:    { bg: "#fef2f2", text: "#dc2626", border: "#fecaca", dot: "#ef4444" },
-    cancelled: { bg: "#fff7ed", text: "#ea580c", border: "#fed7aa", dot: "#f97316" },
-    expired:   { bg: "#f9fafb", text: "#9ca3af", border: "#e5e7eb", dot: "#d1d5db" },
+  const styles: Record<string, { badge: string; dot: string }> = {
+    paid: {
+      badge: "border-[#bbf7d0] bg-[#f0fdf4] text-[#16a34a]",
+      dot: "bg-[#22c55e]",
+    },
+    created: {
+      badge: "border-[#e5e7eb] bg-[#f9fafb] text-[#6b7280]",
+      dot: "bg-[#9ca3af]",
+    },
+    failed: {
+      badge: "border-[#fecaca] bg-[#fef2f2] text-[#dc2626]",
+      dot: "bg-[#ef4444]",
+    },
+    cancelled: {
+      badge: "border-[#fed7aa] bg-[#fff7ed] text-[#ea580c]",
+      dot: "bg-[#f97316]",
+    },
+    expired: {
+      badge: "border-[#e5e7eb] bg-[#f9fafb] text-[#9ca3af]",
+      dot: "bg-[#d1d5db]",
+    },
   };
   const s = styles[status] ?? styles.created;
   return (
-    <span style={{ background: s.bg, color: s.text, border: `1px solid ${s.border}`, padding: "3px 10px", borderRadius: 6, fontSize: 11, fontFamily: "var(--font-noto), 'Noto Sans', system-ui, sans-serif", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}>
-      <span style={{ width: 5, height: 5, borderRadius: "50%", background: s.dot, flexShrink: 0 }} />
+    <span
+      className={`${s.badge} inline-flex items-center gap-[5px] rounded-md border px-2.5 py-[3px] font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] text-[11px] font-semibold`}
+    >
+      <span className={`${s.dot} size-[5px] shrink-0 rounded-full`} />
       {status.toUpperCase()}
     </span>
   );
@@ -295,41 +498,89 @@ function useBillingTimer(user: DbUser | null) {
 
   useEffect(() => {
     const update = () => {
-      if (!user) { setDisplay("Not started"); setPct(0); return; }
-      if (user.plan === "free") { setDisplay("Free plan"); setPct(100); return; }
+      if (!user) {
+        setDisplay("Not started");
+        setPct(0);
+        return;
+      }
+      if (user.plan === "free") {
+        setDisplay("Free plan");
+        setPct(100);
+        return;
+      }
       const now = Date.now();
-      const expirationAt = user.expirationDate ? new Date(user.expirationDate).getTime() : NaN;
+      const expirationAt = user.expirationDate
+        ? new Date(user.expirationDate).getTime()
+        : NaN;
       if (Number.isFinite(expirationAt) && expirationAt > now) {
         const remaining = expirationAt - now;
         const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-        setDisplay(days > 0 ? `${days}d ${hours}h left` : `${hours}h ${minutes}m left`);
+        const hours = Math.floor(
+          (remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+        );
+        const minutes = Math.floor(
+          (remaining % (1000 * 60 * 60)) / (1000 * 60),
+        );
+        setDisplay(
+          days > 0 ? `${days}d ${hours}h left` : `${hours}h ${minutes}m left`,
+        );
         if (user.billingDate) {
           const start = new Date(user.billingDate).getTime();
-          const total = Number.isFinite(start) && expirationAt > start ? expirationAt - start : remaining;
-          setPct(Math.max(0, Math.min(100, (remaining / Math.max(total, 1)) * 100)));
-        } else { setPct(100); }
+          const total =
+            Number.isFinite(start) && expirationAt > start
+              ? expirationAt - start
+              : remaining;
+          setPct(
+            Math.max(0, Math.min(100, (remaining / Math.max(total, 1)) * 100)),
+          );
+        } else {
+          setPct(100);
+        }
         return;
       }
-      if (!user.billingDate) { setDisplay("Not started"); setPct(0); return; }
+      if (!user.billingDate) {
+        setDisplay("Not started");
+        setPct(0);
+        return;
+      }
       const CYCLE = 30 * 24 * 60 * 60 * 1000;
       const start = new Date(user.billingDate).getTime();
-      if (Number.isNaN(start)) { setDisplay("Invalid date"); setPct(0); return; }
+      if (Number.isNaN(start)) {
+        setDisplay("Invalid date");
+        setPct(0);
+        return;
+      }
       const end = start + CYCLE;
       const remaining = end - now;
-      if (remaining <= 0) { setDisplay("Expired"); setPct(0); return; }
+      if (remaining <= 0) {
+        setDisplay("Expired");
+        setPct(0);
+        return;
+      }
       setPct((remaining / CYCLE) * 100);
       const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      setDisplay(days > 0 ? `${days}d ${hours}h left` : `${hours}h ${Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))}m left`);
+      const hours = Math.floor(
+        (remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+      );
+      setDisplay(
+        days > 0
+          ? `${days}d ${hours}h left`
+          : `${hours}h ${Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))}m left`,
+      );
     };
     update();
     const id = setInterval(update, 60_000);
     return () => clearInterval(id);
   }, [user?.plan, user?.billingDate, user?.expirationDate]);
 
-  const color = display === "Expired" ? "#dc2626" : pct > 50 ? "#16a34a" : pct > 20 ? "#d97706" : "#dc2626";
+  const color =
+    display === "Expired"
+      ? "#dc2626"
+      : pct > 50
+        ? "#16a34a"
+        : pct > 20
+          ? "#d97706"
+          : "#dc2626";
   return { display, pct, color };
 }
 
@@ -337,20 +588,25 @@ function useBillingTimer(user: DbUser | null) {
 function OrderModal({ order, onClose }: { order: Order; onClose: () => void }) {
   return (
     <div
-      className="db-modal-backdrop"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-lg"
       role="presentation"
       onClick={onClose}
       onKeyDown={(e) => e.key === "Escape" && onClose()}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, backdropFilter: "blur(8px)" }}
     >
       <div
-        className="db-modal"
+        className="max-h-[calc(100vh-32px)] w-full max-w-[480px] overflow-y-auto rounded-3xl border border-black/8 bg-white p-8 font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] shadow-[0_20px_56px_rgba(0,0,0,0.12)] max-[640px]:rounded-[18px] max-[640px]:p-[22px]"
         onClick={(e) => e.stopPropagation()}
-        style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 24, padding: 32, width: "100%", maxWidth: 480, fontFamily: "var(--font-noto), 'Noto Sans', system-ui, sans-serif", boxShadow: "0 20px 56px rgba(0,0,0,0.12)" }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-          <span style={{ color: "#000", fontWeight: 700, fontSize: 16, fontFamily: "var(--font-noto), 'Noto Sans', system-ui, sans-serif" }}>Order Details</span>
-          <button type="button" onClick={onClose} aria-label="Close order details" style={{ color: "#9ca3af", background: "none", border: "none", cursor: "pointer", padding: 4 }}>
+        <div className="mb-6 flex items-center justify-between">
+          <span className="font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] text-base font-bold text-black">
+            Order Details
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close order details"
+            className="cursor-pointer border-none bg-transparent p-1 text-[#9ca3af]"
+          >
             <IconX />
           </button>
         </div>
@@ -359,11 +615,23 @@ function OrderModal({ order, onClose }: { order: Order; onClose: () => void }) {
           ["Amount", `₹${order.amount.toFixed(2)} ${order.currency}`],
           ["Status", order.status],
           ["Credited", order.credited ? "Yes" : "No"],
-          ["Date", order.createdAt ? new Date(order.createdAt).toLocaleString("en-IN") : "—"],
+          [
+            "Date",
+            order.createdAt
+              ? new Date(order.createdAt).toLocaleString("en-IN")
+              : "—",
+          ],
         ].map(([k, v]) => (
-          <div key={k} className="db-modal-row" style={{ display: "flex", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid #f3f4f6" }}>
-            <span style={{ color: "#9ca3af", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: "var(--font-noto), 'Noto Sans', system-ui, sans-serif", fontWeight: 600 }}>{k}</span>
-            <span style={{ color: "#374151", fontSize: 13, fontFamily: "var(--font-noto), 'Noto Sans', system-ui, sans-serif" }}>{v}</span>
+          <div
+            key={k}
+            className="flex justify-between border-b border-[#f3f4f6] py-3 max-[640px]:flex-col max-[640px]:gap-[5px]"
+          >
+            <span className="font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] text-[11px] font-semibold tracking-[0.06em] text-[#9ca3af] uppercase">
+              {k}
+            </span>
+            <span className="max-w-full font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] text-[13px] text-[#374151] [overflow-wrap:anywhere]">
+              {v}
+            </span>
           </div>
         ))}
       </div>
@@ -381,18 +649,37 @@ export default function DashboardPage() {
   const [regenerateError, setRegenerateError] = useState<string | null>(null);
   const [keyVisible, setKeyVisible] = useState(false);
   const [limitPurchaseLoading, setLimitPurchaseLoading] = useState(false);
-  const [limitPurchaseMessage, setLimitPurchaseMessage] = useState<string | null>(null);
-  const [verifiedReturnOrderId, setVerifiedReturnOrderId] = useState<string | null>(null);
+  const [limitPurchaseMessage, setLimitPurchaseMessage] = useState<
+    string | null
+  >(null);
+  const [verifiedReturnOrderId, setVerifiedReturnOrderId] = useState<
+    string | null
+  >(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
   const [logsTimelineDays, setLogsTimelineDays] = useState<14 | 30>(14);
   const [topupSelection, setTopupSelection] = useState(1);
-  const [apiCodeLanguage, setApiCodeLanguage] = useState<ApiCodeLanguage>("javascript");
+  const [apiCodeLanguage, setApiCodeLanguage] =
+    useState<ApiCodeLanguage>("javascript");
   const [viewOrder, setViewOrder] = useState<Order | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [playgroundAction, setPlaygroundAction] = useState<"pnr" | "train" | "track" | "history" | "station" | "search" | "seat" | "fare" | "cancelled">("pnr");
+  const [playgroundAction, setPlaygroundAction] = useState<
+    | "pnr"
+    | "train"
+    | "track"
+    | "history"
+    | "station"
+    | "search"
+    | "seat"
+    | "fare"
+    | "cancelled"
+  >("pnr");
   const [playgroundLoading, setPlaygroundLoading] = useState(false);
-  const [playgroundStatusCode, setPlaygroundStatusCode] = useState<number | null>(null);
-  const [playgroundResponseTime, setPlaygroundResponseTime] = useState<number | null>(null);
+  const [playgroundStatusCode, setPlaygroundStatusCode] = useState<
+    number | null
+  >(null);
+  const [playgroundResponseTime, setPlaygroundResponseTime] = useState<
+    number | null
+  >(null);
   const [playgroundResultText, setPlaygroundResultText] = useState("");
   const [playgroundError, setPlaygroundError] = useState<string | null>(null);
   const [pnrInput, setPnrInput] = useState("");
@@ -402,7 +689,9 @@ export default function DashboardPage() {
   const [historyTrainInput, setHistoryTrainInput] = useState("");
   const [historyDateInput, setHistoryDateInput] = useState("");
   const [stationInput, setStationInput] = useState("");
-  const [stationHoursInput, setStationHoursInput] = useState<"2" | "4" | "8">("2");
+  const [stationHoursInput, setStationHoursInput] = useState<"2" | "4" | "8">(
+    "2",
+  );
   const [fromStationInput, setFromStationInput] = useState("");
   const [toStationInput, setToStationInput] = useState("");
   const [searchDateInput, setSearchDateInput] = useState("");
@@ -419,11 +708,26 @@ export default function DashboardPage() {
   const [fareClassInput, setFareClassInput] = useState("SL");
   const [fareQuotaInput, setFareQuotaInput] = useState("GN");
 
-  const { data: userData, error: userError, isLoading: userLoading, isValidating: userValidating, mutate: mutateUser } =
-    useSWR<VerifyUserResponse>(`/api/user/verify?days=${logsTimelineDays}`, fetcher, { revalidateOnFocus: true });
+  const {
+    data: userData,
+    error: userError,
+    isLoading: userLoading,
+    isValidating: userValidating,
+    mutate: mutateUser,
+  } = useSWR<VerifyUserResponse>(
+    `/api/user/verify?days=${logsTimelineDays}`,
+    fetcher,
+    { revalidateOnFocus: true },
+  );
 
-  const { data: ordersData, isLoading: ordersLoading, isValidating: ordersValidating, mutate: mutateOrders } =
-    useSWR<UserOrdersResponse>("/api/user/orders", fetcher, { revalidateOnFocus: true });
+  const {
+    data: ordersData,
+    isLoading: ordersLoading,
+    isValidating: ordersValidating,
+    mutate: mutateOrders,
+  } = useSWR<UserOrdersResponse>("/api/user/orders", fetcher, {
+    revalidateOnFocus: true,
+  });
 
   const dbUser = userData?.user ?? null;
   const auditDailyUsage = userData?.logs?.dailyUsage ?? [];
@@ -435,8 +739,12 @@ export default function DashboardPage() {
   const selectedTopup = TOPUP_OPTIONS[topupSelection] || TOPUP_OPTIONS[0];
   const billing = useBillingTimer(dbUser);
 
-  const activeExpirationTimestamp = dbUser?.expirationDate ? new Date(dbUser.expirationDate).getTime() : NaN;
-  const hasActiveExpirationOverride = Number.isFinite(activeExpirationTimestamp) && activeExpirationTimestamp > Date.now();
+  const activeExpirationTimestamp = dbUser?.expirationDate
+    ? new Date(dbUser.expirationDate).getTime()
+    : NaN;
+  const hasActiveExpirationOverride =
+    Number.isFinite(activeExpirationTimestamp) &&
+    activeExpirationTimestamp > Date.now();
 
   useEffect(() => {
     if (!userError) {
@@ -448,7 +756,8 @@ export default function DashboardPage() {
       return;
     }
 
-    const status = userError instanceof FetchError ? userError.status : undefined;
+    const status =
+      userError instanceof FetchError ? userError.status : undefined;
     const isAuthFailure = status === 401 || status === 403;
 
     if (!isAuthFailure) {
@@ -474,42 +783,91 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const refreshAll = () => { mutateUser(); mutateOrders(); };
+  const refreshAll = () => {
+    mutateUser();
+    mutateOrders();
+  };
 
-  const verifyLimitTopup = useCallback(async (orderId: string) => {
-    setLimitPurchaseLoading(true);
-    setLimitPurchaseMessage("Verifying payment...");
-    try {
-      const response = await fetch("/api/user/increase-limit", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId }) });
-      const data = await response.json();
-      if (!response.ok || !data?.success) throw new Error(data?.message || "Unable to verify payment");
-      if (!data?.paid) { setLimitPurchaseMessage("Payment is still pending. Please retry in a moment."); return data; }
-      setLimitPurchaseMessage(`Limit increased by ${Number(data.extraLimit || 0).toLocaleString("en-IN")} requests.`);
-      await mutateUser();
-      return data;
-    } catch (error: unknown) {
-      setLimitPurchaseMessage(getErrorMessage(error, "Payment verification failed. Please try again."));
-      throw error;
-    } finally { setLimitPurchaseLoading(false); }
-  }, [mutateUser]);
+  const verifyLimitTopup = useCallback(
+    async (orderId: string) => {
+      setLimitPurchaseLoading(true);
+      setLimitPurchaseMessage("Verifying payment...");
+      try {
+        const response = await fetch("/api/user/increase-limit", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data?.success)
+          throw new Error(data?.message || "Unable to verify payment");
+        if (!data?.paid) {
+          setLimitPurchaseMessage(
+            "Payment is still pending. Please retry in a moment.",
+          );
+          return data;
+        }
+        setLimitPurchaseMessage(
+          `Limit increased by ${Number(data.extraLimit || 0).toLocaleString("en-IN")} requests.`,
+        );
+        await mutateUser();
+        return data;
+      } catch (error: unknown) {
+        setLimitPurchaseMessage(
+          getErrorMessage(
+            error,
+            "Payment verification failed. Please try again.",
+          ),
+        );
+        throw error;
+      } finally {
+        setLimitPurchaseLoading(false);
+      }
+    },
+    [mutateUser],
+  );
 
   const startLimitTopupPayment = async () => {
     if (limitPurchaseLoading) return;
     setLimitPurchaseLoading(true);
     setLimitPurchaseMessage(null);
     try {
-      const response = await fetch("/api/user/increase-limit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ extraLimit: selectedTopup.requests }) });
+      const response = await fetch("/api/user/increase-limit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ extraLimit: selectedTopup.requests }),
+      });
       const data = await response.json();
-      const order = data?.order as { orderId?: string; paymentSessionId?: string } | undefined;
-      if (!response.ok || !order?.orderId || !order?.paymentSessionId) throw new Error(data?.message || "Unable to create payment order");
+      const order = data?.order as
+        | { orderId?: string; paymentSessionId?: string }
+        | undefined;
+      if (!response.ok || !order?.orderId || !order?.paymentSessionId)
+        throw new Error(data?.message || "Unable to create payment order");
       await loadCashfreeSdk();
-      if (!window.Cashfree) throw new Error("Cashfree checkout failed to load. Please refresh and try again.");
+      if (!window.Cashfree)
+        throw new Error(
+          "Cashfree checkout failed to load. Please refresh and try again.",
+        );
       setLimitPurchaseMessage("Opening secure payment popup...");
-      const cashfree = window.Cashfree({ mode: data?.cashfreeMode === "sandbox" ? "sandbox" : "production" });
-      try { await cashfree.checkout({ paymentSessionId: order.paymentSessionId, redirectTarget: "_modal" }); } catch { /* modal close */ }
+      const cashfree = window.Cashfree({
+        mode: data?.cashfreeMode === "sandbox" ? "sandbox" : "production",
+      });
+      try {
+        await cashfree.checkout({
+          paymentSessionId: order.paymentSessionId,
+          redirectTarget: "_modal",
+        });
+      } catch {
+        /* modal close */
+      }
       await verifyLimitTopup(order.orderId);
     } catch (error: unknown) {
-      setLimitPurchaseMessage(getErrorMessage(error, "Unable to process limit add-on. Please try again."));
+      setLimitPurchaseMessage(
+        getErrorMessage(
+          error,
+          "Unable to process limit add-on. Please try again.",
+        ),
+      );
       setLimitPurchaseLoading(false);
     }
   };
@@ -518,32 +876,51 @@ export default function DashboardPage() {
     const params = new URLSearchParams(window.location.search);
     const paymentReturn = params.get("payment_return");
     const orderId = params.get("order_id");
-    if (paymentReturn !== "limit" || !orderId || verifiedReturnOrderId === orderId) return;
+    if (
+      paymentReturn !== "limit" ||
+      !orderId ||
+      verifiedReturnOrderId === orderId
+    )
+      return;
     setVerifiedReturnOrderId(orderId);
     verifyLimitTopup(orderId).catch(() => {});
   }, [verifiedReturnOrderId, verifyLimitTopup]);
 
   const onLogout = async () => {
-    try { await signOut(auth); await fetch("/api/user/verify", { method: "DELETE" }); } catch {}
+    try {
+      await signOut(auth);
+      await fetch("/api/user/verify", { method: "DELETE" });
+    } catch {}
     router.replace("/");
   };
 
   const copyApiKey = () => {
-    if (dbUser?.apiKey) { navigator.clipboard.writeText(dbUser.apiKey); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    if (dbUser?.apiKey) {
+      navigator.clipboard.writeText(dbUser.apiKey);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const regenerateApiKey = async () => {
     if (!dbUser?.apiKey || !dbUser?.email || regeneratingKey) return;
-    setRegeneratingKey(true); setRegenerateError(null); setCopied(false);
+    setRegeneratingKey(true);
+    setRegenerateError(null);
+    setCopied(false);
     try {
       const res = await fetch("/api/user/key/regenerate", { method: "GET" });
       const data = await res.json();
-      if (!res.ok || !data?.success) throw new Error(data?.message || "Failed to regenerate key");
+      if (!res.ok || !data?.success)
+        throw new Error(data?.message || "Failed to regenerate key");
       setKeyVisible(true);
       await mutateUser();
     } catch (error) {
-      setRegenerateError(error instanceof Error ? error.message : "Failed to regenerate key");
-    } finally { setRegeneratingKey(false); }
+      setRegenerateError(
+        error instanceof Error ? error.message : "Failed to regenerate key",
+      );
+    } finally {
+      setRegeneratingKey(false);
+    }
   };
 
   const toInputDate = (ddmmyyyy: string) => {
@@ -557,7 +934,12 @@ export default function DashboardPage() {
     return `${dd}-${mm}-${yyyy}`;
   };
 
-  const resetPlaygroundMeta = () => { setPlaygroundError(null); setPlaygroundStatusCode(null); setPlaygroundResponseTime(null); setPlaygroundResultText(""); };
+  const resetPlaygroundMeta = () => {
+    setPlaygroundError(null);
+    setPlaygroundStatusCode(null);
+    setPlaygroundResponseTime(null);
+    setPlaygroundResultText("");
+  };
 
   const runPlayground = async () => {
     setPlaygroundLoading(true);
@@ -565,47 +947,97 @@ export default function DashboardPage() {
     const start = performance.now();
     try {
       const apiKey = dbUser?.apiKey;
-      if (!apiKey) throw new Error("Session expired. Please refresh and sign in again.");
+      if (!apiKey)
+        throw new Error("Session expired. Please refresh and sign in again.");
       configure(apiKey);
       let result: unknown;
       switch (playgroundAction) {
         case "pnr":
-          if (!/^\d{10}$/.test(pnrInput)) throw new Error("PNR must be exactly 10 digits");
-          result = await checkPNRStatus(pnrInput); break;
+          if (!/^\d{10}$/.test(pnrInput))
+            throw new Error("PNR must be exactly 10 digits");
+          result = await checkPNRStatus(pnrInput);
+          break;
         case "train":
-          if (!/^\d{5}$/.test(trainInput)) throw new Error("Train number must be exactly 5 digits");
-          result = await getTrainInfo(trainInput); break;
+          if (!/^\d{5}$/.test(trainInput))
+            throw new Error("Train number must be exactly 5 digits");
+          result = await getTrainInfo(trainInput);
+          break;
         case "track":
-          if (!/^\d{5}$/.test(trackTrainInput)) throw new Error("Train number must be exactly 5 digits");
-          if (!/^\d{2}-\d{2}-\d{4}$/.test(trackDateInput)) throw new Error("Date must be in DD-MM-YYYY format");
-          result = await trackTrain(trackTrainInput, trackDateInput); break;
+          if (!/^\d{5}$/.test(trackTrainInput))
+            throw new Error("Train number must be exactly 5 digits");
+          if (!/^\d{2}-\d{2}-\d{4}$/.test(trackDateInput))
+            throw new Error("Date must be in DD-MM-YYYY format");
+          result = await trackTrain(trackTrainInput, trackDateInput);
+          break;
         case "history":
-          if (!/^\d{5}$/.test(historyTrainInput)) throw new Error("Train number must be exactly 5 digits");
-          if (!/^\d{2}-\d{2}-\d{4}$/.test(historyDateInput)) throw new Error("Date must be in DD-MM-YYYY format");
-          result = await getTrainHistory(historyTrainInput, historyDateInput); break;
+          if (!/^\d{5}$/.test(historyTrainInput))
+            throw new Error("Train number must be exactly 5 digits");
+          if (!/^\d{2}-\d{2}-\d{4}$/.test(historyDateInput))
+            throw new Error("Date must be in DD-MM-YYYY format");
+          result = await getTrainHistory(historyTrainInput, historyDateInput);
+          break;
         case "station":
           if (!stationInput.trim()) throw new Error("Station code is required");
-          result = await liveAtStation(stationInput.trim().toUpperCase(), Number(stationHoursInput) as 2 | 4 | 8); break;
+          result = await liveAtStation(
+            stationInput.trim().toUpperCase(),
+            Number(stationHoursInput) as 2 | 4 | 8,
+          );
+          break;
         case "search":
-          if (!fromStationInput.trim() || !toStationInput.trim()) throw new Error("From and To station codes are required");
-          if (searchDateInput && !/^\d{2}-\d{2}-\d{4}$/.test(searchDateInput)) throw new Error("Date must be in DD-MM-YYYY format");
-          result = await searchTrainBetweenStations(fromStationInput.trim().toUpperCase(), toStationInput.trim().toUpperCase(), searchDateInput || undefined); break;
+          if (!fromStationInput.trim() || !toStationInput.trim())
+            throw new Error("From and To station codes are required");
+          if (searchDateInput && !/^\d{2}-\d{2}-\d{4}$/.test(searchDateInput))
+            throw new Error("Date must be in DD-MM-YYYY format");
+          result = await searchTrainBetweenStations(
+            fromStationInput.trim().toUpperCase(),
+            toStationInput.trim().toUpperCase(),
+            searchDateInput || undefined,
+          );
+          break;
         case "seat":
-          if (!/^\d{5}$/.test(seatTrainInput)) throw new Error("Train number must be exactly 5 digits");
-          if (!seatFromInput.trim() || !seatToInput.trim()) throw new Error("From and To station codes are required");
-          if (!/^\d{2}-\d{2}-\d{4}$/.test(seatDateInput)) throw new Error("Date must be in DD-MM-YYYY format");
-          result = await getAvailability(seatTrainInput, seatFromInput.trim().toUpperCase(), seatToInput.trim().toUpperCase(), seatDateInput, seatClassInput, seatQuotaInput); break;
+          if (!/^\d{5}$/.test(seatTrainInput))
+            throw new Error("Train number must be exactly 5 digits");
+          if (!seatFromInput.trim() || !seatToInput.trim())
+            throw new Error("From and To station codes are required");
+          if (!/^\d{2}-\d{2}-\d{4}$/.test(seatDateInput))
+            throw new Error("Date must be in DD-MM-YYYY format");
+          result = await getAvailability(
+            seatTrainInput,
+            seatFromInput.trim().toUpperCase(),
+            seatToInput.trim().toUpperCase(),
+            seatDateInput,
+            seatClassInput,
+            seatQuotaInput,
+          );
+          break;
         case "fare":
-          if (!/^\d{5}$/.test(fareTrainInput)) throw new Error("Train number must be exactly 5 digits");
-          if (!fareFromInput.trim() || !fareToInput.trim()) throw new Error("From and To station codes are required");
-          if (!/^\d{2}-\d{2}-\d{4}$/.test(fareDateInput)) throw new Error("Date must be in DD-MM-YYYY format");
-          result = await fareLookup(fareTrainInput, fareFromInput.trim().toUpperCase(), fareToInput.trim().toUpperCase(), fareDateInput, fareClassInput, fareQuotaInput); break;
+          if (!/^\d{5}$/.test(fareTrainInput))
+            throw new Error("Train number must be exactly 5 digits");
+          if (!fareFromInput.trim() || !fareToInput.trim())
+            throw new Error("From and To station codes are required");
+          if (!/^\d{2}-\d{2}-\d{4}$/.test(fareDateInput))
+            throw new Error("Date must be in DD-MM-YYYY format");
+          result = await fareLookup(
+            fareTrainInput,
+            fareFromInput.trim().toUpperCase(),
+            fareToInput.trim().toUpperCase(),
+            fareDateInput,
+            fareClassInput,
+            fareQuotaInput,
+          );
+          break;
         case "cancelled":
-          result = await cancelList(); break;
+          result = await cancelList();
+          break;
       }
       const resultRecord =
         typeof result === "object" && result !== null
-          ? (result as { success?: unknown; error?: unknown; message?: unknown; statusCode?: unknown })
+          ? (result as {
+              success?: unknown;
+              error?: unknown;
+              message?: unknown;
+              statusCode?: unknown;
+            })
           : null;
       const codeGuess =
         typeof resultRecord?.statusCode === "number"
@@ -625,10 +1057,24 @@ export default function DashboardPage() {
         setPlaygroundError(resultError);
       }
     } catch (error: unknown) {
-      const err = error as { message?: string; status?: number; response?: { status?: number } };
+      const err = error as {
+        message?: string;
+        status?: number;
+        response?: { status?: number };
+      };
       setPlaygroundError(err?.message || "Something went wrong");
       setPlaygroundStatusCode(err?.status || err?.response?.status || 500);
-      setPlaygroundResultText(JSON.stringify({ success: false, message: err?.message || "Something went wrong", statusCode: err?.status || err?.response?.status || 500 }, null, 2));
+      setPlaygroundResultText(
+        JSON.stringify(
+          {
+            success: false,
+            message: err?.message || "Something went wrong",
+            statusCode: err?.status || err?.response?.status || 500,
+          },
+          null,
+          2,
+        ),
+      );
     } finally {
       setPlaygroundResponseTime(Math.round(performance.now() - start));
       setPlaygroundLoading(false);
@@ -640,21 +1086,39 @@ export default function DashboardPage() {
 
   const usagePct = dbUser.limit > 0 ? (dbUser.usage / dbUser.limit) * 100 : 0;
   const usageLeft = Math.max(0, dbUser.limit - dbUser.usage);
-  const usageColor = usagePct > 80 ? "#ea580c" : usagePct > 60 ? "#d97706" : "#16a34a";
-  const maxDailyRequests = Math.max(1, ...auditDailyUsage.map((e) => e.requests));
-  const chartData = auditDailyUsage.map((entry) => ({ ...entry, label: new Date(entry.date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) }));
-  const maskedKey = dbUser.apiKey ? `${dbUser.apiKey.slice(0, 8)}${"•".repeat(24)}${dbUser.apiKey.slice(-6)}` : "";
+  const usageColor =
+    usagePct > 80 ? "#ea580c" : usagePct > 60 ? "#d97706" : "#16a34a";
+  const maxDailyRequests = Math.max(
+    1,
+    ...auditDailyUsage.map((e) => e.requests),
+  );
+  const chartData = auditDailyUsage.map((entry) => ({
+    ...entry,
+    label: new Date(entry.date).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+    }),
+  }));
+  const maskedKey = dbUser.apiKey
+    ? `${dbUser.apiKey.slice(0, 8)}${"•".repeat(24)}${dbUser.apiKey.slice(-6)}`
+    : "";
   const paidOrders = orders.filter((o) => o.status === "paid");
   const totalSpent = paidOrders.reduce((a, o) => a + o.amount, 0);
   const normalizedPlan = (dbUser.plan || "").toLowerCase();
   const avatarSeed = encodeURIComponent(dbUser.name || dbUser.email);
   const dicebearUrl = `https://api.dicebear.com/10.x/pixel-art/svg?seed=${avatarSeed}`;
-  const canBuyLimitTopup = normalizedPlan === "pro" || normalizedPlan === "enterprise" || normalizedPlan === "advance" || normalizedPlan === "advanced";
-  const billingStartTimestamp = dbUser.billingDate ? new Date(dbUser.billingDate).getTime() : NaN;
+  const canBuyLimitTopup =
+    normalizedPlan === "pro" ||
+    normalizedPlan === "enterprise" ||
+    normalizedPlan === "advance" ||
+    normalizedPlan === "advanced";
+  const billingStartTimestamp = dbUser.billingDate
+    ? new Date(dbUser.billingDate).getTime()
+    : NaN;
   const topupExpirationTimestamp = hasActiveExpirationOverride
     ? activeExpirationTimestamp
     : Number.isFinite(billingStartTimestamp)
-      ? billingStartTimestamp + (30 * 24 * 60 * 60 * 1000)
+      ? billingStartTimestamp + 30 * 24 * 60 * 60 * 1000
       : NaN;
   const billingDaysMatch = billing.display.match(/^(\d+)d\b/);
   const topupDaysLeft = billingDaysMatch
@@ -663,22 +1127,47 @@ export default function DashboardPage() {
       ? 0
       : null;
   const topupExpiryDate = Number.isFinite(topupExpirationTimestamp)
-    ? new Date(topupExpirationTimestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    ? new Date(topupExpirationTimestamp).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
     : "current plan expiry";
-  const topupValidityTone = topupDaysLeft === null || topupDaysLeft > 7
-    ? { background: "#f8fafc", border: "#e2e8f0", icon: "#64748b", text: "#64748b" }
-    : topupDaysLeft >= 3
-      ? { background: "#fffbeb", border: "#fde68a", icon: "#d97706", text: "#a16207" }
-      : { background: "#fff7ed", border: "#fed7aa", icon: "#ea580c", text: "#c2410c" };
-  const topupValidityMessage = topupDaysLeft === null || topupDaysLeft > 7
-    ? Number.isFinite(topupExpirationTimestamp)
-      ? `Expires with your current plan on ${topupExpiryDate} · Unused requests do not carry forward.`
-      : "Expires with your current plan · Unused requests do not carry forward."
-    : `${topupDaysLeft === 0 ? "Plan expires today" : `Plan expires in ${topupDaysLeft} ${topupDaysLeft === 1 ? "day" : "days"}`} · This top-up will expire on ${topupExpiryDate} · Unused requests do not carry forward.`;
-  const topupMessageIsError = Boolean(limitPurchaseMessage && /(failed|error|unable)/i.test(limitPurchaseMessage));
-  const directApiBaseUrl = process.env.NEXT_PUBLIC_DIRECT_API_BASE_URL || "https://railkit-api.rajivdubey.dev";
+  const topupValidityTone =
+    topupDaysLeft === null || topupDaysLeft > 7
+      ? {
+          box: "border-[#e2e8f0] bg-[#f8fafc]",
+          icon: "text-[#64748b]",
+          text: "text-[#64748b]",
+        }
+      : topupDaysLeft >= 3
+        ? {
+            box: "border-[#fde68a] bg-[#fffbeb]",
+            icon: "text-[#d97706]",
+            text: "text-[#a16207]",
+          }
+        : {
+            box: "border-[#fed7aa] bg-[#fff7ed]",
+            icon: "text-[#ea580c]",
+            text: "text-[#c2410c]",
+          };
+  const topupValidityMessage =
+    topupDaysLeft === null || topupDaysLeft > 7
+      ? Number.isFinite(topupExpirationTimestamp)
+        ? `Expires with your current plan on ${topupExpiryDate} · Unused requests do not carry forward.`
+        : "Expires with your current plan · Unused requests do not carry forward."
+      : `${topupDaysLeft === 0 ? "Plan expires today" : `Plan expires in ${topupDaysLeft} ${topupDaysLeft === 1 ? "day" : "days"}`} · This top-up will expire on ${topupExpiryDate} · Unused requests do not carry forward.`;
+  const topupMessageIsError = Boolean(
+    limitPurchaseMessage && /(failed|error|unable)/i.test(limitPurchaseMessage),
+  );
+  const directApiBaseUrl =
+    process.env.NEXT_PUBLIC_DIRECT_API_BASE_URL ||
+    "https://railkit-api.rajivdubey.dev";
 
-  const apiLanguageMeta: Record<ApiCodeLanguage, { label: string; syntax: "javascript" | "python" | "bash" }> = {
+  const apiLanguageMeta: Record<
+    ApiCodeLanguage,
+    { label: string; syntax: "javascript" | "python" | "bash" }
+  > = {
     javascript: { label: "JavaScript", syntax: "javascript" },
     python: { label: "Python", syntax: "python" },
     curl: { label: "cURL", syntax: "bash" },
@@ -686,461 +1175,131 @@ export default function DashboardPage() {
 
   const buildApiSnippet = (examplePath: string, language: ApiCodeLanguage) => {
     const url = `${directApiBaseUrl}${examplePath}`;
-    if (language === "python") return `import requests\n\nurl = "${url}"\nheaders = {\n    "x-api-key": "YOUR_API_KEY",\n    "accept": "application/json",\n}\n\nresponse = requests.get(url, headers=headers)\ndata = response.json()\nprint(data)`;
-    if (language === "curl") return `curl -X GET "${url}" \\\n  -H "x-api-key: YOUR_API_KEY" \\\n  -H "accept: application/json"`;
+    if (language === "python")
+      return `import requests\n\nurl = "${url}"\nheaders = {\n    "x-api-key": "YOUR_API_KEY",\n    "accept": "application/json",\n}\n\nresponse = requests.get(url, headers=headers)\ndata = response.json()\nprint(data)`;
+    if (language === "curl")
+      return `curl -X GET "${url}" \\\n  -H "x-api-key: YOUR_API_KEY" \\\n  -H "accept: application/json"`;
     return `const API_KEY = process.env.RAILKIT_API_KEY;\n\nconst response = await fetch("${url}", {\n  method: "GET",\n  headers: {\n    "x-api-key": API_KEY,\n    "accept": "application/json",\n  },\n});\n\nconst data = await response.json();\nconsole.log(data);`;
   };
 
   const usageExampleCode = `import {\n  configure,\n  checkPNRStatus,\n  getTrainInfo,\n  trackTrain,\n  getTrainHistory,\n} from "railkit";\n\n// Step 1: configure once with your API key\nconfigure(process.env.RAILKIT_API_KEY);\n\n// Check PNR status\nconst pnrResult = await checkPNRStatus("1234567890");\n\n// Get train information\nconst trainResult = await getTrainInfo("12345");\n\n// Track Live Train\nconst liveTrainResult = await trackTrain("12345", "28-03-2026");\n\n// Get Train History (for completed journeys)\nconst historyResult = await getTrainHistory("12345", "28-03-2026");`;
 
-  const navItems: { id: ActiveTab; label: string; icon: React.ReactNode; badge?: string }[] = [
-    { id: "overview",     label: "Overview",       icon: <IconOverview /> },
-    { id: "apikey",       label: "API Key",         icon: <IconKey /> },
-    { id: "apiendpoints", label: "API Endpoints",   icon: <IconEndpoints /> },
-    { id: "playground",   label: "Playground",      icon: <IconTerminal /> },
-    { id: "logs",         label: "Logs",            icon: <IconActivity />, badge: recentLogs.length > 0 ? (recentLogs.length > 99 ? "99+" : String(recentLogs.length)) : undefined },
-    { id: "orders",       label: "Orders",          icon: <IconReceipt />,  badge: orders.length > 0 ? String(orders.length) : undefined },
+  const navItems: {
+    id: ActiveTab;
+    label: string;
+    icon: React.ReactNode;
+    badge?: string;
+  }[] = [
+    { id: "overview", label: "Overview", icon: <IconOverview /> },
+    { id: "apikey", label: "API Key", icon: <IconKey /> },
+    { id: "apiendpoints", label: "API Endpoints", icon: <IconEndpoints /> },
+    { id: "playground", label: "Playground", icon: <IconTerminal /> },
+    {
+      id: "logs",
+      label: "Logs",
+      icon: <IconActivity />,
+      badge:
+        recentLogs.length > 0
+          ? recentLogs.length > 99
+            ? "99+"
+            : String(recentLogs.length)
+          : undefined,
+    },
+    {
+      id: "orders",
+      label: "Orders",
+      icon: <IconReceipt />,
+      badge: orders.length > 0 ? String(orders.length) : undefined,
+    },
   ];
 
   return (
     <>
-      <style>{`
-        .db-root {
-          font-family: var(--font-noto), 'Noto Sans', system-ui, sans-serif;
-          background: #f8f8f8;
-          min-height: 100vh;
-          padding-top: 60px; /* global header offset */
-        }
-        .db-root * { box-sizing: border-box; margin: 0; padding: 0; font-family: inherit; }
+      {viewOrder && (
+        <OrderModal order={viewOrder} onClose={() => setViewOrder(null)} />
+      )}
 
-        .db-layout {
-          display: flex;
-          min-height: calc(100vh - 60px);
-          max-width: 1280px;
-          margin: 0 auto;
-          padding: 20px 20px 32px;
-          gap: 14px;
-          align-items: flex-start;
-        }
-
-        /* ── Sidebar ── */
-        .db-sidebar {
-          width: 220px;
-          flex-shrink: 0;
-          background: #fff;
-          border: 1px solid #ebebeb;
-          border-radius: 18px;
-          box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-          position: sticky;
-          top: 80px;
-          max-height: calc(100vh - 100px);
-          overflow-y: auto;
-          display: flex;
-          flex-direction: column;
-          padding: 20px 12px;
-          gap: 2px;
-          z-index: 10;
-        }
-
-        .db-sidebar-label {
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: #c0c0c0;
-          padding: 6px 10px 4px;
-          margin-top: 6px;
-        }
-
-        .db-nav-btn {
-          display: flex;
-          align-items: center;
-          gap: 9px;
-          width: 100%;
-          padding: 9px 10px;
-          border-radius: 9px;
-          border: none;
-          background: transparent;
-          color: #6b7280;
-          font-size: 13px;
-          font-weight: 500;
-          cursor: pointer;
-          text-align: left;
-          transition: background 0.13s, color 0.13s;
-          position: relative;
-        }
-        .db-nav-btn:hover { background: #f3f4f6; color: #111; }
-        .db-nav-btn.active { background: #f0f0f0; color: #000; font-weight: 600; }
-        .db-nav-btn.active svg { opacity: 1; }
-        .db-nav-btn svg { opacity: 0.6; flex-shrink: 0; }
-        .db-nav-btn.active svg { opacity: 1; }
-        .db-nav-badge {
-          margin-left: auto;
-          background: #e5e7eb;
-          color: #6b7280;
-          font-size: 10px;
-          font-weight: 700;
-          padding: 1px 6px;
-          border-radius: 999px;
-          line-height: 1.6;
-        }
-        .db-nav-btn.active .db-nav-badge { background: #000; color: #fff; }
-
-        .db-sidebar-footer {
-          margin-top: auto;
-          padding-top: 12px;
-          border-top: 1px solid #f3f4f6;
-        }
-
-        /* ── Main content ── */
-        .db-main {
-          flex: 1;
-          min-width: 0;
-          padding: 28px 28px 36px;
-          background: #fff;
-          border: 1px solid #ebebeb;
-          border-radius: 18px;
-          box-shadow: 0 2px 12px rgba(0,0,0,0.04);
-        }
-
-        /* ── Page title bar ── */
-        .db-titlebar {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 24px;
-          flex-wrap: wrap;
-          gap: 10px;
-        }
-        .db-title {
-          font-size: 20px;
-          font-weight: 700;
-          color: #000;
-          letter-spacing: -0.02em;
-        }
-        .db-subtitle {
-          font-size: 12px;
-          color: #9ca3af;
-          margin-top: 2px;
-          font-weight: 400;
-        }
-
-        /* ── Cards ── */
-        .db-card {
-          background: #fff;
-          border: 1px solid #ebebeb;
-          border-radius: 16px;
-          padding: 24px;
-        }
-        .db-card-sm {
-          background: #fff;
-          border: 1px solid #ebebeb;
-          border-radius: 12px;
-          padding: 16px 18px;
-        }
-        .db-card-dark {
-          background: #0d1117;
-          border: 1px solid #21262d;
-          border-radius: 16px;
-        }
-
-        /* ── Inputs ── */
-        .db-input {
-          background: #fafafa;
-          border: 1px solid #e5e7eb;
-          border-radius: 10px;
-          padding: 10px 12px;
-          color: #111827;
-          font-size: 13px;
-          font-family: var(--font-noto), 'Noto Sans', system-ui, sans-serif;
-          outline: none;
-          width: 100%;
-          transition: border-color 0.15s, box-shadow 0.15s;
-        }
-        .db-input:focus { border-color: #000; box-shadow: 0 0 0 3px rgba(0,0,0,0.06); background: #fff; }
-        .db-select {
-          background: #fafafa;
-          border: 1px solid #e5e7eb;
-          border-radius: 10px;
-          padding: 10px 12px;
-          color: #111827;
-          font-size: 13px;
-          font-family: var(--font-noto), 'Noto Sans', system-ui, sans-serif;
-          outline: none;
-          width: 100%;
-        }
-
-        /* ── Misc ── */
-        .db-section-label {
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: #c0c0c0;
-          margin-bottom: 12px;
-        }
-        .row-hover:hover { background: #fafafa !important; }
-        .db-break-anywhere { overflow-wrap: anywhere; word-break: break-word; }
-        .db-code-block {
-          max-width: 100%;
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-        }
-        .db-code-block pre { min-width: max-content; }
-        .db-profile-copy { min-width: 0; }
-        .db-profile-copy p {
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .db-key-field { width: 100%; }
-        .db-key-value {
-          min-width: 0;
-          scrollbar-width: thin;
-        }
-        .db-table-scroll {
-          width: 100%;
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-        }
-        .db-data-table { min-width: 700px; }
-        .db-modal-backdrop { padding: 16px; }
-        .db-modal {
-          max-height: calc(100vh - 32px);
-          overflow-y: auto;
-        }
-
-        /* ── Mobile tab bar ── */
-        .db-mobile-tabs {
-          display: none;
-          grid-template-columns: 1fr 1fr;
-          gap: 6px;
-          margin-bottom: 18px;
-        }
-        .db-mobile-tab {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          padding: 9px 10px;
-          border-radius: 10px;
-          border: 1px solid #e5e7eb;
-          background: #fff;
-          color: #6b7280;
-          font-size: 12px;
-          font-weight: 500;
-          cursor: pointer;
-          transition: background 0.13s, color 0.13s, border-color 0.13s;
-        }
-        .db-mobile-tab.active {
-          background: #000;
-          color: #fff;
-          border-color: #000;
-          font-weight: 600;
-        }
-        .db-mobile-toggle { display: none; }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-
-        .db-stat { animation: fadeUp 0.35s ease both; }
-        .db-stat:nth-child(1) { animation-delay: 0.03s; }
-        .db-stat:nth-child(2) { animation-delay: 0.07s; }
-        .db-stat:nth-child(3) { animation-delay: 0.11s; }
-        .db-stat:nth-child(4) { animation-delay: 0.15s; }
-
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 4px; }
-
-        @media (max-width: 1100px) {
-          .db-sidebar { width: 200px; }
-          .db-main { padding: 24px 22px 32px; }
-          .db-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-          .db-playground-grid { grid-template-columns: minmax(0, 1fr) !important; }
-          .db-response-panel { min-height: 360px !important; }
-        }
-        @media (max-width: 768px) {
-          .db-root { overflow-x: hidden; }
-          .db-sidebar { display: none; }
-          .db-layout { padding: 12px 12px 28px; }
-          .db-mobile-tabs { display: grid; }
-          .db-main { padding: 20px 16px 32px; }
-          .db-stats-grid { grid-template-columns: 1fr 1fr !important; }
-          .db-overview-grid { grid-template-columns: 1fr !important; }
-          .db-titlebar {
-            align-items: flex-start;
-            margin-bottom: 16px;
-          }
-          .db-title-actions {
-            width: 100%;
-            justify-content: flex-start;
-          }
-          .db-card { padding: 20px; }
-          .db-key-row { flex-direction: column !important; }
-          .db-key-field { flex: none !important; }
-          .db-key-regen {
-            width: 100%;
-            justify-content: center;
-          }
-          .db-language-select .db-select { width: 100% !important; }
-          .db-form-grid { grid-template-columns: minmax(0, 1fr) !important; }
-          .db-form-grid > * { grid-column: 1 / -1 !important; min-width: 0; }
-          .db-input,
-          .db-select { min-height: 44px; }
-          .db-action-pills > button { min-height: 40px; }
-          .db-response-panel { min-height: 320px !important; }
-          .db-chart-wrap { height: 230px !important; padding: 8px !important; }
-          .db-table-heading {
-            gap: 8px;
-            flex-wrap: wrap;
-          }
-          .db-topup-overlay {
-            flex-direction: column;
-            text-align: center;
-          }
-        }
-        @media (max-width: 640px) {
-          .db-data-table,
-          .db-data-table tbody,
-          .db-data-table tr,
-          .db-data-table td {
-            display: block;
-            width: 100%;
-          }
-          .db-data-table { min-width: 0; }
-          .db-data-table thead { display: none; }
-          .db-data-table tbody {
-            display: grid;
-            gap: 10px;
-            padding: 10px;
-          }
-          .db-data-table tbody tr {
-            overflow: hidden;
-            border: 1px solid #ebebeb !important;
-            border-radius: 12px;
-            background: #fff;
-          }
-          .db-data-table tbody td {
-            display: flex;
-            min-width: 0;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 16px;
-            padding: 10px 12px !important;
-            border-bottom: 1px solid #f3f4f6;
-            text-align: right;
-            overflow-wrap: anywhere;
-            white-space: normal !important;
-          }
-          .db-data-table tbody td:last-child { border-bottom: 0; }
-          .db-data-table tbody td::before {
-            content: attr(data-label);
-            flex: 0 0 78px;
-            color: #9ca3af;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.06em;
-            text-align: left;
-            text-transform: uppercase;
-          }
-          .db-data-table tbody .db-empty-cell {
-            display: block;
-            padding: 28px 16px !important;
-            text-align: center;
-          }
-          .db-data-table tbody .db-empty-cell::before { display: none; }
-          .db-modal { padding: 22px !important; border-radius: 18px !important; }
-          .db-modal-row {
-            flex-direction: column;
-            gap: 5px;
-          }
-          .db-modal-row > :last-child {
-            max-width: 100%;
-            overflow-wrap: anywhere;
-          }
-        }
-        @media (max-width: 480px) {
-          .db-layout { padding: 8px 8px 24px; }
-          .db-stats-grid { grid-template-columns: 1fr !important; }
-          .db-main { padding: 14px 12px 28px; }
-          .db-main { border-radius: 14px; }
-          .db-card { padding: 16px; border-radius: 13px; }
-          .db-title { font-size: 18px; }
-          .db-mobile-tabs { gap: 5px; margin-bottom: 14px; }
-          .db-mobile-tab {
-            min-width: 0;
-            min-height: 42px;
-            padding: 8px 6px;
-            font-size: 11px;
-          }
-          .db-mobile-tab svg { flex-shrink: 0; }
-          .db-profile-head { align-items: flex-start !important; }
-          .db-profile-copy { padding-top: 3px; }
-          .db-billing-summary { grid-template-columns: 1fr !important; }
-          .db-install-copy { overflow-wrap: anywhere; }
-          .db-key-warning { align-items: flex-start !important; }
-          .db-key-field { padding: 10px 11px !important; }
-          .db-key-value { font-size: 12px !important; }
-          .db-code-block { padding: 12px !important; border-radius: 11px !important; }
-          .db-chart-wrap { height: 210px !important; }
-          .db-table-heading { padding: 12px 14px !important; }
-          .db-response-panel { min-height: 280px !important; border-radius: 13px; }
-        }
-      `}</style>
-
-      {viewOrder && <OrderModal order={viewOrder} onClose={() => setViewOrder(null)} />}
-
-      <div className="db-root">
-        <div className="db-layout">
-
+      <div className="min-h-screen bg-[#f8f8f8] pt-[60px] font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] max-[768px]:overflow-x-hidden [&_*]:box-border [&_*]:font-[inherit] [&::-webkit-scrollbar]:size-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-[#e0e0e0] [&::-webkit-scrollbar-track]:bg-transparent">
+        <div className="mx-auto flex min-h-[calc(100vh-60px)] max-w-7xl items-start gap-3.5 px-5 pt-5 pb-8 max-[768px]:px-3 max-[768px]:pt-3 max-[768px]:pb-7 max-[480px]:px-2 max-[480px]:pt-2 max-[480px]:pb-6">
           {/* ── Left Sidebar ─────────────────────────────────────────────── */}
-          <aside className={`db-sidebar${sidebarOpen ? " open" : ""}`}>
+          <aside
+            data-open={sidebarOpen}
+            className="sticky top-20 z-10 flex max-h-[calc(100vh-100px)] w-[220px] shrink-0 flex-col gap-0.5 overflow-y-auto rounded-[18px] border border-[#ebebeb] bg-white px-3 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)] max-[1100px]:w-[200px] max-[768px]:hidden"
+          >
             {/* User pill */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px 14px", borderBottom: "1px solid #f3f4f6", marginBottom: 8 }}>
-              <img src={dicebearUrl} alt={dbUser.name || dbUser.email} style={{ width: 34, height: 34, borderRadius: 10, border: "1px solid #e5e7eb", flexShrink: 0, background: "#f3f4f6" }} />
-              <div style={{ minWidth: 0 }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: "#111", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{dbUser.name || "User"}</p>
-                <p style={{ fontSize: 11, color: "#9ca3af", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 1 }}>{dbUser.email}</p>
+            <div className="mb-2 flex items-center gap-2.5 border-b border-[#f3f4f6] px-2.5 pt-2 pb-3.5">
+              <img
+                src={dicebearUrl}
+                alt={dbUser.name || dbUser.email}
+                className="size-[34px] shrink-0 rounded-[10px] border border-[#e5e7eb] bg-[#f3f4f6]"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-semibold text-[#111]">
+                  {dbUser.name || "User"}
+                </p>
+                <p className="mt-px truncate text-[11px] text-[#9ca3af]">
+                  {dbUser.email}
+                </p>
               </div>
             </div>
 
-            <p className="db-sidebar-label">Workspace</p>
+            <p className="mt-1.5 px-2.5 pt-1.5 pb-1 text-[10px] font-bold tracking-[0.08em] text-[#c0c0c0] uppercase">
+              Workspace
+            </p>
 
             {navItems.map((item) => (
               <button
                 key={item.id}
                 type="button"
-                className={`db-nav-btn${activeTab === item.id ? " active" : ""}`}
-                onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
+                className={`relative flex w-full cursor-pointer items-center gap-[9px] rounded-[9px] border-none px-2.5 py-[9px] text-left text-[13px] transition-[background,color] duration-150 [&_svg]:shrink-0 ${activeTab === item.id ? "bg-[#f0f0f0] font-semibold text-black [&_svg]:opacity-100" : "bg-transparent font-medium text-[#6b7280] hover:bg-[#f3f4f6] hover:text-[#111] [&_svg]:opacity-60"}`}
+                onClick={() => {
+                  setActiveTab(item.id);
+                  setSidebarOpen(false);
+                }}
               >
                 {item.icon}
                 <span>{item.label}</span>
-                {item.badge && <span className="db-nav-badge">{item.badge}</span>}
+                {item.badge && (
+                  <span
+                    className={`ml-auto rounded-full px-1.5 py-px text-[10px] leading-[1.6] font-bold ${activeTab === item.id ? "bg-black text-white" : "bg-[#e5e7eb] text-[#6b7280]"}`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
               </button>
             ))}
 
-            <div className="db-sidebar-footer">
+            <div className="mt-auto border-t border-[#f3f4f6] pt-3">
               <button
                 type="button"
                 onClick={refreshAll}
-                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", borderRadius: 9, border: "none", background: "transparent", color: "#9ca3af", fontSize: 12, fontWeight: 500, cursor: "pointer", transition: "color 0.15s, background 0.15s" }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#f3f4f6"; (e.currentTarget as HTMLElement).style.color = "#374151"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#9ca3af"; }}
+                className="flex w-full cursor-pointer items-center gap-2 rounded-[9px] border-none bg-transparent px-2.5 py-2 text-xs font-medium text-[#9ca3af] transition-[color,background] duration-150 hover:bg-[#f3f4f6] hover:text-[#374151]"
               >
-                <span style={{ display: "inline-flex", animation: refreshing ? "spin 1s linear infinite" : "none" }}><IconRefresh /></span>
+                <span
+                  className={`inline-flex ${refreshing ? "animate-spin" : ""}`}
+                >
+                  <IconRefresh />
+                </span>
                 {refreshing ? "Syncing..." : "Refresh data"}
               </button>
               <button
                 type="button"
                 onClick={onLogout}
-                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "8px 10px", borderRadius: 9, border: "none", background: "transparent", color: "#9ca3af", fontSize: 12, fontWeight: 500, cursor: "pointer", transition: "color 0.15s, background 0.15s", marginTop: 2 }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = "#fef2f2"; (e.currentTarget as HTMLElement).style.color = "#dc2626"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = "transparent"; (e.currentTarget as HTMLElement).style.color = "#9ca3af"; }}
+                className="mt-0.5 flex w-full cursor-pointer items-center gap-2 rounded-[9px] border-none bg-transparent px-2.5 py-2 text-xs font-medium text-[#9ca3af] transition-[color,background] duration-150 hover:bg-[#fef2f2] hover:text-[#dc2626]"
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
                 </svg>
                 Sign out
               </button>
@@ -1148,48 +1307,59 @@ export default function DashboardPage() {
           </aside>
 
           {/* ── Main Content ─────────────────────────────────────────────── */}
-          <main className="db-main">
+          <main className="min-w-0 flex-1 rounded-[18px] border border-[#ebebeb] bg-white px-7 pt-7 pb-9 shadow-[0_2px_12px_rgba(0,0,0,0.04)] max-[1100px]:px-[22px] max-[1100px]:pt-6 max-[1100px]:pb-8 max-[768px]:px-4 max-[768px]:pt-5 max-[480px]:rounded-[14px] max-[480px]:px-3 max-[480px]:pt-3.5 max-[480px]:pb-7">
             {/* Title bar */}
-            <div className="db-titlebar">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-2.5 max-[768px]:mb-4 max-[768px]:items-start">
+              <div className="flex items-center gap-2.5">
                 <div>
-                  <h1 className="db-title">
-                    {navItems.find(n => n.id === activeTab)?.label ?? "Dashboard"}
+                  <h1 className="text-xl font-bold tracking-[-0.02em] text-black max-[480px]:text-lg">
+                    {navItems.find((n) => n.id === activeTab)?.label ??
+                      "Dashboard"}
                   </h1>
-                  <p className="db-subtitle">
+                  <p className="mt-0.5 text-xs font-normal text-[#9ca3af]">
                     {activeTab === "overview" && "Your usage at a glance"}
                     {activeTab === "apikey" && "Manage your secret key"}
                     {activeTab === "apiendpoints" && "Direct REST endpoints"}
-                    {activeTab === "playground" && "Live test without leaving the dashboard"}
+                    {activeTab === "playground" &&
+                      "Live test without leaving the dashboard"}
                     {activeTab === "logs" && "Recent API call history"}
                     {activeTab === "orders" && "Billing and payment history"}
                   </p>
                 </div>
               </div>
-              <div className="db-title-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="flex items-center gap-2 max-[768px]:w-full max-[768px]:justify-start">
                 <PlanBadge plan={dbUser.plan} />
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: dbUser.active ? "#16a34a" : "#9ca3af", background: dbUser.active ? "#f0fdf4" : "#f9fafb", border: `1px solid ${dbUser.active ? "#bbf7d0" : "#e5e7eb"}`, padding: "3px 8px", borderRadius: 6, fontWeight: 600 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: dbUser.active ? "#22c55e" : "#d1d5db" }} />
+                <span
+                  className={`inline-flex items-center gap-[5px] rounded-md border px-2 py-[3px] text-[11px] font-semibold ${dbUser.active ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#16a34a]" : "border-[#e5e7eb] bg-[#f9fafb] text-[#9ca3af]"}`}
+                >
+                  <span
+                    className={`size-1.5 rounded-full ${dbUser.active ? "bg-[#22c55e]" : "bg-[#d1d5db]"}`}
+                  />
                   {dbUser.active ? "Active" : "Inactive"}
                 </span>
               </div>
             </div>
 
             {/* ── Mobile tab bar (≤768px only) ── */}
-            <div className="db-mobile-tabs" role="tablist">
+            <div
+              className="mb-[18px] hidden grid-cols-2 gap-1.5 max-[768px]:grid max-[480px]:mb-3.5 max-[480px]:gap-[5px]"
+              role="tablist"
+            >
               {navItems.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   role="tab"
                   aria-selected={activeTab === item.id}
-                  className={`db-mobile-tab${activeTab === item.id ? " active" : ""}`}
+                  className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-[10px] border px-2.5 py-[9px] text-xs transition-[background,color,border-color] duration-150 max-[480px]:min-h-[42px] max-[480px]:min-w-0 max-[480px]:px-1.5 max-[480px]:py-2 max-[480px]:text-[11px] max-[480px]:[&_svg]:shrink-0 ${activeTab === item.id ? "border-black bg-black font-semibold text-white" : "border-[#e5e7eb] bg-white font-medium text-[#6b7280]"}`}
                   onClick={() => setActiveTab(item.id)}
                 >
                   {item.icon}
                   {item.label}
                   {item.badge && (
-                    <span style={{ background: activeTab === item.id ? "rgba(255,255,255,0.25)" : "#e5e7eb", color: activeTab === item.id ? "#fff" : "#6b7280", fontSize: 10, fontWeight: 700, padding: "0px 5px", borderRadius: 999, lineHeight: "18px" }}>
+                    <span
+                      className={`rounded-full px-[5px] text-[10px] leading-[18px] font-bold ${activeTab === item.id ? "bg-white/25 text-white" : "bg-[#e5e7eb] text-[#6b7280]"}`}
+                    >
                       {item.badge}
                     </span>
                   )}
@@ -1199,82 +1369,231 @@ export default function DashboardPage() {
 
             {/* ── Overview ─────────────────────────────────────────────── */}
             {activeTab === "overview" && (
-              <div style={{ display: "grid", gap: 16 }}>
+              <div className="grid gap-4">
                 {/* Stats grid */}
-                <div className="db-stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
+                <div className="grid grid-cols-4 gap-3 max-[1100px]:grid-cols-2 max-[768px]:grid-cols-2 max-[480px]:grid-cols-1">
                   {[
-                    { label: "Current Plan",    value: dbUser.plan.toUpperCase(), sub: dbUser.active ? "Account active" : "Inactive", color: normalizedPlan === "advance" || normalizedPlan === "enterprise" ? "#7c3aed" : normalizedPlan === "pro" ? "#16a34a" : "#6b7280" },
-                    { label: "Requests Used",   value: dbUser.usage.toLocaleString("en-IN"), sub: `of ${dbUser.limit.toLocaleString("en-IN")} total`, color: usageColor },
-                    { label: "Requests Left",   value: usageLeft.toLocaleString("en-IN"), sub: `${(100 - usagePct).toFixed(0)}% remaining`, color: "#2563eb" },
-                    { label: "Billing Cycle",   value: billing.display, sub: hasActiveExpirationOverride ? `until ${new Date(activeExpirationTimestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : dbUser.billingDate ? `since ${new Date(dbUser.billingDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : "Not started", color: billing.color },
-                  ].map((s) => (
-                    <div key={s.label} className="db-card db-stat" style={{ borderTop: `3px solid ${s.color}`, padding: "16px 18px" }}>
-                      <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#c0c0c0", marginBottom: 8 }}>{s.label}</p>
-                      <p style={{ fontSize: 22, fontWeight: 800, color: s.color, letterSpacing: "-0.03em", lineHeight: 1 }}>{s.value}</p>
-                      <p style={{ fontSize: 11, color: "#c0c0c0", marginTop: 6 }}>{s.sub}</p>
+                    {
+                      label: "Current Plan",
+                      value: dbUser.plan.toUpperCase(),
+                      sub: dbUser.active ? "Account active" : "Inactive",
+                      color:
+                        normalizedPlan === "advance" ||
+                        normalizedPlan === "enterprise"
+                          ? "#7c3aed"
+                          : normalizedPlan === "pro"
+                            ? "#16a34a"
+                            : "#6b7280",
+                    },
+                    {
+                      label: "Requests Used",
+                      value: dbUser.usage.toLocaleString("en-IN"),
+                      sub: `of ${dbUser.limit.toLocaleString("en-IN")} total`,
+                      color: usageColor,
+                    },
+                    {
+                      label: "Requests Left",
+                      value: usageLeft.toLocaleString("en-IN"),
+                      sub: `${(100 - usagePct).toFixed(0)}% remaining`,
+                      color: "#2563eb",
+                    },
+                    {
+                      label: "Billing Cycle",
+                      value: billing.display,
+                      sub: hasActiveExpirationOverride
+                        ? `until ${new Date(activeExpirationTimestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+                        : dbUser.billingDate
+                          ? `since ${new Date(dbUser.billingDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
+                          : "Not started",
+                      color: billing.color,
+                    },
+                  ].map((s, index) => (
+                    <div
+                      key={s.label}
+                      className={`animate-dashboard-fade-up rounded-2xl border border-[#ebebeb] border-t-[3px] bg-white px-[18px] py-4 max-[480px]:rounded-[13px] ${s.color === "#7c3aed" ? "border-t-[#7c3aed]" : s.color === "#16a34a" ? "border-t-[#16a34a]" : s.color === "#6b7280" ? "border-t-[#6b7280]" : s.color === "#2563eb" ? "border-t-[#2563eb]" : s.color === "#ea580c" ? "border-t-[#ea580c]" : s.color === "#d97706" ? "border-t-[#d97706]" : "border-t-[#dc2626]"} ${index === 0 ? "[animation-delay:0.03s]" : index === 1 ? "[animation-delay:0.07s]" : index === 2 ? "[animation-delay:0.11s]" : "[animation-delay:0.15s]"}`}
+                    >
+                      <p className="mb-2 text-[10px] font-bold tracking-[0.08em] text-[#c0c0c0] uppercase">
+                        {s.label}
+                      </p>
+                      <p
+                        className={`text-[22px] leading-none font-extrabold tracking-[-0.03em] ${s.color === "#7c3aed" ? "text-[#7c3aed]" : s.color === "#16a34a" ? "text-[#16a34a]" : s.color === "#6b7280" ? "text-[#6b7280]" : s.color === "#2563eb" ? "text-[#2563eb]" : s.color === "#ea580c" ? "text-[#ea580c]" : s.color === "#d97706" ? "text-[#d97706]" : "text-[#dc2626]"}`}
+                      >
+                        {s.value}
+                      </p>
+                      <p className="mt-1.5 text-[11px] text-[#c0c0c0]">
+                        {s.sub}
+                      </p>
                     </div>
                   ))}
                 </div>
 
                 {/* Profile + Usage */}
-                <div className="db-overview-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div className="grid grid-cols-2 gap-4 max-[768px]:grid-cols-1">
                   {/* Profile */}
-                  <div className="db-card">
-                    <p className="db-section-label">Profile</p>
-                    <div className="db-profile-head" style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
-                      <img src={dicebearUrl} alt={dbUser.name || dbUser.email} style={{ width: 48, height: 48, borderRadius: 14, border: "1px solid #e5e7eb", flexShrink: 0, background: "#f3f4f6" }} />
-                      <div className="db-profile-copy">
-                        <p style={{ fontSize: 15, fontWeight: 700, color: "#000" }}>{dbUser.name || "—"}</p>
-                        <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>{dbUser.email}</p>
+                  <div className="rounded-2xl border border-[#ebebeb] bg-white p-6 max-[768px]:p-5 max-[480px]:rounded-[13px] max-[480px]:p-4">
+                    <p className="mb-3 text-[10px] font-bold tracking-[0.08em] text-[#c0c0c0] uppercase">
+                      Profile
+                    </p>
+                    <div className="mb-5 flex items-center gap-3.5 max-[480px]:items-start">
+                      <img
+                        src={dicebearUrl}
+                        alt={dbUser.name || dbUser.email}
+                        className="size-12 shrink-0 rounded-[14px] border border-[#e5e7eb] bg-[#f3f4f6]"
+                      />
+                      <div className="min-w-0 pt-0 max-[480px]:pt-[3px] [&_p]:truncate">
+                        <p className="text-[15px] font-bold text-black">
+                          {dbUser.name || "—"}
+                        </p>
+                        <p className="mt-0.5 text-xs text-[#9ca3af]">
+                          {dbUser.email}
+                        </p>
                       </div>
                     </div>
                     {[
-                      { k: "Plan",        v: <PlanBadge plan={dbUser.plan} /> },
-                      { k: "Status",      v: <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12 }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: dbUser.active ? "#22c55e" : "#d1d5db" }} /><span style={{ color: dbUser.active ? "#16a34a" : "#9ca3af" }}>{dbUser.active ? "Active" : "Inactive"}</span></span> },
-                      { k: "Total Spent", v: <span style={{ color: "#16a34a", fontSize: 13, fontWeight: 700 }}>₹{totalSpent.toFixed(2)}</span> },
+                      { k: "Plan", v: <PlanBadge plan={dbUser.plan} /> },
+                      {
+                        k: "Status",
+                        v: (
+                          <span className="inline-flex items-center gap-[5px] text-xs">
+                            <span
+                              className={`size-1.5 rounded-full ${dbUser.active ? "bg-[#22c55e]" : "bg-[#d1d5db]"}`}
+                            />
+                            <span
+                              className={
+                                dbUser.active
+                                  ? "text-[#16a34a]"
+                                  : "text-[#9ca3af]"
+                              }
+                            >
+                              {dbUser.active ? "Active" : "Inactive"}
+                            </span>
+                          </span>
+                        ),
+                      },
+                      {
+                        k: "Total Spent",
+                        v: (
+                          <span className="text-[13px] font-bold text-[#16a34a]">
+                            ₹{totalSpent.toFixed(2)}
+                          </span>
+                        ),
+                      },
                     ].map(({ k, v }) => (
-                      <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", borderTop: "1px solid #f3f4f6" }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "#9ca3af" }}>{k}</span>
+                      <div
+                        key={k}
+                        className="flex items-center justify-between border-t border-[#f3f4f6] py-[11px]"
+                      >
+                        <span className="text-[11px] font-semibold tracking-[0.06em] text-[#9ca3af] uppercase">
+                          {k}
+                        </span>
                         {v}
                       </div>
                     ))}
                   </div>
 
                   {/* Usage & Billing */}
-                  <div className="db-card">
-                    <p className="db-section-label">Usage & Billing</p>
-                    <div style={{ marginBottom: 20 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 7 }}>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>API Requests</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: usageColor }}>{usagePct.toFixed(1)}%</span>
+                  <div className="rounded-2xl border border-[#ebebeb] bg-white p-6 max-[768px]:p-5 max-[480px]:rounded-[13px] max-[480px]:p-4">
+                    <p className="mb-3 text-[10px] font-bold tracking-[0.08em] text-[#c0c0c0] uppercase">
+                      Usage & Billing
+                    </p>
+                    <div className="mb-5">
+                      <div className="mb-[7px] flex justify-between">
+                        <span className="text-xs font-semibold text-[#374151]">
+                          API Requests
+                        </span>
+                        <span
+                          className={`text-xs font-bold ${usageColor === "#16a34a" ? "text-[#16a34a]" : usageColor === "#d97706" ? "text-[#d97706]" : "text-[#ea580c]"}`}
+                        >
+                          {usagePct.toFixed(1)}%
+                        </span>
                       </div>
-                      <div style={{ height: 6, background: "#f3f4f6", borderRadius: 3, overflow: "hidden" }}>
-                        <div style={{ height: "100%", borderRadius: 3, background: usageColor, width: `${Math.min(100, usagePct)}%`, transition: "width 0.6s ease" }} />
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 5 }}>
-                        <span style={{ fontSize: 10, color: "#c0c0c0" }}>{dbUser.usage.toLocaleString("en-IN")} used</span>
-                        <span style={{ fontSize: 10, color: "#c0c0c0" }}>{dbUser.limit.toLocaleString("en-IN")} total</span>
+                      <svg
+                        viewBox="0 0 100 6"
+                        preserveAspectRatio="none"
+                        aria-hidden="true"
+                        className="h-1.5 w-full overflow-hidden rounded-[3px]"
+                      >
+                        <rect
+                          width="100"
+                          height="6"
+                          rx="3"
+                          className="fill-[#f3f4f6]"
+                        />
+                        <rect
+                          width={Math.min(100, usagePct)}
+                          height="6"
+                          rx="3"
+                          className={`transition-[width] duration-[600ms] ease-[ease] ${usageColor === "#16a34a" ? "fill-[#16a34a]" : usageColor === "#d97706" ? "fill-[#d97706]" : "fill-[#ea580c]"}`}
+                        />
+                      </svg>
+                      <div className="mt-[5px] flex justify-between">
+                        <span className="text-[10px] text-[#c0c0c0]">
+                          {dbUser.usage.toLocaleString("en-IN")} used
+                        </span>
+                        <span className="text-[10px] text-[#c0c0c0]">
+                          {dbUser.limit.toLocaleString("en-IN")} total
+                        </span>
                       </div>
                     </div>
-                    {dbUser.plan !== "free" && (dbUser.billingDate || hasActiveExpirationOverride) && (
-                      <div style={{ marginBottom: 20 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 7 }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>Billing Cycle</span>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: billing.color }}>{billing.display}</span>
+                    {dbUser.plan !== "free" &&
+                      (dbUser.billingDate || hasActiveExpirationOverride) && (
+                        <div className="mb-5">
+                          <div className="mb-[7px] flex justify-between">
+                            <span className="text-xs font-semibold text-[#374151]">
+                              Billing Cycle
+                            </span>
+                            <span
+                              className={`text-xs font-bold ${billing.color === "#16a34a" ? "text-[#16a34a]" : billing.color === "#d97706" ? "text-[#d97706]" : "text-[#dc2626]"}`}
+                            >
+                              {billing.display}
+                            </span>
+                          </div>
+                          <svg
+                            viewBox="0 0 100 6"
+                            preserveAspectRatio="none"
+                            aria-hidden="true"
+                            className="h-1.5 w-full overflow-hidden rounded-[3px]"
+                          >
+                            <rect
+                              width="100"
+                              height="6"
+                              rx="3"
+                              className="fill-[#f3f4f6]"
+                            />
+                            <rect
+                              width={billing.pct}
+                              height="6"
+                              rx="3"
+                              className={`transition-[width] duration-[600ms] ease-[ease] ${billing.color === "#16a34a" ? "fill-[#16a34a]" : billing.color === "#d97706" ? "fill-[#d97706]" : "fill-[#dc2626]"}`}
+                            />
+                          </svg>
                         </div>
-                        <div style={{ height: 6, background: "#f3f4f6", borderRadius: 3, overflow: "hidden" }}>
-                          <div style={{ height: "100%", borderRadius: 3, background: billing.color, width: `${billing.pct}%`, transition: "width 0.6s ease" }} />
-                        </div>
-                      </div>
-                    )}
-                    <div className="db-billing-summary" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      )}
+                    <div className="grid grid-cols-2 gap-2.5 max-[480px]:grid-cols-1">
                       {[
-                        { label: "Paid Orders", value: paidOrders.length, color: "#16a34a" },
-                        { label: "Total Spent",  value: `₹${totalSpent.toFixed(0)}`, color: "#d97706" },
+                        {
+                          label: "Paid Orders",
+                          value: paidOrders.length,
+                          color: "#16a34a",
+                        },
+                        {
+                          label: "Total Spent",
+                          value: `₹${totalSpent.toFixed(0)}`,
+                          color: "#d97706",
+                        },
                       ].map((s) => (
-                        <div key={s.label} style={{ background: "#f8f8f8", border: "1px solid #f0f0f0", borderRadius: 10, padding: "12px 14px" }}>
-                          <p style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", color: "#c0c0c0", marginBottom: 5 }}>{s.label}</p>
-                          <p style={{ fontSize: 20, fontWeight: 800, color: s.color, letterSpacing: "-0.03em" }}>{s.value}</p>
+                        <div
+                          key={s.label}
+                          className="rounded-[10px] border border-[#f0f0f0] bg-[#f8f8f8] px-3.5 py-3"
+                        >
+                          <p className="mb-[5px] text-[10px] font-bold tracking-[0.07em] text-[#c0c0c0] uppercase">
+                            {s.label}
+                          </p>
+                          <p
+                            className={`text-xl font-extrabold tracking-[-0.03em] ${s.color === "#16a34a" ? "text-[#16a34a]" : "text-[#d97706]"}`}
+                          >
+                            {s.value}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -1282,132 +1601,197 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Topup */}
-                <div
-                  className="db-card"
-                  style={{ position: "relative" }}
-                  onMouseEnter={(e) => { const o = e.currentTarget.querySelector<HTMLElement>("[data-topup-overlay]"); if (o) o.style.opacity = "1"; }}
-                  onMouseLeave={(e) => { const o = e.currentTarget.querySelector<HTMLElement>("[data-topup-overlay]"); if (o) o.style.opacity = "0"; }}
-                >
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px 10px", flexWrap: "wrap", marginBottom: 14 }}>
-                      <p className="db-section-label" style={{ marginBottom: 0 }}>ADD EXTRA REQUESTS</p>
-                      <p style={{ fontSize: 11, color: "#9ca3af", lineHeight: 1.5 }}>
-                        {usageLeft.toLocaleString("en-IN")} left
-                        {topupDaysLeft !== null && <> · {topupDaysLeft} {topupDaysLeft === 1 ? "day" : "days"} left</>}
-                        {Number.isFinite(topupExpirationTimestamp) && <> · Expires {topupExpiryDate}</>}
-                      </p>
-                    </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 12 }}>
-                      {TOPUP_OPTIONS.map((option, index) => {
-                        const active = index === topupSelection;
-                        return (
-                          <button key={option.requests} type="button" onClick={() => setTopupSelection(index)} disabled={limitPurchaseLoading} aria-pressed={active}
-                            style={{ textAlign: "left", padding: "12px 14px", borderRadius: 12, border: active ? "2px solid #111" : "1px solid #e5e7eb", background: active ? "#f8f8f8" : "#fafafa", color: "#111827", cursor: limitPurchaseLoading ? "wait" : "pointer", transition: "border-color 0.15s, background 0.15s", outline: "none" }}>
-                            <div style={{ fontSize: 12, fontWeight: active ? 700 : 600 }}>+{option.requests.toLocaleString("en-IN")} requests</div>
-                            <div style={{ marginTop: 5, fontSize: 11, color: active ? "#374151" : "#9ca3af" }}>₹{option.price} · ₹{option.perReq.toFixed(3)}/req</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 7, padding: "10px 12px", borderRadius: 9, border: `1px solid ${topupValidityTone.border}`, background: topupValidityTone.background, marginBottom: 12 }}>
-                      <span aria-hidden="true" style={{ color: topupValidityTone.icon, fontSize: 13, lineHeight: 1.5, flexShrink: 0 }}>{topupDaysLeft !== null && topupDaysLeft <= 7 ? "⚠" : "ⓘ"}</span>
-                      <p style={{ minWidth: 0, fontSize: 11, color: topupValidityTone.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>{topupValidityMessage}</p>
-                    </div>
-                    <button type="button" onClick={startLimitTopupPayment} disabled={limitPurchaseLoading} style={{ width: "100%", border: "none", background: limitPurchaseLoading ? "#e5e7eb" : "#4f46e5", color: limitPurchaseLoading ? "#9ca3af" : "#fff", borderRadius: 12, padding: "13px", cursor: limitPurchaseLoading ? "wait" : "pointer", fontSize: 13, fontWeight: 700, transition: "background 0.15s", letterSpacing: "0.01em" }}>
-                      {limitPurchaseLoading ? "Processing..." : `Add ${selectedTopup.requests.toLocaleString("en-IN")} Requests — ₹${selectedTopup.price.toLocaleString("en-IN")} →`}
-                    </button>
-                    <p style={{ marginTop: 7, fontSize: 10, color: "#9ca3af", lineHeight: 1.4, textAlign: "center" }}>Payments securely processed by Cashfree.</p>
-                    {limitPurchaseMessage && (
-                      <p role="status" style={{ marginTop: 8, padding: "7px 9px", borderRadius: 8, border: `1px solid ${topupMessageIsError ? "#fecaca" : "#e5e7eb"}`, background: topupMessageIsError ? "#fef2f2" : "#f9fafb", color: topupMessageIsError ? "#dc2626" : "#6b7280", fontSize: 11, lineHeight: 1.45 }}>{limitPurchaseMessage}</p>
-                    )}
-                    {!canBuyLimitTopup && (
-                      <div
-                        className="db-topup-overlay"
-                        data-topup-overlay
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          borderRadius: 12,
-                          background: "rgba(255, 255, 255, 0.6)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 10,
-                          padding: 20,
-                          zIndex: 2,
-                          pointerEvents: "none",
-                          opacity: 0,
-                          transition: "opacity 0.18s ease",
-                        }}
-                      >
-                        <p style={{ fontSize: 13, color: "#374151", margin: 0 }}>
-                          Purchase a plan to increase your request limit
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => router.push("/pricing")}
-                          style={{
-                            background: "#111827",
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 8,
-                            padding: "8px 14px",
-                            fontSize: 12,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            pointerEvents: "auto",
-                          }}
-                        >
-                          View plans
-                        </button>
-                      </div>
-                    )}
+                <div className="group/topup relative rounded-2xl border border-[#ebebeb] bg-white p-6 max-[768px]:p-5 max-[480px]:rounded-[13px] max-[480px]:p-4">
+                  <div className="mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                    <p className="text-[10px] font-bold tracking-[0.08em] text-[#c0c0c0] uppercase">
+                      ADD EXTRA REQUESTS
+                    </p>
+                    <p className="text-[11px] leading-normal text-[#9ca3af]">
+                      {usageLeft.toLocaleString("en-IN")} left
+                      {topupDaysLeft !== null && (
+                        <>
+                          {" "}
+                          · {topupDaysLeft}{" "}
+                          {topupDaysLeft === 1 ? "day" : "days"} left
+                        </>
+                      )}
+                      {Number.isFinite(topupExpirationTimestamp) && (
+                        <> · Expires {topupExpiryDate}</>
+                      )}
+                    </p>
                   </div>
+                  <div className="mb-3 grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2.5">
+                    {TOPUP_OPTIONS.map((option, index) => {
+                      const active = index === topupSelection;
+                      return (
+                        <button
+                          key={option.requests}
+                          type="button"
+                          onClick={() => setTopupSelection(index)}
+                          disabled={limitPurchaseLoading}
+                          aria-pressed={active}
+                          className={`cursor-pointer rounded-xl px-3.5 py-3 text-left text-[#111827] outline-none transition-[border-color,background] duration-150 disabled:cursor-wait ${active ? "border-2 border-[#111] bg-[#f8f8f8]" : "border border-[#e5e7eb] bg-[#fafafa]"}`}
+                        >
+                          <div
+                            className={`text-xs ${active ? "font-bold" : "font-semibold"}`}
+                          >
+                            +{option.requests.toLocaleString("en-IN")} requests
+                          </div>
+                          <div
+                            className={`mt-[5px] text-[11px] ${active ? "text-[#374151]" : "text-[#9ca3af]"}`}
+                          >
+                            ₹{option.price} · ₹{option.perReq.toFixed(3)}/req
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div
+                    className={`${topupValidityTone.box} mb-3 flex items-start gap-[7px] rounded-[9px] border px-3 py-2.5`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`${topupValidityTone.icon} shrink-0 text-[13px] leading-normal`}
+                    >
+                      {topupDaysLeft !== null && topupDaysLeft <= 7 ? "⚠" : "ⓘ"}
+                    </span>
+                    <p
+                      className={`${topupValidityTone.text} min-w-0 text-[11px] leading-normal [overflow-wrap:anywhere]`}
+                    >
+                      {topupValidityMessage}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={startLimitTopupPayment}
+                    disabled={limitPurchaseLoading}
+                    className={`w-full rounded-xl border-none p-[13px] text-[13px] font-bold tracking-[0.01em] transition-colors duration-150 ${limitPurchaseLoading ? "cursor-wait bg-[#e5e7eb] text-[#9ca3af]" : "cursor-pointer bg-[#4f46e5] text-white"}`}
+                  >
+                    {limitPurchaseLoading
+                      ? "Processing..."
+                      : `Add ${selectedTopup.requests.toLocaleString("en-IN")} Requests — ₹${selectedTopup.price.toLocaleString("en-IN")} →`}
+                  </button>
+                  <p className="mt-[7px] text-center text-[10px] leading-[1.4] text-[#9ca3af]">
+                    Payments securely processed by Cashfree.
+                  </p>
+                  {limitPurchaseMessage && (
+                    <p
+                      role="status"
+                      className={`mt-2 rounded-lg border px-[9px] py-[7px] text-[11px] leading-[1.45] ${topupMessageIsError ? "border-[#fecaca] bg-[#fef2f2] text-[#dc2626]" : "border-[#e5e7eb] bg-[#f9fafb] text-[#6b7280]"}`}
+                    >
+                      {limitPurchaseMessage}
+                    </p>
+                  )}
+                  {!canBuyLimitTopup && (
+                    <div
+                      className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center gap-2.5 rounded-xl bg-white/60 p-5 opacity-0 transition-opacity duration-[180ms] group-hover/topup:opacity-100 max-[768px]:flex-col max-[768px]:text-center"
+                      data-topup-overlay
+                    >
+                      <p className="text-[13px] text-[#374151]">
+                        Purchase a plan to increase your request limit
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => router.push("/pricing")}
+                        className="pointer-events-auto cursor-pointer rounded-lg border-none bg-[#111827] px-3.5 py-2 text-xs font-semibold text-white"
+                      >
+                        View plans
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             {/* ── API Key ───────────────────────────────────────────────── */}
             {activeTab === "apikey" && (
-              <div className="db-card">
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 10, background: "#f3f4f6", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", color: "#374151", flexShrink: 0 }}>
+              <div className={dashboardCardClass}>
+                <div className="mb-1.5 flex items-center gap-2.5">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-[10px] border border-[#e5e7eb] bg-[#f3f4f6] text-[#374151]">
                     <IconKey />
                   </div>
-                  <p style={{ fontSize: 16, fontWeight: 700, color: "#000" }}>Secret API Key</p>
+                  <p className="text-base font-bold text-black">
+                    Secret API Key
+                  </p>
                 </div>
-                <p className="db-install-copy" style={{ fontSize: 12, color: "#9ca3af", marginBottom: 20, lineHeight: 1.7 }}>
+                <p className="mb-5 text-xs leading-[1.7] text-[#9ca3af] max-[480px]:[overflow-wrap:anywhere]">
                   Install{" "}
-                  <span style={{ color: "#16a34a", background: "#f0fdf4", padding: "1px 7px", borderRadius: 5, border: "1px solid #bbf7d0", fontSize: 12 }}>npm install railkit</span>
-                  {" "}→ configure your key → call any function
+                  <span className="rounded-[5px] border border-[#bbf7d0] bg-[#f0fdf4] px-[7px] py-px text-xs text-[#16a34a]">
+                    npm install railkit
+                  </span>{" "}
+                  → configure your key → call any function
                 </p>
-                <div className="db-key-warning" style={{ background: "#f8f8f8", border: "1px solid #f0f0f0", borderRadius: 10, padding: "10px 14px", marginBottom: 18, display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: "#6b7280", flexShrink: 0 }}><IconShield /></span>
-                  <span style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>Your key grants full package access. Rotate it immediately if you believe it has been compromised.</span>
+                <div className="mb-[18px] flex items-center gap-2 rounded-[10px] border border-[#f0f0f0] bg-[#f8f8f8] px-3.5 py-2.5 max-[480px]:items-start">
+                  <span className="shrink-0 text-[#6b7280]">
+                    <IconShield />
+                  </span>
+                  <span className="text-xs leading-[1.6] text-[#6b7280]">
+                    Your key grants full package access. Rotate it immediately
+                    if you believe it has been compromised.
+                  </span>
                 </div>
                 {/* Key row */}
-                <div className="db-key-row" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <div className="db-key-field" style={{ flex: 1, minWidth: 0, background: "#fafafa", border: "1px solid #e5e7eb", borderRadius: 10, padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <span className="db-key-value" style={{ fontFamily: "var(--font-noto), 'Noto Sans', monospace", fontSize: 13, color: "#374151", overflowX: "auto", whiteSpace: "nowrap", flex: 1 }}>
-                      {regeneratingKey ? <ApiKeySkeleton /> : keyVisible ? dbUser.apiKey : maskedKey}
+                <div className="flex flex-wrap gap-2 max-[768px]:flex-col">
+                  <div className="flex w-full min-w-0 flex-1 items-center justify-between gap-2 rounded-[10px] border border-[#e5e7eb] bg-[#fafafa] px-3.5 py-[11px] max-[768px]:flex-none max-[480px]:px-[11px] max-[480px]:py-2.5">
+                    <span className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-[var(--font-noto),'Noto_Sans',monospace] text-[13px] text-[#374151] [scrollbar-width:thin] max-[480px]:text-xs">
+                      {regeneratingKey ? (
+                        <ApiKeySkeleton />
+                      ) : keyVisible ? (
+                        dbUser.apiKey
+                      ) : (
+                        maskedKey
+                      )}
                     </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
-                      <button type="button" onClick={() => setKeyVisible(!keyVisible)} aria-label={keyVisible ? "Hide key" : "Reveal key"} disabled={regeneratingKey} style={{ background: "none", border: "none", color: regeneratingKey ? "#d1d5db" : "#9ca3af", cursor: regeneratingKey ? "not-allowed" : "pointer", display: "flex", alignItems: "center", padding: 4 }}>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setKeyVisible(!keyVisible)}
+                        aria-label={keyVisible ? "Hide key" : "Reveal key"}
+                        disabled={regeneratingKey}
+                        className={`flex items-center border-none bg-transparent p-1 ${regeneratingKey ? "cursor-not-allowed text-[#d1d5db]" : "cursor-pointer text-[#9ca3af]"}`}
+                      >
                         {keyVisible ? <IconEyeOff /> : <IconEye />}
                       </button>
-                      <button type="button" onClick={copyApiKey} aria-label={copied ? "Copied" : "Copy key"} disabled={regeneratingKey} style={{ background: "none", border: "none", color: copied ? "#16a34a" : regeneratingKey ? "#d1d5db" : "#9ca3af", cursor: regeneratingKey ? "not-allowed" : "pointer", display: "flex", alignItems: "center", padding: 4, transition: "color 0.2s" }}>
+                      <button
+                        type="button"
+                        onClick={copyApiKey}
+                        aria-label={copied ? "Copied" : "Copy key"}
+                        disabled={regeneratingKey}
+                        className={`flex items-center border-none bg-transparent p-1 transition-colors duration-200 ${copied ? "text-[#16a34a]" : regeneratingKey ? "cursor-not-allowed text-[#d1d5db]" : "cursor-pointer text-[#9ca3af]"}`}
+                      >
                         {copied ? <IconCheck /> : <IconCopy />}
                       </button>
                     </div>
                   </div>
-                  <button className="db-key-regen" type="button" onClick={regenerateApiKey} disabled={regeneratingKey} style={{ background: regeneratingKey ? "#e5e7eb" : "#000", border: "none", color: regeneratingKey ? "#9ca3af" : "#fff", borderRadius: 10, padding: "0 20px", cursor: regeneratingKey ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap", height: 44, transition: "background 0.2s" }}>
-                    <span style={{ display: "inline-flex", animation: regeneratingKey ? "spin 0.9s linear infinite" : "none" }}><IconRefresh /></span>
+                  <button
+                    type="button"
+                    onClick={regenerateApiKey}
+                    disabled={regeneratingKey}
+                    className={`flex h-11 items-center gap-2 whitespace-nowrap rounded-[10px] border-none px-5 text-[13px] font-semibold transition-colors duration-200 max-[768px]:w-full max-[768px]:justify-center ${regeneratingKey ? "cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]" : "cursor-pointer bg-black text-white"}`}
+                  >
+                    <span
+                      className={`inline-flex ${regeneratingKey ? "animate-spin" : ""}`}
+                    >
+                      <IconRefresh />
+                    </span>
                     {regeneratingKey ? "Regenerating..." : "Regenerate Key"}
                   </button>
                 </div>
-                {regenerateError && <p style={{ marginTop: 10, color: "#dc2626", fontSize: 12 }}>{regenerateError}</p>}
+                {regenerateError && (
+                  <p className="mt-2.5 text-xs text-[#dc2626]">
+                    {regenerateError}
+                  </p>
+                )}
                 {/* Code example */}
-                <div className="db-code-block" style={{ marginTop: 24, background: "#0d1117", border: "1px solid #21262d", borderRadius: 14, padding: "16px 20px" }}>
-                  <p style={{ color: "#6b7280", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12, fontWeight: 600 }}>Example Usage</p>
-                  <SyntaxHighlighter language="typescript" style={nightOwl} customStyle={{ margin: 0, background: "transparent", fontSize: 12, lineHeight: 1.8, padding: 0 }}>
+                <div className="mt-6 max-w-full overflow-x-auto rounded-[14px] border border-[#21262d] bg-[#0d1117] px-5 py-4 [-webkit-overflow-scrolling:touch] max-[480px]:rounded-[11px] max-[480px]:p-3 [&_pre]:min-w-max">
+                  <p className="mb-3 text-[10px] font-semibold tracking-[0.1em] text-[#6b7280] uppercase">
+                    Example Usage
+                  </p>
+                  <SyntaxHighlighter
+                    language="typescript"
+                    style={nightOwl}
+                    className="!m-0 !bg-transparent !p-0 !text-xs !leading-[1.8]"
+                  >
                     {usageExampleCode}
                   </SyntaxHighlighter>
                 </div>
@@ -1416,40 +1800,80 @@ export default function DashboardPage() {
 
             {/* ── API Endpoints ─────────────────────────────────────────── */}
             {activeTab === "apiendpoints" && (
-              <div style={{ display: "grid", gap: 14 }}>
-                <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 12, padding: "12px 16px", color: "#9a3412", fontSize: 12, lineHeight: 1.7 }}>
-                  Direct API access is enabled only on the <b>Advance</b> plan. Free/Pro users must use the official SDK.
+              <div className="grid gap-3.5">
+                <div className="rounded-xl border border-[#fed7aa] bg-[#fff7ed] px-4 py-3 text-xs leading-[1.7] text-[#9a3412]">
+                  Direct API access is enabled only on the <b>Advance</b> plan.
+                  Free/Pro users must use the official SDK.
                 </div>
-                <div className="db-card">
-                  <p style={{ fontSize: 15, fontWeight: 700, color: "#000", marginBottom: 10 }}>How to call endpoints</p>
-                  <div className="db-language-select" style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
-                    <select value={apiCodeLanguage} onChange={(e) => setApiCodeLanguage(e.target.value as ApiCodeLanguage)} className="db-select" style={{ width: "auto" }}>
-                      {(Object.keys(apiLanguageMeta) as ApiCodeLanguage[]).map((lang) => (
-                        <option key={lang} value={lang}>{apiLanguageMeta[lang].label}</option>
-                      ))}
+                <div className={dashboardCardClass}>
+                  <p className="mb-2.5 text-[15px] font-bold text-black">
+                    How to call endpoints
+                  </p>
+                  <div className="mb-2.5 flex justify-end">
+                    <select
+                      value={apiCodeLanguage}
+                      onChange={(e) =>
+                        setApiCodeLanguage(e.target.value as ApiCodeLanguage)
+                      }
+                      className={`${dashboardSelectClass} !w-auto max-[768px]:!w-full`}
+                    >
+                      {(Object.keys(apiLanguageMeta) as ApiCodeLanguage[]).map(
+                        (lang) => (
+                          <option key={lang} value={lang}>
+                            {apiLanguageMeta[lang].label}
+                          </option>
+                        ),
+                      )}
                     </select>
                   </div>
-                  <p className="db-break-anywhere" style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.7, marginBottom: 14 }}>
-                    Base URL: <span style={{ color: "#2563eb" }}>{directApiBaseUrl}</span><br />
-                    Required header: <span style={{ color: "#16a34a" }}>x-api-key: YOUR_API_KEY</span>
+                  <p className="mb-3.5 break-words text-xs leading-[1.7] text-[#6b7280] [overflow-wrap:anywhere]">
+                    Base URL:{" "}
+                    <span className="text-[#2563eb]">{directApiBaseUrl}</span>
+                    <br />
+                    Required header:{" "}
+                    <span className="text-[#16a34a]">
+                      x-api-key: YOUR_API_KEY
+                    </span>
                   </p>
-                  <div className="db-code-block" style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 12, padding: 14, overflowX: "auto" }}>
-                    <SyntaxHighlighter language={apiLanguageMeta[apiCodeLanguage].syntax} style={nightOwl} customStyle={{ margin: 0, background: "transparent", fontSize: 12, lineHeight: 1.7, padding: 0 }}>
-                      {buildApiSnippet("/api/checkPNRStatus/1234567890", apiCodeLanguage)}
+                  <div className="max-w-full overflow-x-auto rounded-xl border border-[#21262d] bg-[#0d1117] p-3.5 [-webkit-overflow-scrolling:touch] max-[480px]:rounded-[11px] max-[480px]:p-3 [&_pre]:min-w-max">
+                    <SyntaxHighlighter
+                      language={apiLanguageMeta[apiCodeLanguage].syntax}
+                      style={nightOwl}
+                      className="!m-0 !bg-transparent !p-0 !text-xs !leading-[1.7]"
+                    >
+                      {buildApiSnippet(
+                        "/api/checkPNRStatus/1234567890",
+                        apiCodeLanguage,
+                      )}
                     </SyntaxHighlighter>
                   </div>
                 </div>
                 {apiEndpointDocs.map((endpoint) => (
-                  <div key={endpoint.path} className="db-card">
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
-                      <span style={{ color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>{endpoint.method}</span>
-                      <p style={{ fontSize: 14, fontWeight: 700, color: "#000" }}>{endpoint.name}</p>
+                  <div key={endpoint.path} className={dashboardCardClass}>
+                    <div className="mb-2 flex flex-wrap items-center gap-2.5">
+                      <span className="rounded-md border border-[#bbf7d0] bg-[#f0fdf4] px-2 py-0.5 text-[11px] font-bold text-[#16a34a]">
+                        {endpoint.method}
+                      </span>
+                      <p className="text-sm font-bold text-black">
+                        {endpoint.name}
+                      </p>
                     </div>
-                    <p style={{ fontSize: 12, color: "#374151", marginBottom: 4, wordBreak: "break-all" }}>{endpoint.path}</p>
-                    <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4, wordBreak: "break-all" }}>Example: {directApiBaseUrl}{endpoint.examplePath}</p>
-                    <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>{endpoint.notes}</p>
-                    <div className="db-code-block" style={{ background: "#0d1117", border: "1px solid #21262d", borderRadius: 12, padding: 14, overflowX: "auto" }}>
-                      <SyntaxHighlighter language={apiLanguageMeta[apiCodeLanguage].syntax} style={nightOwl} customStyle={{ margin: 0, background: "transparent", fontSize: 12, lineHeight: 1.7, padding: 0 }}>
+                    <p className="mb-1 break-all text-xs text-[#374151]">
+                      {endpoint.path}
+                    </p>
+                    <p className="mb-1 break-all text-[11px] text-[#9ca3af]">
+                      Example: {directApiBaseUrl}
+                      {endpoint.examplePath}
+                    </p>
+                    <p className="mb-3 text-[11px] text-[#9ca3af]">
+                      {endpoint.notes}
+                    </p>
+                    <div className="max-w-full overflow-x-auto rounded-xl border border-[#21262d] bg-[#0d1117] p-3.5 [-webkit-overflow-scrolling:touch] max-[480px]:rounded-[11px] max-[480px]:p-3 [&_pre]:min-w-max">
+                      <SyntaxHighlighter
+                        language={apiLanguageMeta[apiCodeLanguage].syntax}
+                        style={nightOwl}
+                        className="!m-0 !bg-transparent !p-0 !text-xs !leading-[1.7]"
+                      >
                         {buildApiSnippet(endpoint.examplePath, apiCodeLanguage)}
                       </SyntaxHighlighter>
                     </div>
@@ -1460,100 +1884,374 @@ export default function DashboardPage() {
 
             {/* ── Playground ────────────────────────────────────────────── */}
             {activeTab === "playground" && (
-              <div className="db-playground-grid" style={{ display: "grid", gridTemplateColumns: "1.05fr 0.95fr", gap: 16 }}>
-                <div className="db-card">
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
-                    <p style={{ fontSize: 15, fontWeight: 700, color: "#000" }}>API Playground</p>
-                    <span style={{ color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 600 }}>Using your API key</span>
+              <div className="grid grid-cols-[1.05fr_0.95fr] gap-4 max-[1100px]:grid-cols-1">
+                <div className={dashboardCardClass}>
+                  <div className="mb-2.5 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-[15px] font-bold text-black">
+                      API Playground
+                    </p>
+                    <span className="rounded-md border border-[#bbf7d0] bg-[#f0fdf4] px-2 py-[3px] text-[11px] font-semibold text-[#16a34a]">
+                      Using your API key
+                    </span>
                   </div>
-                  <p style={{ fontSize: 12, color: "#9ca3af", lineHeight: 1.7, marginBottom: 16 }}>Run live requests without leaving your workspace.</p>
+                  <p className="mb-4 text-xs leading-[1.7] text-[#9ca3af]">
+                    Run live requests without leaving your workspace.
+                  </p>
                   {/* Action pills */}
-                  <div className="db-action-pills" style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
-                    {[{ id: "pnr", label: "PNR" }, { id: "train", label: "Train" }, { id: "track", label: "Track" }, { id: "history", label: "History" }, { id: "station", label: "Station" }, { id: "search", label: "Search" }, { id: "seat", label: "Seat" }, { id: "fare", label: "Fare" }, { id: "cancelled", label: "Cancelled" }].map((item) => (
-                      <button type="button" key={item.id} onClick={() => { setPlaygroundAction(item.id as typeof playgroundAction); resetPlaygroundMeta(); }}
-                        style={{ background: playgroundAction === item.id ? "#000" : "#f3f4f6", border: `1px solid ${playgroundAction === item.id ? "#000" : "#e5e7eb"}`, color: playgroundAction === item.id ? "#fff" : "#6b7280", borderRadius: 8, padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "background 0.15s, color 0.15s" }}>
+                  <div className="mb-4 flex flex-wrap gap-1.5 max-[768px]:[&>button]:min-h-10">
+                    {[
+                      { id: "pnr", label: "PNR" },
+                      { id: "train", label: "Train" },
+                      { id: "track", label: "Track" },
+                      { id: "history", label: "History" },
+                      { id: "station", label: "Station" },
+                      { id: "search", label: "Search" },
+                      { id: "seat", label: "Seat" },
+                      { id: "fare", label: "Fare" },
+                      { id: "cancelled", label: "Cancelled" },
+                    ].map((item) => (
+                      <button
+                        type="button"
+                        key={item.id}
+                        onClick={() => {
+                          setPlaygroundAction(
+                            item.id as typeof playgroundAction,
+                          );
+                          resetPlaygroundMeta();
+                        }}
+                        className={`cursor-pointer rounded-lg border px-3.5 py-1.5 text-xs font-semibold transition-[background,color] duration-150 ${playgroundAction === item.id ? "border-black bg-black text-white" : "border-[#e5e7eb] bg-[#f3f4f6] text-[#6b7280]"}`}
+                      >
                         {item.label}
                       </button>
                     ))}
                   </div>
                   {/* Inputs */}
-                  <div className="db-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                    {playgroundAction === "pnr" && <input value={pnrInput} onChange={(e) => setPnrInput(e.target.value.replace(/\D/g, ""))} maxLength={10} placeholder="PNR number (10 digits)" className="db-input" style={{ gridColumn: "1 / -1" }} />}
-                    {playgroundAction === "train" && <input value={trainInput} onChange={(e) => setTrainInput(e.target.value.replace(/\D/g, ""))} maxLength={5} placeholder="Train number (5 digits)" className="db-input" style={{ gridColumn: "1 / -1" }} />}
-                    {playgroundAction === "track" && (<>
-                      <input value={trackTrainInput} onChange={(e) => setTrackTrainInput(e.target.value.replace(/\D/g, ""))} maxLength={5} placeholder="Train number" className="db-input" />
-                      <input type="date" value={toInputDate(trackDateInput)} onChange={(e) => setTrackDateInput(fromInputDate(e.target.value))} className="db-input" />
-                    </>)}
-                    {playgroundAction === "history" && (<>
-                      <input value={historyTrainInput} onChange={(e) => setHistoryTrainInput(e.target.value.replace(/\D/g, ""))} maxLength={5} placeholder="Train number" className="db-input" />
-                      <input type="date" value={toInputDate(historyDateInput)} onChange={(e) => setHistoryDateInput(fromInputDate(e.target.value))} className="db-input" />
-                    </>)}
-                    {playgroundAction === "station" && (<>
-                      <input value={stationInput} onChange={(e) => setStationInput(e.target.value.toUpperCase())} placeholder="Station code (e.g. NDLS)" className="db-input" />
-                      <select value={stationHoursInput} onChange={(e) => setStationHoursInput(e.target.value as "2" | "4" | "8")} className="db-select" aria-label="Time window in hours">
-                        <option value="2">2 hrs</option>
-                        <option value="4">4 hrs</option>
-                        <option value="8">8 hrs</option>
-                      </select>
-                    </>)}
-                    {playgroundAction === "search" && (<>
-                      <input value={fromStationInput} onChange={(e) => setFromStationInput(e.target.value.toUpperCase())} placeholder="From station code" className="db-input" />
-                      <input value={toStationInput} onChange={(e) => setToStationInput(e.target.value.toUpperCase())} placeholder="To station code" className="db-input" />
-                      <input type="date" value={toInputDate(searchDateInput)} onChange={(e) => setSearchDateInput(fromInputDate(e.target.value))} className="db-input" />
-                    </>)}
-                    {playgroundAction === "seat" && (<>
-                      <input value={seatTrainInput} onChange={(e) => setSeatTrainInput(e.target.value.replace(/\D/g, ""))} maxLength={5} placeholder="Train number" className="db-input" />
-                      <input type="date" value={toInputDate(seatDateInput)} onChange={(e) => setSeatDateInput(fromInputDate(e.target.value))} className="db-input" />
-                      <input value={seatFromInput} onChange={(e) => setSeatFromInput(e.target.value.toUpperCase())} placeholder="From station code" className="db-input" />
-                      <input value={seatToInput} onChange={(e) => setSeatToInput(e.target.value.toUpperCase())} placeholder="To station code" className="db-input" />
-                      <select value={seatClassInput} onChange={(e) => setSeatClassInput(e.target.value)} className="db-select">
-                        {["SL", "3A", "2A", "1A", "CC", "EC", "2S"].map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                      <select value={seatQuotaInput} onChange={(e) => setSeatQuotaInput(e.target.value)} className="db-select">
-                        {["GN", "TQ", "LD", "PT", "SS"].map((q) => <option key={q} value={q}>{q}</option>)}
-                      </select>
-                    </>)}
-                    {playgroundAction === "fare" && (<>
-                      <input value={fareTrainInput} onChange={(e) => setFareTrainInput(e.target.value.replace(/\D/g, ""))} maxLength={5} placeholder="Train number" className="db-input" />
-                      <input type="date" value={toInputDate(fareDateInput)} onChange={(e) => setFareDateInput(fromInputDate(e.target.value))} className="db-input" />
-                      <input value={fareFromInput} onChange={(e) => setFareFromInput(e.target.value.toUpperCase())} placeholder="From station code" className="db-input" />
-                      <input value={fareToInput} onChange={(e) => setFareToInput(e.target.value.toUpperCase())} placeholder="To station code" className="db-input" />
-                      <select value={fareClassInput} onChange={(e) => setFareClassInput(e.target.value)} className="db-select">
-                        {["SL","3A","2A","1A","CC","EC","EA","FC","2S","3E","VS","CH","HS","VC","VA"].map((c) => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                      <select value={fareQuotaInput} onChange={(e) => setFareQuotaInput(e.target.value)} className="db-select">
-                        {["GN","TQ","PT","LD","DF","FT","LB","YU","DP","HP","PH","SS"].map((q) => <option key={q} value={q}>{q}</option>)}
-                      </select>
-                    </>)}
+                  <div className="grid grid-cols-2 gap-2.5 max-[768px]:grid-cols-1 max-[768px]:[&>*]:col-span-full max-[768px]:[&>*]:min-w-0">
+                    {playgroundAction === "pnr" && (
+                      <input
+                        value={pnrInput}
+                        onChange={(e) =>
+                          setPnrInput(e.target.value.replace(/\D/g, ""))
+                        }
+                        maxLength={10}
+                        placeholder="PNR number (10 digits)"
+                        className={`${dashboardInputClass} col-span-full`}
+                      />
+                    )}
+                    {playgroundAction === "train" && (
+                      <input
+                        value={trainInput}
+                        onChange={(e) =>
+                          setTrainInput(e.target.value.replace(/\D/g, ""))
+                        }
+                        maxLength={5}
+                        placeholder="Train number (5 digits)"
+                        className={`${dashboardInputClass} col-span-full`}
+                      />
+                    )}
+                    {playgroundAction === "track" && (
+                      <>
+                        <input
+                          value={trackTrainInput}
+                          onChange={(e) =>
+                            setTrackTrainInput(
+                              e.target.value.replace(/\D/g, ""),
+                            )
+                          }
+                          maxLength={5}
+                          placeholder="Train number"
+                          className={dashboardInputClass}
+                        />
+                        <input
+                          type="date"
+                          value={toInputDate(trackDateInput)}
+                          onChange={(e) =>
+                            setTrackDateInput(fromInputDate(e.target.value))
+                          }
+                          className={dashboardInputClass}
+                        />
+                      </>
+                    )}
+                    {playgroundAction === "history" && (
+                      <>
+                        <input
+                          value={historyTrainInput}
+                          onChange={(e) =>
+                            setHistoryTrainInput(
+                              e.target.value.replace(/\D/g, ""),
+                            )
+                          }
+                          maxLength={5}
+                          placeholder="Train number"
+                          className={dashboardInputClass}
+                        />
+                        <input
+                          type="date"
+                          value={toInputDate(historyDateInput)}
+                          onChange={(e) =>
+                            setHistoryDateInput(fromInputDate(e.target.value))
+                          }
+                          className={dashboardInputClass}
+                        />
+                      </>
+                    )}
+                    {playgroundAction === "station" && (
+                      <>
+                        <input
+                          value={stationInput}
+                          onChange={(e) =>
+                            setStationInput(e.target.value.toUpperCase())
+                          }
+                          placeholder="Station code (e.g. NDLS)"
+                          className={dashboardInputClass}
+                        />
+                        <select
+                          value={stationHoursInput}
+                          onChange={(e) =>
+                            setStationHoursInput(
+                              e.target.value as "2" | "4" | "8",
+                            )
+                          }
+                          className={dashboardSelectClass}
+                          aria-label="Time window in hours"
+                        >
+                          <option value="2">2 hrs</option>
+                          <option value="4">4 hrs</option>
+                          <option value="8">8 hrs</option>
+                        </select>
+                      </>
+                    )}
+                    {playgroundAction === "search" && (
+                      <>
+                        <input
+                          value={fromStationInput}
+                          onChange={(e) =>
+                            setFromStationInput(e.target.value.toUpperCase())
+                          }
+                          placeholder="From station code"
+                          className={dashboardInputClass}
+                        />
+                        <input
+                          value={toStationInput}
+                          onChange={(e) =>
+                            setToStationInput(e.target.value.toUpperCase())
+                          }
+                          placeholder="To station code"
+                          className={dashboardInputClass}
+                        />
+                        <input
+                          type="date"
+                          value={toInputDate(searchDateInput)}
+                          onChange={(e) =>
+                            setSearchDateInput(fromInputDate(e.target.value))
+                          }
+                          className={dashboardInputClass}
+                        />
+                      </>
+                    )}
+                    {playgroundAction === "seat" && (
+                      <>
+                        <input
+                          value={seatTrainInput}
+                          onChange={(e) =>
+                            setSeatTrainInput(e.target.value.replace(/\D/g, ""))
+                          }
+                          maxLength={5}
+                          placeholder="Train number"
+                          className={dashboardInputClass}
+                        />
+                        <input
+                          type="date"
+                          value={toInputDate(seatDateInput)}
+                          onChange={(e) =>
+                            setSeatDateInput(fromInputDate(e.target.value))
+                          }
+                          className={dashboardInputClass}
+                        />
+                        <input
+                          value={seatFromInput}
+                          onChange={(e) =>
+                            setSeatFromInput(e.target.value.toUpperCase())
+                          }
+                          placeholder="From station code"
+                          className={dashboardInputClass}
+                        />
+                        <input
+                          value={seatToInput}
+                          onChange={(e) =>
+                            setSeatToInput(e.target.value.toUpperCase())
+                          }
+                          placeholder="To station code"
+                          className={dashboardInputClass}
+                        />
+                        <select
+                          value={seatClassInput}
+                          onChange={(e) => setSeatClassInput(e.target.value)}
+                          className={dashboardSelectClass}
+                        >
+                          {["SL", "3A", "2A", "1A", "CC", "EC", "2S"].map(
+                            (c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                        <select
+                          value={seatQuotaInput}
+                          onChange={(e) => setSeatQuotaInput(e.target.value)}
+                          className={dashboardSelectClass}
+                        >
+                          {["GN", "TQ", "LD", "PT", "SS"].map((q) => (
+                            <option key={q} value={q}>
+                              {q}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    )}
+                    {playgroundAction === "fare" && (
+                      <>
+                        <input
+                          value={fareTrainInput}
+                          onChange={(e) =>
+                            setFareTrainInput(e.target.value.replace(/\D/g, ""))
+                          }
+                          maxLength={5}
+                          placeholder="Train number"
+                          className={dashboardInputClass}
+                        />
+                        <input
+                          type="date"
+                          value={toInputDate(fareDateInput)}
+                          onChange={(e) =>
+                            setFareDateInput(fromInputDate(e.target.value))
+                          }
+                          className={dashboardInputClass}
+                        />
+                        <input
+                          value={fareFromInput}
+                          onChange={(e) =>
+                            setFareFromInput(e.target.value.toUpperCase())
+                          }
+                          placeholder="From station code"
+                          className={dashboardInputClass}
+                        />
+                        <input
+                          value={fareToInput}
+                          onChange={(e) =>
+                            setFareToInput(e.target.value.toUpperCase())
+                          }
+                          placeholder="To station code"
+                          className={dashboardInputClass}
+                        />
+                        <select
+                          value={fareClassInput}
+                          onChange={(e) => setFareClassInput(e.target.value)}
+                          className={dashboardSelectClass}
+                        >
+                          {[
+                            "SL",
+                            "3A",
+                            "2A",
+                            "1A",
+                            "CC",
+                            "EC",
+                            "EA",
+                            "FC",
+                            "2S",
+                            "3E",
+                            "VS",
+                            "CH",
+                            "HS",
+                            "VC",
+                            "VA",
+                          ].map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={fareQuotaInput}
+                          onChange={(e) => setFareQuotaInput(e.target.value)}
+                          className={dashboardSelectClass}
+                        >
+                          {[
+                            "GN",
+                            "TQ",
+                            "PT",
+                            "LD",
+                            "DF",
+                            "FT",
+                            "LB",
+                            "YU",
+                            "DP",
+                            "HP",
+                            "PH",
+                            "SS",
+                          ].map((q) => (
+                            <option key={q} value={q}>
+                              {q}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    )}
                     {playgroundAction === "cancelled" && (
-                      <div style={{ gridColumn: "1 / -1", padding: "11px 12px", borderRadius: 10, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#6b7280", fontSize: 12, lineHeight: 1.6 }}>
-                        No input required. Run the request to fetch all fully and partially cancelled trains.
+                      <div className="col-span-full rounded-[10px] border border-[#e5e7eb] bg-[#f9fafb] px-3 py-[11px] text-xs leading-[1.6] text-[#6b7280]">
+                        No input required. Run the request to fetch all fully
+                        and partially cancelled trains.
                       </div>
                     )}
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-                    <button type="button" onClick={runPlayground} disabled={playgroundLoading} style={{ background: playgroundLoading ? "#e5e7eb" : "#000", border: "none", color: playgroundLoading ? "#9ca3af" : "#fff", borderRadius: 10, padding: "10px 18px", fontSize: 13, fontWeight: 700, cursor: playgroundLoading ? "not-allowed" : "pointer", transition: "background 0.15s" }}>
+                  <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={runPlayground}
+                      disabled={playgroundLoading}
+                      className={`rounded-[10px] border-none px-[18px] py-2.5 text-[13px] font-bold transition-colors duration-150 ${playgroundLoading ? "cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]" : "cursor-pointer bg-black text-white"}`}
+                    >
                       {playgroundLoading ? "Running..." : "Run Request"}
                     </button>
                     {playgroundStatusCode !== null && (
-                      <span style={{ color: playgroundStatusCode < 400 ? "#16a34a" : "#dc2626", background: playgroundStatusCode < 400 ? "#f0fdf4" : "#fef2f2", border: `1px solid ${playgroundStatusCode < 400 ? "#bbf7d0" : "#fecaca"}`, borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 600 }}>HTTP {playgroundStatusCode}</span>
+                      <span
+                        className={`rounded-md border px-2 py-[3px] text-[11px] font-semibold ${playgroundStatusCode < 400 ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#16a34a]" : "border-[#fecaca] bg-[#fef2f2] text-[#dc2626]"}`}
+                      >
+                        HTTP {playgroundStatusCode}
+                      </span>
                     )}
                     {playgroundResponseTime !== null && (
-                      <span style={{ color: "#2563eb", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6, padding: "3px 8px", fontSize: 11, fontWeight: 600 }}>{playgroundResponseTime}ms</span>
+                      <span className="rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-2 py-[3px] text-[11px] font-semibold text-[#2563eb]">
+                        {playgroundResponseTime}ms
+                      </span>
                     )}
                   </div>
-                  {playgroundError && <p style={{ marginTop: 10, color: "#dc2626", fontSize: 12 }}>{playgroundError}</p>}
+                  {playgroundError && (
+                    <p className="mt-2.5 text-xs text-[#dc2626]">
+                      {playgroundError}
+                    </p>
+                  )}
                 </div>
                 {/* Response panel */}
-                <div className="db-card-dark db-response-panel" style={{ minHeight: 420, overflow: "hidden" }}>
-                  <div style={{ background: "#161b22", borderBottom: "1px solid #21262d", padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ color: "#8b949e", fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>Response</span>
-                    <span style={{ color: "#6b7280", fontSize: 11 }}>JSON</span>
+                <div className="min-h-[420px] overflow-hidden rounded-2xl border border-[#21262d] bg-[#0d1117] max-[1100px]:min-h-[360px] max-[768px]:min-h-80 max-[480px]:min-h-[280px] max-[480px]:rounded-[13px]">
+                  <div className="flex items-center justify-between border-b border-[#21262d] bg-[#161b22] px-4 py-3">
+                    <span className="text-[11px] font-semibold tracking-[0.08em] text-[#8b949e] uppercase">
+                      Response
+                    </span>
+                    <span className="text-[11px] text-[#6b7280]">JSON</span>
                   </div>
-                  <div style={{ padding: 16 }}>
-                    {playgroundLoading ? <PlaygroundResponseSkeleton /> : (
-                      <SyntaxHighlighter language="json" style={nightOwl} customStyle={{ margin: 0, background: "transparent", fontSize: 12, lineHeight: 1.7, minHeight: 360, maxHeight: 520, borderRadius: 8, overflow: "auto", padding: 0 }}>
-                        {playgroundResultText || `{\n  "message": "Run a request to preview the live response"\n}`}
+                  <div className="p-4">
+                    {playgroundLoading ? (
+                      <PlaygroundResponseSkeleton />
+                    ) : (
+                      <SyntaxHighlighter
+                        language="json"
+                        style={nightOwl}
+                        className="!m-0 !min-h-[360px] !max-h-[520px] !overflow-auto !rounded-lg !bg-transparent !p-0 !text-xs !leading-[1.7]"
+                      >
+                        {playgroundResultText ||
+                          `{\n  "message": "Run a request to preview the live response"\n}`}
                       </SyntaxHighlighter>
                     )}
                   </div>
@@ -1563,68 +2261,215 @@ export default function DashboardPage() {
 
             {/* ── Logs ──────────────────────────────────────────────────── */}
             {activeTab === "logs" && (
-              <div style={{ display: "grid", gap: 16 }}>
-                <div className="db-card">
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
-                    <p style={{ fontSize: 15, fontWeight: 700, color: "#000" }}>API Requests Per Day</p>
-                    <div style={{ display: "flex", border: "1px solid #e5e7eb", borderRadius: 8, overflow: "hidden" }}>
+              <div className="grid gap-4">
+                <div className={dashboardCardClass}>
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
+                    <p className="text-[15px] font-bold text-black">
+                      API Requests Per Day
+                    </p>
+                    <div className="flex overflow-hidden rounded-lg border border-[#e5e7eb]">
                       {([14, 30] as const).map((days) => (
-                        <button type="button" key={days} onClick={() => setLogsTimelineDays(days)} style={{ background: logsTimelineDays === days ? "#000" : "#fff", color: logsTimelineDays === days ? "#fff" : "#6b7280", border: "none", borderRight: days === 14 ? "1px solid #e5e7eb" : "none", padding: "6px 14px", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "background 0.15s" }}>
+                        <button
+                          type="button"
+                          key={days}
+                          onClick={() => setLogsTimelineDays(days)}
+                          className={`cursor-pointer border-none px-3.5 py-1.5 text-xs font-semibold transition-colors duration-150 ${days === 14 ? "border-r border-r-[#e5e7eb]" : ""} ${logsTimelineDays === days ? "bg-black text-white" : "bg-white text-[#6b7280]"}`}
+                        >
                           {days}D
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div className="db-chart-wrap" style={{ background: "#fafafa", border: "1px solid #f0f0f0", borderRadius: 12, padding: 12, height: 260 }}>
+                  <div className="h-[260px] rounded-xl border border-[#f0f0f0] bg-[#fafafa] p-3 max-[768px]:h-[230px] max-[768px]:p-2 max-[480px]:h-[210px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData} margin={{ top: 12, right: 16, left: 0, bottom: 0 }}>
+                      <AreaChart
+                        data={chartData}
+                        margin={{ top: 12, right: 16, left: 0, bottom: 0 }}
+                      >
                         <defs>
-                          <linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#000" stopOpacity={0.08} />
-                            <stop offset="100%" stopColor="#000" stopOpacity={0.01} />
+                          <linearGradient
+                            id="areaFill"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                          >
+                            <stop
+                              offset="0%"
+                              stopColor="#000"
+                              stopOpacity={0.08}
+                            />
+                            <stop
+                              offset="100%"
+                              stopColor="#000"
+                              stopOpacity={0.01}
+                            />
                           </linearGradient>
                         </defs>
                         <CartesianGrid stroke="#f0f0f0" strokeDasharray="3 3" />
-                        <XAxis dataKey="label" tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={{ stroke: "#f0f0f0" }} tickLine={{ stroke: "#f0f0f0" }} minTickGap={18} />
-                        <YAxis allowDecimals={false} tick={{ fill: "#9ca3af", fontSize: 11 }} axisLine={{ stroke: "#f0f0f0" }} tickLine={{ stroke: "#f0f0f0" }} />
-                        <Tooltip cursor={{ stroke: "rgba(0,0,0,0.1)", strokeWidth: 1 }} contentStyle={{ background: "#fff", border: "1px solid #ebebeb", borderRadius: 10, color: "#374151", fontSize: 12, boxShadow: "0 4px 16px rgba(0,0,0,0.06)" }} formatter={(value) => { const n = typeof value === "number" ? value : Number(value ?? 0); return [`${n} requests`, "Usage"]; }} labelFormatter={(label) => `Date: ${label}`} />
-                        <Area type="monotone" dataKey="requests" stroke="none" fill="url(#areaFill)" />
-                        <Line type="monotone" dataKey="requests" stroke="#000" strokeWidth={2} dot={{ r: 3, stroke: "#fff", strokeWidth: 1.5, fill: "#000" }} activeDot={{ r: 5, fill: "#000", stroke: "#fff", strokeWidth: 2 }} />
+                        <XAxis
+                          dataKey="label"
+                          tick={{ fill: "#9ca3af", fontSize: 11 }}
+                          axisLine={{ stroke: "#f0f0f0" }}
+                          tickLine={{ stroke: "#f0f0f0" }}
+                          minTickGap={18}
+                        />
+                        <YAxis
+                          allowDecimals={false}
+                          tick={{ fill: "#9ca3af", fontSize: 11 }}
+                          axisLine={{ stroke: "#f0f0f0" }}
+                          tickLine={{ stroke: "#f0f0f0" }}
+                        />
+                        <Tooltip
+                          cursor={{ stroke: "rgba(0,0,0,0.1)", strokeWidth: 1 }}
+                          contentStyle={{
+                            background: "#fff",
+                            border: "1px solid #ebebeb",
+                            borderRadius: 10,
+                            color: "#374151",
+                            fontSize: 12,
+                            boxShadow: "0 4px 16px rgba(0,0,0,0.06)",
+                          }}
+                          formatter={(value) => {
+                            const n =
+                              typeof value === "number"
+                                ? value
+                                : Number(value ?? 0);
+                            return [`${n} requests`, "Usage"];
+                          }}
+                          labelFormatter={(label) => `Date: ${label}`}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="requests"
+                          stroke="none"
+                          fill="url(#areaFill)"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="requests"
+                          stroke="#000"
+                          strokeWidth={2}
+                          dot={{
+                            r: 3,
+                            stroke: "#fff",
+                            strokeWidth: 1.5,
+                            fill: "#000",
+                          }}
+                          activeDot={{
+                            r: 5,
+                            fill: "#000",
+                            stroke: "#fff",
+                            strokeWidth: 2,
+                          }}
+                        />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
-                  <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap", color: "#c0c0c0", fontSize: 10, fontWeight: 600 }}>
-                    <span>Start: {auditDailyUsage[0] ? new Date(auditDailyUsage[0].date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "-"}</span>
+                  <div className="mt-2 flex flex-wrap justify-between gap-2 text-[10px] font-semibold text-[#c0c0c0]">
+                    <span>
+                      Start:{" "}
+                      {auditDailyUsage[0]
+                        ? new Date(auditDailyUsage[0].date).toLocaleDateString(
+                            "en-IN",
+                            { day: "2-digit", month: "short" },
+                          )
+                        : "-"}
+                    </span>
                     <span>Peak: {maxDailyRequests} req/day</span>
-                    <span>End: {auditDailyUsage[auditDailyUsage.length - 1] ? new Date(auditDailyUsage[auditDailyUsage.length - 1].date).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : "-"}</span>
+                    <span>
+                      End:{" "}
+                      {auditDailyUsage[auditDailyUsage.length - 1]
+                        ? new Date(
+                            auditDailyUsage[auditDailyUsage.length - 1].date,
+                          ).toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                          })
+                        : "-"}
+                    </span>
                   </div>
                 </div>
-                <div className="db-card" style={{ padding: 0, overflow: "hidden" }}>
-                  <div className="db-table-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa" }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>Recent API Logs</span>
-                    <span style={{ fontSize: 11, color: "#9ca3af" }}>{recentLogs.length} entries</span>
+                <div className="overflow-hidden rounded-2xl border border-[#ebebeb] bg-white max-[480px]:rounded-[13px]">
+                  <div className="flex items-center justify-between border-b border-[#f3f4f6] bg-[#fafafa] px-5 py-3.5 max-[768px]:flex-wrap max-[768px]:gap-2 max-[480px]:px-3.5 max-[480px]:py-3">
+                    <span className="text-sm font-bold text-[#111]">
+                      Recent API Logs
+                    </span>
+                    <span className="text-[11px] text-[#9ca3af]">
+                      {recentLogs.length} entries
+                    </span>
                   </div>
-                  <div className="db-table-scroll" style={{ overflowX: "auto" }}>
-                    <table className="db-data-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <div className="w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
+                    <table className={dashboardTableClass}>
                       <thead>
-                        <tr style={{ background: "#fafafa", borderBottom: "1px solid #f3f4f6" }}>
-                          {["Time", "Path", "Status", "Duration", "IP"].map((h) => (
-                            <th key={h} style={{ padding: "11px 16px", textAlign: "left", color: "#c0c0c0", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{h}</th>
-                          ))}
+                        <tr className="border-b border-[#f3f4f6] bg-[#fafafa]">
+                          {["Time", "Path", "Status", "Duration", "IP"].map(
+                            (h) => (
+                              <th
+                                key={h}
+                                className="whitespace-nowrap px-4 py-[11px] text-left text-[10px] font-bold tracking-[0.08em] text-[#c0c0c0] uppercase"
+                              >
+                                {h}
+                              </th>
+                            ),
+                          )}
                         </tr>
                       </thead>
                       <tbody>
                         {recentLogs.length === 0 ? (
-                          <tr><td className="db-empty-cell" colSpan={5} style={{ padding: 48, textAlign: "center", color: "#d1d5db", fontSize: 12 }}>No logs yet for this account.</td></tr>
-                        ) : recentLogs.map((log) => (
-                          <tr key={log.id} className="row-hover" style={{ borderBottom: "1px solid #f9f9f9", transition: "background 0.1s" }}>
-                            <td data-label="Time" style={{ padding: "11px 16px", color: "#9ca3af", fontSize: 11, whiteSpace: "nowrap" }}>{new Date(log.createdAt).toLocaleString("en-IN")}</td>
-                            <td data-label="Path" style={{ padding: "11px 16px", color: "#374151", fontSize: 12, maxWidth: 420, wordBreak: "break-all" }}>{log.path}</td>
-                            <td data-label="Status" style={{ padding: "11px 16px" }}><span style={{ color: log.statusCode >= 200 && log.statusCode < 400 ? "#16a34a" : "#dc2626", fontSize: 12, fontWeight: 700 }}>{log.statusCode}</span></td>
-                            <td data-label="Duration" style={{ padding: "11px 16px", color: "#2563eb", fontSize: 12, fontWeight: 600 }}>{Number(log.duration).toFixed(2)} ms</td>
-                            <td data-label="IP" style={{ padding: "11px 16px", color: "#9ca3af", fontSize: 11 }}>{log.ip}</td>
+                          <tr>
+                            <td
+                              colSpan={5}
+                              className="p-12 text-center text-xs text-[#d1d5db] max-[640px]:block max-[640px]:px-4 max-[640px]:py-7 max-[640px]:before:hidden"
+                            >
+                              No logs yet for this account.
+                            </td>
                           </tr>
-                        ))}
+                        ) : (
+                          recentLogs.map((log) => (
+                            <tr
+                              key={log.id}
+                              className="border-b border-[#f9f9f9] transition-colors duration-100 hover:bg-[#fafafa]"
+                            >
+                              <td
+                                data-label="Time"
+                                className="whitespace-nowrap px-4 py-[11px] text-[11px] text-[#9ca3af]"
+                              >
+                                {new Date(log.createdAt).toLocaleString(
+                                  "en-IN",
+                                )}
+                              </td>
+                              <td
+                                data-label="Path"
+                                className="max-w-[420px] break-all px-4 py-[11px] text-xs text-[#374151]"
+                              >
+                                {log.path}
+                              </td>
+                              <td
+                                data-label="Status"
+                                className="px-4 py-[11px]"
+                              >
+                                <span
+                                  className={`text-xs font-bold ${log.statusCode >= 200 && log.statusCode < 400 ? "text-[#16a34a]" : "text-[#dc2626]"}`}
+                                >
+                                  {log.statusCode}
+                                </span>
+                              </td>
+                              <td
+                                data-label="Duration"
+                                className="px-4 py-[11px] text-xs font-semibold text-[#2563eb]"
+                              >
+                                {Number(log.duration).toFixed(2)} ms
+                              </td>
+                              <td
+                                data-label="IP"
+                                className="px-4 py-[11px] text-[11px] text-[#9ca3af]"
+                              >
+                                {log.ip}
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -1634,54 +2479,132 @@ export default function DashboardPage() {
 
             {/* ── Orders ────────────────────────────────────────────────── */}
             {activeTab === "orders" && (
-              <div className="db-card" style={{ padding: 0, overflow: "hidden" }}>
-                <div className="db-table-heading" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #f3f4f6", background: "#fafafa" }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: "#111" }}>
-                    All orders · <span style={{ color: "#16a34a" }}>{paidOrders.length} paid</span>
+              <div className="overflow-hidden rounded-2xl border border-[#ebebeb] bg-white max-[480px]:rounded-[13px]">
+                <div className="flex items-center justify-between border-b border-[#f3f4f6] bg-[#fafafa] px-5 py-3.5 max-[768px]:flex-wrap max-[768px]:gap-2 max-[480px]:px-3.5 max-[480px]:py-3">
+                  <span className="text-sm font-bold text-[#111]">
+                    All orders ·{" "}
+                    <span className="text-[#16a34a]">
+                      {paidOrders.length} paid
+                    </span>
                   </span>
-                  <span style={{ fontSize: 11, color: "#9ca3af" }}>
-                    Total: <span style={{ color: "#d97706", fontWeight: 700 }}>₹{totalSpent.toFixed(2)}</span>
+                  <span className="text-[11px] text-[#9ca3af]">
+                    Total:{" "}
+                    <span className="font-bold text-[#d97706]">
+                      ₹{totalSpent.toFixed(2)}
+                    </span>
                   </span>
                 </div>
-                <div className="db-table-scroll" style={{ overflowX: "auto" }}>
-                  <table className="db-data-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <div className="w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
+                  <table className={dashboardTableClass}>
                     <thead>
-                      <tr style={{ background: "#fafafa", borderBottom: "1px solid #f3f4f6" }}>
-                        {["Order ID", "Amount", "Status", "Credited", "Date", ""].map((h) => (
-                          <th key={h} style={{ padding: "11px 16px", textAlign: "left", color: "#c0c0c0", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap" }}>{h}</th>
+                      <tr className="border-b border-[#f3f4f6] bg-[#fafafa]">
+                        {[
+                          "Order ID",
+                          "Amount",
+                          "Status",
+                          "Credited",
+                          "Date",
+                          "",
+                        ].map((h) => (
+                          <th
+                            key={h}
+                            className="whitespace-nowrap px-4 py-[11px] text-left text-[10px] font-bold tracking-[0.08em] text-[#c0c0c0] uppercase"
+                          >
+                            {h}
+                          </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {orders.length === 0 ? (
-                        <tr><td className="db-empty-cell" colSpan={6} style={{ padding: 48, textAlign: "center", color: "#d1d5db", fontSize: 12 }}>No orders found. Subscribe to a plan to get started.</td></tr>
-                      ) : orders.map((o) => (
-                        <tr key={o._id} className="row-hover" style={{ borderBottom: "1px solid #f9f9f9", transition: "background 0.1s" }}>
-                          <td data-label="Order ID" style={{ padding: "13px 16px", color: "#9ca3af", fontSize: 11 }}>{o.orderId}</td>
-                          <td data-label="Amount" style={{ padding: "13px 16px" }}>
-                            <span style={{ color: "#16a34a", fontWeight: 700, fontSize: 13 }}>₹{o.amount.toFixed(2)}</span>
-                            <span style={{ color: "#c0c0c0", fontSize: 10, marginLeft: 4 }}>{o.currency}</span>
-                          </td>
-                          <td data-label="Status" style={{ padding: "13px 16px" }}><StatusBadge status={o.status} /></td>
-                          <td data-label="Credited" style={{ padding: "13px 16px" }}>
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12 }}>
-                              {o.credited ? (<><span style={{ color: "#16a34a" }}><IconCheck /></span><span style={{ color: "#16a34a", fontWeight: 600 }}>Yes</span></>) : (<><span style={{ color: "#d1d5db" }}><IconX /></span><span style={{ color: "#9ca3af" }}>No</span></>)}
-                            </span>
-                          </td>
-                          <td data-label="Date" style={{ padding: "13px 16px", color: "#9ca3af", fontSize: 11 }}>{o.createdAt ? new Date(o.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
-                          <td data-label="Details" style={{ padding: "13px 16px" }}>
-                            <button type="button" onClick={() => setViewOrder(o)} style={{ display: "flex", alignItems: "center", gap: 5, background: "#f3f4f6", border: "1px solid #e5e7eb", color: "#6b7280", borderRadius: 8, padding: "5px 11px", fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "background 0.15s" }}>
-                              <IconEye /><span>View</span>
-                            </button>
+                        <tr>
+                          <td
+                            colSpan={6}
+                            className="p-12 text-center text-xs text-[#d1d5db] max-[640px]:block max-[640px]:px-4 max-[640px]:py-7 max-[640px]:before:hidden"
+                          >
+                            No orders found. Subscribe to a plan to get started.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        orders.map((o) => (
+                          <tr
+                            key={o._id}
+                            className="border-b border-[#f9f9f9] transition-colors duration-100 hover:bg-[#fafafa]"
+                          >
+                            <td
+                              data-label="Order ID"
+                              className="px-4 py-[13px] text-[11px] text-[#9ca3af]"
+                            >
+                              {o.orderId}
+                            </td>
+                            <td data-label="Amount" className="px-4 py-[13px]">
+                              <span className="text-[13px] font-bold text-[#16a34a]">
+                                ₹{o.amount.toFixed(2)}
+                              </span>
+                              <span className="ml-1 text-[10px] text-[#c0c0c0]">
+                                {o.currency}
+                              </span>
+                            </td>
+                            <td data-label="Status" className="px-4 py-[13px]">
+                              <StatusBadge status={o.status} />
+                            </td>
+                            <td
+                              data-label="Credited"
+                              className="px-4 py-[13px]"
+                            >
+                              <span className="inline-flex items-center gap-[5px] text-xs">
+                                {o.credited ? (
+                                  <>
+                                    <span className="text-[#16a34a]">
+                                      <IconCheck />
+                                    </span>
+                                    <span className="font-semibold text-[#16a34a]">
+                                      Yes
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="text-[#d1d5db]">
+                                      <IconX />
+                                    </span>
+                                    <span className="text-[#9ca3af]">No</span>
+                                  </>
+                                )}
+                              </span>
+                            </td>
+                            <td
+                              data-label="Date"
+                              className="px-4 py-[13px] text-[11px] text-[#9ca3af]"
+                            >
+                              {o.createdAt
+                                ? new Date(o.createdAt).toLocaleDateString(
+                                    "en-IN",
+                                    {
+                                      day: "numeric",
+                                      month: "short",
+                                      year: "numeric",
+                                    },
+                                  )
+                                : "—"}
+                            </td>
+                            <td data-label="Details" className="px-4 py-[13px]">
+                              <button
+                                type="button"
+                                onClick={() => setViewOrder(o)}
+                                className="flex cursor-pointer items-center gap-[5px] rounded-lg border border-[#e5e7eb] bg-[#f3f4f6] px-[11px] py-[5px] text-xs font-semibold text-[#6b7280] transition-colors duration-150"
+                              >
+                                <IconEye />
+                                <span>View</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
               </div>
             )}
-
           </main>
         </div>
       </div>

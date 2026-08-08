@@ -14,7 +14,20 @@
 
 @theme{
   --font-inter: var(--font-noto);
-  --font-jetbrains: var(--font-noto)
+  --font-jetbrains: var(--font-noto);
+  --animate-dashboard-shimmer: dashboard-shimmer 1.4s ease-in-out infinite;
+  --animate-dashboard-shimmer-fast: dashboard-shimmer 1.3s ease-in-out infinite;
+  --animate-dashboard-fade-up: dashboard-fade-up 0.35s ease both;
+
+  @keyframes dashboard-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  @keyframes dashboard-fade-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 }
 
 body {

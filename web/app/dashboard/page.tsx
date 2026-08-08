@@ -650,6 +650,32 @@ export default function DashboardPage() {
   const avatarSeed = encodeURIComponent(dbUser.name || dbUser.email);
   const dicebearUrl = `https://api.dicebear.com/10.x/pixel-art/svg?seed=${avatarSeed}`;
   const canBuyLimitTopup = normalizedPlan === "pro" || normalizedPlan === "enterprise" || normalizedPlan === "advance" || normalizedPlan === "advanced";
+  const billingStartTimestamp = dbUser.billingDate ? new Date(dbUser.billingDate).getTime() : NaN;
+  const topupExpirationTimestamp = hasActiveExpirationOverride
+    ? activeExpirationTimestamp
+    : Number.isFinite(billingStartTimestamp)
+      ? billingStartTimestamp + (30 * 24 * 60 * 60 * 1000)
+      : NaN;
+  const billingDaysMatch = billing.display.match(/^(\d+)d\b/);
+  const topupDaysLeft = billingDaysMatch
+    ? Number(billingDaysMatch[1])
+    : /^\d+h\b/.test(billing.display) || billing.display === "Expired"
+      ? 0
+      : null;
+  const topupExpiryDate = Number.isFinite(topupExpirationTimestamp)
+    ? new Date(topupExpirationTimestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : "current plan expiry";
+  const topupValidityTone = topupDaysLeft === null || topupDaysLeft > 7
+    ? { background: "#f8fafc", border: "#e2e8f0", icon: "#64748b", text: "#64748b" }
+    : topupDaysLeft >= 3
+      ? { background: "#fffbeb", border: "#fde68a", icon: "#d97706", text: "#a16207" }
+      : { background: "#fff7ed", border: "#fed7aa", icon: "#ea580c", text: "#c2410c" };
+  const topupValidityMessage = topupDaysLeft === null || topupDaysLeft > 7
+    ? Number.isFinite(topupExpirationTimestamp)
+      ? `Expires with your current plan on ${topupExpiryDate} · Unused requests do not carry forward.`
+      : "Expires with your current plan · Unused requests do not carry forward."
+    : `${topupDaysLeft === 0 ? "Plan expires today" : `Plan expires in ${topupDaysLeft} ${topupDaysLeft === 1 ? "day" : "days"}`} · This top-up will expire on ${topupExpiryDate} · Unused requests do not carry forward.`;
+  const topupMessageIsError = Boolean(limitPurchaseMessage && /(failed|error|unable)/i.test(limitPurchaseMessage));
   const directApiBaseUrl = process.env.NEXT_PUBLIC_DIRECT_API_BASE_URL || "https://railkit-api.rajivdubey.dev";
 
   const apiLanguageMeta: Record<ApiCodeLanguage, { label: string; syntax: "javascript" | "python" | "bash" }> = {
@@ -1262,29 +1288,36 @@ export default function DashboardPage() {
                   onMouseEnter={(e) => { const o = e.currentTarget.querySelector<HTMLElement>("[data-topup-overlay]"); if (o) o.style.opacity = "1"; }}
                   onMouseLeave={(e) => { const o = e.currentTarget.querySelector<HTMLElement>("[data-topup-overlay]"); if (o) o.style.opacity = "0"; }}
                 >
-                    <p className="db-section-label">Scale your product</p>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 14 }}>
-                      <span style={{ fontSize: 13, color: "#374151" }}>Selected: <b style={{ color: "#2563eb" }}>{selectedTopup.requests.toLocaleString("en-IN")} requests</b></span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#16a34a" }}>₹{selectedTopup.price.toLocaleString("en-IN")}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px 10px", flexWrap: "wrap", marginBottom: 14 }}>
+                      <p className="db-section-label" style={{ marginBottom: 0 }}>ADD EXTRA REQUESTS</p>
+                      <p style={{ fontSize: 11, color: "#9ca3af", lineHeight: 1.5 }}>
+                        {usageLeft.toLocaleString("en-IN")} left
+                        {topupDaysLeft !== null && <> · {topupDaysLeft} {topupDaysLeft === 1 ? "day" : "days"} left</>}
+                        {Number.isFinite(topupExpirationTimestamp) && <> · Expires {topupExpiryDate}</>}
+                      </p>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 14 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 12 }}>
                       {TOPUP_OPTIONS.map((option, index) => {
                         const active = index === topupSelection;
                         return (
-                          <button key={option.requests} type="button" onClick={() => setTopupSelection(index)} disabled={limitPurchaseLoading}
+                          <button key={option.requests} type="button" onClick={() => setTopupSelection(index)} disabled={limitPurchaseLoading} aria-pressed={active}
                             style={{ textAlign: "left", padding: "12px 14px", borderRadius: 12, border: active ? "2px solid #111" : "1px solid #e5e7eb", background: active ? "#f8f8f8" : "#fafafa", color: "#111827", cursor: limitPurchaseLoading ? "wait" : "pointer", transition: "border-color 0.15s, background 0.15s", outline: "none" }}>
-                            <div style={{ fontSize: 12, fontWeight: active ? 700 : 600 }}>{option.requests.toLocaleString("en-IN")} req</div>
+                            <div style={{ fontSize: 12, fontWeight: active ? 700 : 600 }}>+{option.requests.toLocaleString("en-IN")} requests</div>
                             <div style={{ marginTop: 5, fontSize: 11, color: active ? "#374151" : "#9ca3af" }}>₹{option.price} · ₹{option.perReq.toFixed(3)}/req</div>
                           </button>
                         );
                       })}
                     </div>
-                    <p style={{ fontSize: 11, color: "#9ca3af", lineHeight: 1.6, marginBottom: 6 }}>Payments processed securely by Cashfree. Top-ups add requests only and do not extend your plan expiry.</p>
-                    <button type="button" onClick={startLimitTopupPayment} disabled={limitPurchaseLoading} style={{ width: "100%", marginTop: 12, border: "none", background: limitPurchaseLoading ? "#e5e7eb" : "#4f46e5", color: limitPurchaseLoading ? "#9ca3af" : "#fff", borderRadius: 12, padding: "13px", cursor: limitPurchaseLoading ? "wait" : "pointer", fontSize: 13, fontWeight: 700, transition: "background 0.15s", letterSpacing: "0.01em" }}>
-                      {limitPurchaseLoading ? "Processing..." : "Proceed to Secure Checkout →"}
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 7, padding: "10px 12px", borderRadius: 9, border: `1px solid ${topupValidityTone.border}`, background: topupValidityTone.background, marginBottom: 12 }}>
+                      <span aria-hidden="true" style={{ color: topupValidityTone.icon, fontSize: 13, lineHeight: 1.5, flexShrink: 0 }}>{topupDaysLeft !== null && topupDaysLeft <= 7 ? "⚠" : "ⓘ"}</span>
+                      <p style={{ minWidth: 0, fontSize: 11, color: topupValidityTone.text, lineHeight: 1.5, overflowWrap: "anywhere" }}>{topupValidityMessage}</p>
+                    </div>
+                    <button type="button" onClick={startLimitTopupPayment} disabled={limitPurchaseLoading} style={{ width: "100%", border: "none", background: limitPurchaseLoading ? "#e5e7eb" : "#4f46e5", color: limitPurchaseLoading ? "#9ca3af" : "#fff", borderRadius: 12, padding: "13px", cursor: limitPurchaseLoading ? "wait" : "pointer", fontSize: 13, fontWeight: 700, transition: "background 0.15s", letterSpacing: "0.01em" }}>
+                      {limitPurchaseLoading ? "Processing..." : `Add ${selectedTopup.requests.toLocaleString("en-IN")} Requests — ₹${selectedTopup.price.toLocaleString("en-IN")} →`}
                     </button>
+                    <p style={{ marginTop: 7, fontSize: 10, color: "#9ca3af", lineHeight: 1.4, textAlign: "center" }}>Payments securely processed by Cashfree.</p>
                     {limitPurchaseMessage && (
-                      <p style={{ marginTop: 10, color: limitPurchaseMessage.toLowerCase().includes("failed") ? "#dc2626" : "#6b7280", fontSize: 12, lineHeight: 1.6 }}>{limitPurchaseMessage}</p>
+                      <p role="status" style={{ marginTop: 8, padding: "7px 9px", borderRadius: 8, border: `1px solid ${topupMessageIsError ? "#fecaca" : "#e5e7eb"}`, background: topupMessageIsError ? "#fef2f2" : "#f9fafb", color: topupMessageIsError ? "#dc2626" : "#6b7280", fontSize: 11, lineHeight: 1.45 }}>{limitPurchaseMessage}</p>
                     )}
                     {!canBuyLimitTopup && (
                       <div

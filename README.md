@@ -1,6 +1,6 @@
 # RailKit
 
-  [![npm version](https://badge.fury.io/js/railkit.svg)](https://www.npmjs.com/package/railkit)
+[![npm version](https://badge.fury.io/js/railkit.svg)](https://www.npmjs.com/package/railkit)
 [![Downloads](https://img.shields.io/npm/dm/railkit.svg)](https://www.npmjs.com/package/railkit)
 [![License](https://img.shields.io/npm/l/railkit.svg)](https://github.com/RAJIV81205/railkit/blob/main/LICENSE)
 

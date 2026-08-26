@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { packageInfo, responseFormats, sidebarGroups } from "./docsData";
 import { apiEndpointDocs, type ApiEndpointDoc } from "./apiEndpointDocs";
-import { useSidebar } from "../SidebarProvider";
 import {
   AlertTriangle,
   Armchair,
@@ -41,7 +40,6 @@ type IntegrationView = "sdk" | "rest";
 type ApiCodeLanguage = "javascript" | "python" | "curl";
 
 const apiEndpointById = new Map(apiEndpointDocs.map((endpoint) => [endpoint.id, endpoint]));
-const apiEndpointIds = new Set(apiEndpointDocs.map((endpoint) => endpoint.id));
 
 const apiLanguageMeta: Record<ApiCodeLanguage, { label: string; syntax: string }> = {
   javascript: { label: "JavaScript", syntax: "javascript" },
@@ -285,12 +283,9 @@ const cancelled = await cancelList();`;
 
 const docsBaseUrl = "https://railkit.rajivdubey.dev/docs";
 
-export default function DocsPage() {
-  const { sidebarOpen, setSidebarOpen } = useSidebar();
-  const [activeSection, setActiveSection] = useState("introduction");
+export default function DocsPage({ activeSlug = "introduction" }: { activeSlug?: string }) {
   const [copiedInstall, setCopiedInstall] = useState(false);
   const [copiedAIMarkdown, setCopiedAIMarkdown] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
   const [setupView, setSetupView] = useState<IntegrationView>("sdk");
   const [quickStartLanguage, setQuickStartLanguage] = useState<ApiCodeLanguage>("javascript");
 
@@ -307,51 +302,15 @@ export default function DocsPage() {
       const restContract = rest
         ? `\nREST: \`${rest.method} ${rest.path}\`\nRequired header: \`x-api-key: YOUR_API_KEY\``
         : "";
-      return `### ${ep.title}\nLink: [${docsBaseUrl}#${ep.id}](${docsBaseUrl}#${ep.id})\nSDK: \`${ep.signature}\`${restContract}\nParameters:\n${params}\n\nSDK example:\n\`\`\`javascript\n${ep.example}\n\`\`\``;
+      return `### ${ep.title}\nLink: [${docsBaseUrl}/${ep.id}](${docsBaseUrl}/${ep.id})\nSDK: \`${ep.signature}\`${restContract}\nParameters:\n${params}\n\nSDK example:\n\`\`\`javascript\n${ep.example}\n\`\`\``;
     }).join("\n\n");
 
     const sectionLinks = ["installation","quickstart","pnr-status","train-info","live-tracking","train-history","station-live","train-search","seat-availability","fare-lookup","cancelled-trains","validation","errors"]
-      .map((id) => { const s = flatSections.find((i) => i.id === id); return s ? `- [${s.label}](${docsBaseUrl}#${s.id})` : null; })
+      .map((id) => { const s = flatSections.find((i) => i.id === id); return s ? `- [${s.label}](${docsBaseUrl}/${s.id})` : null; })
       .filter(Boolean).join("\n");
 
     return `# RailKit - Implementation Essentials\n\n## Official Links\n- Docs: [${docsBaseUrl}](${docsBaseUrl})\n- NPM: [${packageInfo.links.npm}](${packageInfo.links.npm})\n- GitHub: [${packageInfo.links.github}](${packageInfo.links.github})\n\n## REST API\n- Base URL: \`${directApiBaseUrl}\`\n- Auth header: \`x-api-key: YOUR_API_KEY\`\n- Direct REST access requires the Advance plan.\n\n## SDK Quick Setup\n\`\`\`bash\n${installSnippet}\n\`\`\`\n\n\`\`\`javascript\n${quickStartSnippet}\n\`\`\`\n\n## Section Links\n${sectionLinks}\n\n## Endpoint Contracts\n${endpointDetails}\n\n## Required Input Rules\n- PNR: exactly 10 digits\n- Train number: exactly 5 digits (string)\n- Date: DD-MM-YYYY\n- Station code: uppercase\n\n## Response Handling\nSuccess: \`{ success: true, data: { ... } }\`\nError: \`{ success: false, message: "..." }\`\n\nAlso handle:\n\`\`\`ts\n${responseFormats.error}\n\`\`\``;
   }, [directApiBaseUrl, flatSections]);
-
-  const scrollToSection = (sectionId: string) => {
-    setActiveSection(sectionId);
-    const el = document.getElementById(sectionId);
-    if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); history.replaceState(null, "", `#${sectionId}`); }
-    setSidebarOpen(false);
-  };
-
-  useEffect(() => {
-    const hash = window.location.hash.replace("#", "");
-    if (!hash) return;
-    const target = document.getElementById(hash);
-    if (!target) return;
-    setTimeout(() => { target.scrollIntoView({ behavior: "smooth", block: "start" }); setActiveSection(hash); }, 120);
-  }, []);
-
-  useEffect(() => {
-    const update = () => setIsDesktop(window.innerWidth >= 1024);
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  useEffect(() => {
-    const sections = flatSections.map((item) => document.getElementById(item.id)).filter(Boolean) as HTMLElement[];
-    if (!sections.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-        if (visible[0]?.target?.id) setActiveSection(visible[0].target.id);
-      },
-      { rootMargin: "-30% 0px -55% 0px", threshold: [0.1, 0.3, 0.5, 0.7] },
-    );
-    sections.forEach((s) => observer.observe(s));
-    return () => observer.disconnect();
-  }, [flatSections]);
 
   const copyInstall = async () => {
     try { await navigator.clipboard.writeText(installSnippet); setCopiedInstall(true); setTimeout(() => setCopiedInstall(false), 1400); } catch {}
@@ -361,7 +320,7 @@ export default function DocsPage() {
   };
 
   return (
-    <div className="docs-root" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -409,6 +368,7 @@ export default function DocsPage() {
           cursor: pointer;
           text-align: left;
           transition: background 0.15s, color 0.15s;
+          text-decoration: none;
         }
         .docs-sidebar-btn:hover { background: rgba(0,0,0,0.04); color: #000; }
         .docs-sidebar-btn-active {
@@ -568,54 +528,8 @@ export default function DocsPage() {
         }
       `}</style>
 
-      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "240px minmax(0,1fr)" : "1fr", gap: 0, minHeight: "calc(100vh - 60px)" }}>
-
-          {/* ── Sidebar ── */}
-          <aside
-            className="docs-sidebar"
-            style={{
-              position: isDesktop ? "sticky" : "fixed",
-              top: isDesktop ? 60 : 60,
-              left: isDesktop ? "auto" : 0,
-              width: isDesktop ? "auto" : 260,
-              height: isDesktop ? "calc(100vh - 60px)" : "calc(100vh - 60px)",
-              zIndex: 30,
-              transform: sidebarOpen || isDesktop ? "translateX(0)" : "translateX(-110%)",
-              transition: "transform 0.22s ease",
-              alignSelf: "start",
-            }}
-          >
-            {sidebarGroups.map((group, gi) => (
-              <div key={group.title} style={{ marginBottom: gi < sidebarGroups.length - 1 ? 20 : 0 }}>
-                <p className="docs-sidebar-group-label">{group.title}</p>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 4 }}>
-                  {group.items.map((section) => {
-                    const Icon = section.icon;
-                    const isActive = activeSection === section.id;
-                    return (
-                      <button
-                        key={section.id}
-                        type="button"
-                        onClick={() => scrollToSection(section.id)}
-                        className={`docs-sidebar-btn ${isActive ? "docs-sidebar-btn-active" : ""}`}
-                      >
-                        <Icon size={14} style={{ flexShrink: 0 }} />
-                        <span>{section.label}</span>
-                        {apiEndpointIds.has(section.id) && <span className="docs-method-badge">GET</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </aside>
-
-          {/* ── Main ── */}
-          <main className="docs-main" style={{ padding: isDesktop ? "32px 0 64px 40px" : "24px 0 64px" }}>
-
             {/* ── Introduction ── */}
-            <section id="introduction" className="docs-section docs-reveal">
+            {activeSlug === "introduction" && <section id="introduction" className="docs-section docs-reveal">
               <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 12 }}>
                 RailKit developer platform
               </p>
@@ -663,10 +577,10 @@ export default function DocsPage() {
                   </div>
                 ))}
               </div>
-            </section>
+            </section>}
 
             {/* ── Installation ── */}
-            <section id="installation" className="docs-section">
+            {activeSlug === "installation" && <section id="installation" className="docs-section">
               <DocsSectionHeader title={setupView === "sdk" ? "SDK Installation" : "REST API Access"} icon={Package} />
               {setupView === "sdk" ? (
                 <>
@@ -698,10 +612,10 @@ export default function DocsPage() {
                   <DocsInfoPanel title="Authentication" items={["Send x-api-key with every request", "Keep API keys on your server", "Direct REST access requires the Advance plan"]} />
                 </div>
               )}
-            </section>
+            </section>}
 
             {/* ── Quick Start ── */}
-            <section id="quickstart" className="docs-section">
+            {activeSlug === "quickstart" && <section id="quickstart" className="docs-section">
               <DocsSectionHeader title="Quick Start" icon={Rocket} />
               <div style={{ marginBottom: 10, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.07)", background: "#fafafa", fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
                 {setupView === "sdk" ? (
@@ -718,10 +632,10 @@ export default function DocsPage() {
                 bodyMinHeight={setupView === "rest" ? 276 : undefined}
                 swapping
               />
-            </section>
+            </section>}
 
             {/* ── Endpoints ── */}
-            {endpointSections.map((ep) => {
+            {endpointSections.filter((ep) => ep.id === activeSlug).map((ep) => {
               return (
                 <section key={ep.id} id={ep.id} className="docs-section">
                   <DocsSectionHeader title={ep.title} icon={ep.icon} />
@@ -731,7 +645,7 @@ export default function DocsPage() {
             })}
 
             {/* ── Playground ── */}
-            <section id="playground" className="docs-section">
+            {activeSlug === "playground" && <section id="playground" className="docs-section">
               <DocsSectionHeader title="Playground" icon={Gamepad2} />
               <div className="docs-card" style={{ padding: "20px" }}>
                 <p style={{ fontSize: 14, fontWeight: 300, lineHeight: 1.7, color: "#6F6F6F", marginBottom: 16, maxWidth: 520 }}>
@@ -741,10 +655,10 @@ export default function DocsPage() {
                   Open Playground <ChevronRight size={13} />
                 </Link>
               </div>
-            </section>
+            </section>}
 
             {/* ── Validation ── */}
-            <section id="validation" className="docs-section">
+            {activeSlug === "validation" && <section id="validation" className="docs-section">
               <DocsSectionHeader title="Input Validation" icon={CheckCircle} />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
                 <DocsInfoPanel title="PNR" items={["Exactly 10 digits", "Numeric input only", "Reject malformed values early"]} />
@@ -752,10 +666,10 @@ export default function DocsPage() {
                 <DocsInfoPanel title="Date" items={["DD-MM-YYYY format", "Validate real calendar date", "Use same format across APIs"]} />
                 <DocsInfoPanel title="Station Code" items={["Uppercase station code", "Examples: NDLS, BCT, HWH", "Trim extra whitespace"]} />
               </div>
-            </section>
+            </section>}
 
             {/* ── Status codes ── */}
-            <section id="status-codes" className="docs-section">
+            {activeSlug === "status-codes" && <section id="status-codes" className="docs-section">
               <DocsSectionHeader title="Status Codes" icon={BarChart3} />
               <div className="docs-card" style={{ overflowX: "auto" }}>
                 <table className="docs-table">
@@ -783,10 +697,10 @@ export default function DocsPage() {
                   </tbody>
                 </table>
               </div>
-            </section>
+            </section>}
 
             {/* ── Error handling ── */}
-            <section id="errors" className="docs-section" style={{ marginBottom: 64 }}>
+            {activeSlug === "errors" && <section id="errors" className="docs-section" style={{ marginBottom: 64 }}>
               <DocsSectionHeader title="Error Handling" icon={AlertTriangle} />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginBottom: 10 }}>
                 <DocsResponsePanel tone="success" title="Success Response" code={`{\n  success: true,\n  data: { ... }\n}`} />
@@ -800,22 +714,8 @@ export default function DocsPage() {
                 "Invalid train/PNR/date inputs",
                 "Temporary upstream timeout or API outage",
               ]} />
-            </section>
-
-          </main>
-        </div>
-      </div>
-
-      {/* Sidebar overlay on mobile */}
-      {sidebarOpen && (
-        <button
-          type="button"
-          onClick={() => setSidebarOpen(false)}
-          style={{ position: "fixed", inset: 0, zIndex: 20, background: "rgba(0,0,0,0.3)", backdropFilter: "blur(4px)", border: "none", cursor: "pointer" }}
-          aria-label="Close sidebar"
-        />
-      )}
-    </div>
+            </section>}
+    </>
   );
 }
 

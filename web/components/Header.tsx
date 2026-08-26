@@ -18,7 +18,7 @@ export function Header() {
   const pathname = usePathname();
   const isAdminPage = pathname === "/admin";
   const isDashboardPage = pathname === "/dashboard";
-  const isDocsPage = pathname === "/docs";
+  const isDocsPage = pathname === "/docs" || pathname.startsWith("/docs/");
   const router = useRouter();
   const { sidebarOpen, setSidebarOpen } = useSidebar();
   const [user, setUser] = useState<VerifiedUser | null>(null);
@@ -457,7 +457,7 @@ export function Header() {
 
           {/* Center: nav */}
           <nav className="hdr-nav" aria-label="Main navigation">
-            <Link href="/docs"    className={`hdr-nav-link ${pathname === "/docs"    ? "hdr-nav-link-active" : ""}`}>Docs</Link>
+            <Link href="/docs"    className={`hdr-nav-link ${isDocsPage ? "hdr-nav-link-active" : ""}`}>Docs</Link>
             <Link href="/pricing" className={`hdr-nav-link ${pathname === "/pricing" ? "hdr-nav-link-active" : ""}`}>Pricing</Link>
             <Link href="/contact" className={`hdr-nav-link ${pathname === "/contact" ? "hdr-nav-link-active" : ""}`}>Contact</Link>
           </nav>

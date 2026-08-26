@@ -2,104 +2,24 @@ export const SITE_NAME = "RailKit";
 export const SITE_TITLE =
   "RailKit - Indian Railways API & Node.js SDK for PNR Status, Live Train Tracking & Seat Availability";
 export const SITE_DESCRIPTION =
-  "RailKit is a developer-first Indian Railways REST API and Node.js SDK. Check PNR status, track live trains, search trains between stations, view seat availability, fare, and station boards in real time.";
+  "RailKit is an independent, developer-first Indian Railways data API and Node.js SDK for PNR status, live train tracking, trains between stations, seat availability, fares, and station boards.";
 
-// Primary brand + product keywords (high-intent, brand-defining).
-export const PRIMARY_KEYWORDS = [
-  "irctc",
+// Keep metadata focused. Search engines primarily understand the page content,
+// title, description, links and structured data rather than large keyword lists.
+export const SITE_KEYWORDS = [
   "railkit",
-  "irctc api",
-  "irctc sdk",
-  "irctc developer",
   "indian railways api",
   "railway api",
   "indian railways sdk",
-  "irctc nodejs",
-  "irctc npm",
-  "irctc npm package",
-  "railkit npm",
-  "irctc package for nodejs",
-  "irctc integration nodejs",
-  "node.js irctc package",
-  "indian railways rest api",
-  "irctc rest api",
-  "irctc api key",
-  "irctc api for developers",
-  "irctc api documentation",
-  "railway api for developers",
-  "railway data api india",
-  "indian railways data api",
-  "irctc javascript sdk",
-  "irctc typescript sdk",
-  "irctc api pricing",
-];
-
-// Feature-specific keywords mapped to actual endpoints in the SDK.
-export const FEATURE_KEYWORDS = [
   "pnr status api",
-  "pnr status check api",
-  "check pnr status",
-  "pnr enquiry api",
-  "pnr prediction api",
-  "train tracking api",
   "live train tracking api",
-  "live train running status",
   "train running status api",
-  "train schedule api",
-  "train time table api",
   "train between stations api",
-  "train search api",
   "seat availability api",
-  "train availability checker api",
   "train fare api",
-  "train fare enquiry api",
   "station board api",
-  "live station board",
-  "train route api",
-  "train coach position",
-  "platform number api",
-  "tatkal api",
-  "train reservation status api",
-  "indian railway passenger status",
-  "railway station live status",
-];
-
-// Discovery / how-to terms real developers search.
-export const DISCOVERY_KEYWORDS = [
-  "how to check pnr status",
-  "how to track train live",
-  "train running status today",
-  "irctc pnr status check",
-  "indian railways pnr status",
-  "indian railways live train status",
-  "pnr status check online",
-  "live train status indian railways",
-  "train between two stations",
-  "indian railways api free",
-  "irctc api free tier",
-  "best irctc api",
-  "indian railway api nodejs",
-  "npm install irctc",
-  "irctc npm install",
-  "irctc api integration",
-  "indian railway timetable api",
-  "railway api node js",
-  "railway data api node",
-  "irctc train schedule",
-  "indian railways seat availability",
-  "irctc seat availability check",
-  "indian railway fare calculator api",
-  "indian railway station code api",
-  "irctc developer portal",
-  "railway api sandbox",
-  "indian railway api for website",
-];
-
-// Single source of truth used by root metadata and per-page helpers.
-export const SITE_KEYWORDS = [
-  ...PRIMARY_KEYWORDS,
-  ...FEATURE_KEYWORDS,
-  ...DISCOVERY_KEYWORDS,
+  "node.js railway api",
+  "typescript railway sdk",
 ];
 
 export const SOCIAL_IMAGE_PATH = "/icon.png";
@@ -107,7 +27,7 @@ export const OG_LOCALE = "en_IN";
 export const TWITTER_CARD = "summary_large_image";
 export const TWITTER_HANDLE = "@rajiv81205";
 export const TWITTER_SITE = "@rajiv81205";
-// Ideal OG image: 1200×630px. Current icon.png is 512×512 (acceptable fallback).
+// Current social image dimensions. Replace with a dedicated 1200×630 image when available.
 export const OG_IMAGE_WIDTH = 512;
 export const OG_IMAGE_HEIGHT = 512;
 
@@ -145,7 +65,6 @@ export function buildMetadata({
   const resolvedTitle = title ? `${title} | ${SITE_NAME}` : SITE_TITLE;
   const resolvedKeywords = keywords?.length ? keywords : SITE_KEYWORDS;
   const imageUrl = absoluteUrl(imagePath);
-
   const isArticle = type === "article";
 
   return {

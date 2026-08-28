@@ -2,6 +2,7 @@
  * Configure the SDK with your API key before using any other function.
  * The backend URL is managed by the package - you only need your API key.
  *
+ * @param apiKey - API key from the RailKit dashboard
  * @example
  * configure('your-api-key-here');
  */
@@ -10,6 +11,7 @@ export function configure(apiKey: string): void;
 /**
  * Check the PNR status for a given 10-digit PNR number.
  *
+ * @param pnr - 10-digit PNR number
  * @example
  * const result = await checkPNRStatus('1234567890');
  * 
@@ -19,6 +21,7 @@ export function checkPNRStatus(pnr: string): Promise<any>;
 /**
  * Get detailed information and route for a given 5-digit train number.
  *
+ * @param trainNumber - 5-digit train number
  * @example
  * const result = await getTrainInfo('12301');
  * 
@@ -27,6 +30,7 @@ export function getTrainInfo(trainNumber: string): Promise<any>;
 
 /**
  * Get the live running status of a train.
+ * @param trainNumber - 5-digit train number
  * @param date - Journey date in DD-MM-YYYY format (optional, defaults to today)
  *
  * @example
@@ -51,7 +55,7 @@ export function getTrainHistory(trainNumber: string, journeyDate: string): Promi
 
 /**
  * Get the list of upcoming trains at a station.
- * @param stationCode - Station Code (e.g., 'NDLS' for New Delhi)
+ * @param stationCode - Station code (e.g., 'NDLS' for New Delhi)
  * @param hours - Time window in hours: 2, 4, or 8 (default 2)
  *
  * @example
@@ -122,3 +126,36 @@ export function fareLookup(
  * const result = await cancelList();
  */
 export function cancelList(): Promise<any>;
+
+/**
+ * Resolve a station code to its name and coordinates.
+ * @param stationCode - Station code of 1-5 letters or digits
+ */
+export function stationByCode(stationCode: string): Promise<any>;
+
+/**
+ * Find up to 10 stations matching a partial name.
+ * @param name - Partial station name, at least 2 characters
+ */
+export function stationsByName(name: string): Promise<any>;
+
+/**
+ * Resolve an exact 5-digit train number to its stored train name.
+ * @param trainNumber - Exactly 5 numeric digits
+ */
+export function trainByNumber(trainNumber: string): Promise<any>;
+
+/**
+ * Find up to 10 trains matching a partial name.
+ * @param name - Partial train name, at least 2 characters
+ */
+export function trainsByName(name: string): Promise<any>;
+
+/**
+ * Get the complete station timetable.
+ * Omit date for all trains; supplied date must be DD-MM-YYYY and today,
+ * yesterday, or tomorrow.
+ * @param stationCode - Station code of 1-5 letters or digits
+ * @param date - Optional date in DD-MM-YYYY format
+ */
+export function trainTimetableAtStation(stationCode: string, date?: string): Promise<any>;

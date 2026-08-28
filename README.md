@@ -20,6 +20,9 @@ A comprehensive Node.js SDK for Indian Railways. Get real-time PNR status, train
 - 🔍 **Train Search** — Find all direct trains between two stations
 - 💺 **Seat Availability** — Check availability and fare for any class and quota
 - 💰 **Fare Lookup** — Full fare breakdown for any train, class, and quota
+- 🚉 **Station Lookup** — Resolve station codes and search stations by name
+- 🔎 **Train Lookup** — Resolve train numbers and search trains by name
+- 🗓️ **Station Timetable** — Complete scheduled trains crossing a station
 - ⚡ **Fast & Reliable** — Built-in timeout handling, input validation, and caching
 
 ---
@@ -72,6 +75,12 @@ import {
   searchTrainBetweenStations,
   getAvailability,
   fareLookup,
+  cancelList,
+  stationByCode,
+  stationsByName,
+  trainByNumber,
+  trainsByName,
+  trainTimetableAtStation,
 } from 'railkit';
 
 // Configure once
@@ -97,6 +106,15 @@ const availResult = await getAvailability('12496', 'ASN', 'DDU', '27-12-2025', '
 
 // Get fare for a journey
 const fareResult = await fareLookup('12313', 'ASN', 'NDLS', '06-06-2026', '3A', 'GN');
+
+// Look up stations and trains
+const station = await stationByCode('NDLS');
+const stationMatches = await stationsByName('delhi');
+const train = await trainByNumber('12345');
+const trainMatches = await trainsByName('rajdhani');
+
+// Complete station timetable; omit date for all trains crossing the station
+const timetable = await trainTimetableAtStation('ASN');
 ```
 
 ---
@@ -656,6 +674,63 @@ if (result.success) {
     concession:  0
   }
 }
+```
+
+---
+
+### 9. `cancelList()`
+
+Get fully and partially cancelled trains.
+
+```javascript
+const result = await cancelList();
+```
+
+### 10. `stationByCode(stationCode)`
+
+Resolve a station code to its name and coordinates.
+
+```javascript
+const result = await stationByCode('NDLS');
+// result.data: { code, name, lat, lon }
+```
+
+### 11. `stationsByName(name)`
+
+Find up to 10 stations matching a partial name.
+
+```javascript
+const result = await stationsByName('delhi');
+// result.data.stations: [{ code, name, lat, lon }, ...]
+```
+
+### 12. `trainByNumber(trainNumber)`
+
+Resolve an exact 5-digit numeric train number.
+
+```javascript
+const result = await trainByNumber('12345');
+// result.data: { trainNo, trainName }
+```
+
+### 13. `trainsByName(name)`
+
+Find up to 10 trains matching a partial name.
+
+```javascript
+const result = await trainsByName('rajdhani');
+// result.data.trains: [{ trainNo, trainName }, ...]
+```
+
+### 14. `trainTimetableAtStation(stationCode, date?)`
+
+Get the complete scheduled timetable for trains crossing a station. Omit the
+date to return all trains and their running days. If supplied, date must be
+today, yesterday, or tomorrow in `DD-MM-YYYY` format.
+
+```javascript
+const result = await trainTimetableAtStation('ASN');
+// Or: await trainTimetableAtStation('ASN', '28-08-2026');
 ```
 
 ---

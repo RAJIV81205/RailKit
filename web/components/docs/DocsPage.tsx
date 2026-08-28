@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/hljs";
@@ -34,22 +35,35 @@ type EndpointSection = {
   signature: string;
   params: Array<{ name: string; type: string; desc: string }>;
   example: string;
+  response: string;
 };
 
 type IntegrationView = "sdk" | "rest";
 type ApiCodeLanguage = "javascript" | "python" | "curl";
 
-const apiEndpointById = new Map(apiEndpointDocs.map((endpoint) => [endpoint.id, endpoint]));
+const apiEndpointById = new Map(
+  apiEndpointDocs.map((endpoint) => [endpoint.id, endpoint]),
+);
 
-const apiLanguageMeta: Record<ApiCodeLanguage, { label: string; syntax: string }> = {
+const ReactJson = dynamic(() => import("react-json-view"), { ssr: false });
+
+const apiLanguageMeta: Record<
+  ApiCodeLanguage,
+  { label: string; syntax: string }
+> = {
   javascript: { label: "JavaScript", syntax: "javascript" },
   python: { label: "Python", syntax: "python" },
   curl: { label: "cURL", syntax: "bash" },
 };
 
-function buildRestSnippet(baseUrl: string, examplePath: string, language: ApiCodeLanguage) {
+function buildRestSnippet(
+  baseUrl: string,
+  examplePath: string,
+  language: ApiCodeLanguage,
+) {
   const url = `${baseUrl}${examplePath}`;
-  if (language === "python") return `import requests
+  if (language === "python")
+    return `import requests
 
 response = requests.get(
     "${url}",
@@ -57,7 +71,8 @@ response = requests.get(
 )
 
 print(response.json())`;
-  if (language === "curl") return `curl -X GET "${url}" \\
+  if (language === "curl")
+    return `curl -X GET "${url}" \\
   -H "x-api-key: YOUR_API_KEY" \\
   -H "accept: application/json"`;
   return `const response = await fetch("${url}", {
@@ -77,59 +92,116 @@ const endpointSections: EndpointSection[] = [
     id: "pnr-status",
     title: "PNR Status",
     icon: Ticket,
-    description: "Get complete PNR status with passenger details, journey route, and confirmation updates.",
+    description:
+      "Get complete PNR status with passenger details, journey route, and confirmation updates.",
     signature: "checkPNRStatus(pnr: string)",
     params: [{ name: "pnr", type: "string", desc: "10-digit PNR number" }],
-    example: `const result = await checkPNRStatus("5827194603");
+    example: `const result = await checkPNRStatus("6948325823");
 
 if (result.success) {
   console.log(result.data.train.name);
   console.log(result.data.journey.source.name);
   console.log(result.data.passengers[0].current.details);
 }`,
+    response: `{
+  "success": true,
+  "data": {
+    "pnr": "6948325823",
+    "train": { "number": "18021", "name": "KGP KUR EXP" },
+    "journey": {
+      "dateOfJourney": "Sep 4, 2026 4:40:00 AM",
+      "class": "CC", "quota": "GN",
+      "source": { "code": "KGP", "name": "KHARAGPUR JN" },
+      "destination": { "code": "KUR", "name": "KHURDA ROAD JN" },
+      "boardingPoint": { "code": "KGP", "name": "KHARAGPUR JN" },
+      "distance": 366,
+      "arrivalDate": "Sep 4, 2026 1:50:00 PM"
+    },
+    "chart": { "status": "Chart Not Prepared" },
+    "booking": { "fare": 1050, "ticketFare": 1050, "bookingDate": "Aug 18, 2026 8:04:06 PM" },
+    "passengers": [
+      {
+        "serialNumber": "Passenger 1", "coachPosition": 0,
+        "booking": { "status": "CNF", "coach": "C1", "berthNo": 30, "berthCode": "WS", "details": "CNF/C1/30/WS" },
+        "current": { "status": "CNF", "coach": "C1", "berthNo": 30, "berthCode": "WS", "details": "CNF/C1/30/WS" }
+      },
+      {
+        "serialNumber": "Passenger 2", "coachPosition": 0,
+        "booking": { "status": "CNF", "coach": "C1", "berthNo": 31, "berthCode": null, "details": "CNF/C1/31" },
+        "current": { "status": "CNF", "coach": "C1", "berthNo": 31, "berthCode": null, "details": "CNF/C1/31" }
+      }
+    ]
+  }
+}`,
   },
   {
     id: "train-info",
     title: "Train Information",
     icon: Train,
-    description: "Retrieve route details, running schedule, stoppages, and station-level metadata.",
+    description:
+      "Retrieve route details, running schedule, stoppages, and station-level metadata.",
     signature: "getTrainInfo(trainNumber: string)",
-    params: [{ name: "trainNumber", type: "string", desc: "5-digit train number" }],
+    params: [
+      { name: "trainNumber", type: "string", desc: "5-digit train number" },
+    ],
     example: `const result = await getTrainInfo("12345");
 
 if (result.success) {
   console.log(result.data.trainInfo.train_name);
   console.log(result.data.route.length);
 }`,
+    response: `{
+  "success": true,
+  "data": {
+    "trainInfo": { "train_no": "12345", "train_name": "SARAIGHAT EXP", "from_stn_name": "Howrah Jn", "from_stn_code": "HWH", "to_stn_name": "Guwahati", "to_stn_code": "GHY", "from_time": "16:05", "to_time": "09:40", "travel_time": "17:35 hrs", "running_days": "1111111", "type": "SUPERFAST", "train_id": "1891" },
+    "route": [{ "stnCode": "HWH", "stnName": "Howrah Jn", "arrival": "--", "departure": "16:05", "halt": "0 min", "haltMinutes": 0, "distance": "0", "day": "1", "platform": 15, "coordinates": { "latitude": 22.5835032884945, "longitude": 88.3422660827637 } }]
+  }
+}`,
   },
   {
     id: "live-tracking",
     title: "Live Tracking",
     icon: MapPin,
-    description: "Track live train movement with station-by-station arrival and delay context.",
+    description:
+      "Track live train movement with station-by-station arrival and delay context.",
     signature: "trackTrain(trainNumber: string, date: string)",
     params: [
       { name: "trainNumber", type: "string", desc: "5-digit train number" },
       { name: "date", type: "string", desc: "Journey date in DD-MM-YYYY" },
     ],
-    example: `const result = await trackTrain("12342", "06-12-2025");
+    example: `const result = await trackTrain("12345", "28-08-2026");
 
 if (result.success) {
   console.log(result.data.statusNote);
   console.log(result.data.timeline);
+}`,
+    response: `{
+  "success": true,
+  "data": {
+    "trainNo": "12345", "trainName": "SARAIGHAT EXP", "date": "28-Aug-2026",
+    "statusNote": "Yet to start from its source", "lastUpdate": "", "totalStations": 161,
+    "coachPosition": [],
+    "timeline": [{ "type": "stoppage", "status": "current", "stationCode": "HWH", "stationName": "HOWRAH JN", "platform": "15", "distanceKm": "", "arrival": { "scheduled": "SRC", "actual": "SRC", "delay": "" }, "departure": { "scheduled": "16:05 28-Aug", "actual": "16:05 28-Aug*", "delay": "On Time" } }],
+    "currentStationCode": "HWH"
+  }
 }`,
   },
   {
     id: "train-history",
     title: "Train History",
     icon: History,
-    description: "Get the completed journey history of a train for a specific date — full station-by-station timeline, per-stop delays, and final coach position once the train has reached its destination.",
+    description:
+      "Get the completed journey history of a train for a specific date — full station-by-station timeline, per-stop delays, and final coach position once the train has reached its destination.",
     signature: "getTrainHistory(trainNumber: string, journeyDate: string)",
     params: [
       { name: "trainNumber", type: "string", desc: "5-digit train number" },
-      { name: "journeyDate", type: "string", desc: "Journey date in DD-MM-YYYY" },
+      {
+        name: "journeyDate",
+        type: "string",
+        desc: "Journey date in DD-MM-YYYY",
+      },
     ],
-    example: `const result = await getTrainHistory("12301", "15-04-2025");
+    example: `const result = await getTrainHistory("12301", "11-06-2026");
 
 if (result.success) {
   console.log(\`🚂 \${result.data.trainName} — \${result.data.journeyDate}\`);
@@ -139,16 +211,47 @@ if (result.success) {
     console.log(\`   Arr: \${stop.arrival.scheduled} → \${stop.arrival.actual} (delay \${stop.arrival.delay}m)\`);
   });
 }`,
+    response: `{
+  "success": true,
+  "data": {
+    "trainNo": "12301", "trainName": "RAJDHANI EXPRES", "journeyDate": "11-06-2026",
+    "sourceStationCode": "HWH", "sourceStationName": "Howrah Jn",
+    "destinationStationCode": "NDLS", "destinationStationName": "New Delhi",
+    "coachPosition": [
+      { "type": "ENG", "number": "ENG", "position": "0" },
+      { "type": "LPR", "number": "LPR", "position": "1" },
+      { "type": "3A", "number": "B1", "position": "2" },
+      { "type": "3A", "number": "B2", "position": "3" },
+      { "type": "2A", "number": "A1", "position": "16" },
+      { "type": "VP", "number": "VP", "position": "23" }
+    ],
+    "stations": [
+      { "stationCode": "HWH", "stationName": "HOWRAH JN", "platform": "9", "arrival": { "scheduled": "SRC", "actual": "SRC" }, "departure": { "scheduled": "16:50 11-Jun", "actual": "16:50 11-Jun", "delay": "On Time" } },
+      { "stationCode": "ASN", "stationName": "ASANSOL JN.", "platform": "4", "distanceKm": "200", "arrival": { "scheduled": "18:47 11-Jun", "actual": "19:03 11-Jun", "delay": "16 Min" }, "departure": { "scheduled": "18:49 11-Jun", "actual": "19:05 11-Jun", "delay": "16 Min" } },
+      { "stationCode": "NDLS", "stationName": "NEW DELHI", "platform": "14", "distanceKm": "1449", "arrival": { "scheduled": "10:05 12-Jun", "actual": "10:13 12-Jun", "delay": "8 Min" }, "departure": { "scheduled": "DSTN", "actual": "DSTN" } }
+    ],
+    "lastUpdate": "12-06-2026 11:12:53 IST"
+  }
+}`,
   },
   {
     id: "station-live",
     title: "Live At Station",
     icon: Building2,
-    description: "Get upcoming and passing trains at a station with near real-time status, delays, and platform info.",
+    description:
+      "Get upcoming and passing trains at a station with near real-time status, delays, and platform info.",
     signature: "liveAtStation(stationCode: string, hours?: number)",
     params: [
-      { name: "stationCode", type: "string", desc: "Station code such as NDLS, BCT, HWH" },
-      { name: "hours", type: "number", desc: "Time window in hours — 2, 4, or 8 (default 2)" },
+      {
+        name: "stationCode",
+        type: "string",
+        desc: "Station code such as NDLS, BCT, HWH",
+      },
+      {
+        name: "hours",
+        type: "number",
+        desc: "Time window in hours — 2, 4, or 8 (default 2)",
+      },
     ],
     example: `const result = await liveAtStation("NDLS", 2);
 
@@ -156,36 +259,56 @@ if (result.success) {
   console.log(result.data.summary);
   console.log("Total trains:", result.data.totalTrains);
 
-  result.data.trains.forEach((t) => {
+    result.data.trains.forEach((t) => {
     console.log(\`🚂 \${t.trainNo} — \${t.trainName}\`);
     console.log(\`   \${t.sourceName} → \${t.destName} | PF \${t.platform}\`);
     console.log(\`   Arr: \${t.arrival.actual} (scheduled \${t.arrival.scheduled}, delay \${t.arrival.delay})\`);
   });
+}`,
+    response: `{
+  "success": true,
+  "data": {
+    "summary": "39 Trains departing from/arriving at NDLS- NEW DELHI in next 2 Hrs.",
+    "totalTrains": 39,
+    "trains": [{ "trainNo": "12138", "trainName": "PUNJAB MAIL", "source": "FZR", "sourceName": "FIROZPUR CANT", "dest": "CSMT", "destName": "C SHIVAJI MAH T", "trainType": "SUPERFAST", "classes": "1A,2A,3A,SL,GEN,PWD", "runDate": "27-Aug-2026", "platform": "3", "cancelled": null, "arrival": { "actual": "05:16", "scheduled": "04:55", "delay": "21 Mins.", "delayed": true }, "departure": { "actual": "05:21", "scheduled": "05:10", "delay": "11 Mins.", "delayed": true } }]
+  }
 }`,
   },
   {
     id: "train-search",
     title: "Train Search",
     icon: Search,
-    description: "Find available trains between stations with timetable and running-day data.",
-    signature: "searchTrainBetweenStations(from: string, to: string, date?: string)",
+    description:
+      "Find available trains between stations with timetable and running-day data.",
+    signature:
+      "searchTrainBetweenStations(from: string, to: string, date?: string)",
     params: [
       { name: "from", type: "string", desc: "Origin station code" },
       { name: "to", type: "string", desc: "Destination station code" },
-      { name: "date", type: "string", desc: "Journey date in DD-MM-YYYY (optional)" },
+      {
+        name: "date",
+        type: "string",
+        desc: "Journey date in DD-MM-YYYY (optional)",
+      },
     ],
-    example: `const result = await searchTrainBetweenStations("NDLS", "BCT", "25-12-2025");
+    example: `const result = await searchTrainBetweenStations("NDLS", "BCT", "28-08-2026");
 
 if (result.success) {
-  console.log(result.data.map((t) => t.train_name));
+    console.log(result.data.map((t) => t.train_name));
+}`,
+    response: `{
+  "success": true,
+  "data": [{ "train_no": "12904", "train_name": "GOLDEN TEMPLE M", "source_stn_name": "Amritsar Jn", "source_stn_code": "ASR", "dstn_stn_name": "Bandra Terminus", "dstn_stn_code": "BDTS", "from_stn_name": "Hazrat Nizamuddin", "from_stn_code": "NZM", "to_stn_name": "Bandra Terminus", "to_stn_code": "BDTS", "from_time": "04:00", "to_time": "23:55", "travel_time": "19:55 hrs", "running_days": "1111111", "distance": "1365", "halts": 20 }]
 }`,
   },
   {
     id: "seat-availability",
     title: "Seat Availability",
     icon: Armchair,
-    description: "Check availability forecasts and detailed fare breakup by quota and class.",
-    signature: "getAvailability(trainNo, fromStnCode, toStnCode, date, coach, quota)",
+    description:
+      "Check availability forecasts and detailed fare breakup by quota and class.",
+    signature:
+      "getAvailability(trainNo, fromStnCode, toStnCode, date, coach, quota)",
     params: [
       { name: "trainNo", type: "string", desc: "5-digit train number" },
       { name: "fromStnCode", type: "string", desc: "Origin station code" },
@@ -195,27 +318,45 @@ if (result.success) {
       { name: "quota", type: "string", desc: "GN, TQ, LD, SS" },
     ],
     example: `const result = await getAvailability(
-  "12496", "ASN", "DDU",
-  "27-12-2025", "2A", "GN"
+  "12904", "NZM", "BDTS",
+  "01-09-2026", "3A", "GN"
 );`,
+    response: `{
+  "success": true,
+  "data": {
+    "train": { "trainNo": "12904", "trainName": "GOLDEN TEMPLE M", "from": "NZM", "to": "BDTS", "fromStationName": "Delhi Hazrat Nizamuddin", "toStationName": "Mumbai Bandra Terminus", "distance": 1366, "travelClass": "3A", "quota": "GN" },
+    "fare": { "baseFare": 1505, "reservationCharge": 40, "superfastCharge": 45, "serviceTax": 80, "totalFare": 1670 },
+    "availability": [{ "date": "1-9-2026", "status": "WAITLIST", "availabilityText": "WL 23", "rawStatus": "RLWL31/WL23", "prediction": "73% Chance", "predictionPercentage": 73, "canBook": true }]
+  }
+}`,
   },
   {
     id: "fare-lookup",
     title: "Fare Lookup",
     icon: IndianRupee,
-    description: "Get the full fare breakdown for a journey — base fare, reservation, superfast, catering, GST, dynamic fare, and total collectible amount.",
-    signature: "fareLookup(trainNo, fromStnCode, toStnCode, date, travelClass, quota)",
+    description:
+      "Get the full fare breakdown for a journey — base fare, reservation, superfast, catering, GST, dynamic fare, and total collectible amount.",
+    signature:
+      "fareLookup(trainNo, fromStnCode, toStnCode, date, travelClass, quota)",
     params: [
       { name: "trainNo", type: "string", desc: "5-digit train number" },
       { name: "fromStnCode", type: "string", desc: "Origin station code" },
       { name: "toStnCode", type: "string", desc: "Destination station code" },
       { name: "date", type: "string", desc: "Journey date in DD-MM-YYYY" },
-      { name: "travelClass", type: "string", desc: "1A · 2A · 3A · 3E · CC · EC · EA · FC · SL · 2S · VS · CH · HS · VC · VA" },
-      { name: "quota", type: "string", desc: "GN · TQ · PT · LD · DF · FT · LB · YU · DP · HP · PH · SS" },
+      {
+        name: "travelClass",
+        type: "string",
+        desc: "1A · 2A · 3A · 3E · CC · EC · EA · FC · SL · 2S · VS · CH · HS · VC · VA",
+      },
+      {
+        name: "quota",
+        type: "string",
+        desc: "GN · TQ · PT · LD · DF · FT · LB · YU · DP · HP · PH · SS",
+      },
     ],
     example: `const result = await fareLookup(
-  "12313", "ASN", "NDLS",
-  "06-06-2026", "3A", "GN"
+  "12904", "NZM", "BDTS",
+  "01-09-2026", "3A", "GN"
 );
 
 if (result.success) {
@@ -224,12 +365,17 @@ if (result.success) {
   console.log(\`\${d.from} → \${d.to} | \${d.distance} km\`);
   console.log(\`Base: ₹\${d.baseFare}  GST: ₹\${d.gst}  Total: ₹\${d.totalFare}\`);
 }`,
+    response: `{
+  "success": true,
+  "data": { "trainNo": "12904", "trainName": "GOLDEN TEMPLE M", "from": "NZM", "to": "BDTS", "class": "3A", "distance": 1366, "baseFare": 1505, "reservation": 40, "superfast": 45, "fuelAmount": 0, "concession": 0, "tatkalFare": 0, "gst": 80, "otherCharge": 0, "catering": 0, "dynamicFare": 0, "totalFare": 1670 }
+}`,
   },
   {
     id: "cancelled-trains",
     title: "Cancelled Trains",
     icon: CircleX,
-    description: "Get the complete list of fully and partially cancelled trains, with route details and the affected segment for partial cancellations.",
+    description:
+      "Get the complete list of fully and partially cancelled trains, with route details and the affected segment for partial cancellations.",
     signature: "cancelList(): Promise<Result>",
     params: [],
     example: `const result = await cancelList();
@@ -250,6 +396,14 @@ if (result.success) {
       train.cancelledSegment.to.name
     );
   });
+}`,
+    response: `{
+  "success": true,
+  "summary": { "total": 60, "fullyCancelled": 16, "partiallyCancelled": 44, "journeyDates": ["26-08-2026"] },
+  "data": {
+    "fullyCancelledTrains": [{ "trainNo": "12614", "trainName": "WODEYAR SF EXP", "journeyDate": "26-08-2026", "status": "fully_cancelled", "route": { "source": { "code": "SBC", "name": "KRANTIVIRA SANGOLLI RAYANNA (BENGALURU)" }, "destination": { "code": "MYS", "name": "MYSORE JN" } }, "cancelledSegment": null, "trainType": null, "reportedAt": "16-08-2026 12:03:14 IST" }],
+    "partiallyCancelledTrains": [{ "trainNo": "12112", "trainName": "AMI CSMT SF EXP", "journeyDate": "26-08-2026", "status": "partially_cancelled", "cancelledSegment": { "from": { "code": "DR", "name": "DADAR" }, "to": { "code": "CSMT", "name": "CHHATRAPATI SHIVAJI MAHARAJ TERMINUS" } } }]
+  }
 }`,
   },
 ];
@@ -283,40 +437,77 @@ const cancelled = await cancelList();`;
 
 const docsBaseUrl = "https://railkit.rajivdubey.dev/docs";
 
-export default function DocsPage({ activeSlug = "introduction" }: { activeSlug?: string }) {
+export default function DocsPage({
+  activeSlug = "introduction",
+}: {
+  activeSlug?: string;
+}) {
   const [copiedInstall, setCopiedInstall] = useState(false);
   const [copiedAIMarkdown, setCopiedAIMarkdown] = useState(false);
   const [setupView, setSetupView] = useState<IntegrationView>("sdk");
-  const [quickStartLanguage, setQuickStartLanguage] = useState<ApiCodeLanguage>("javascript");
+  const [quickStartLanguage, setQuickStartLanguage] =
+    useState<ApiCodeLanguage>("javascript");
 
-  const directApiBaseUrl = process.env.NEXT_PUBLIC_DIRECT_API_BASE_URL || "https://railkit-api.rajivdubey.dev";
+  const directApiBaseUrl =
+    process.env.NEXT_PUBLIC_DIRECT_API_BASE_URL ||
+    "https://railkit-api.rajivdubey.dev";
 
   const flatSections = useMemo(() => sidebarGroups.flatMap((g) => g.items), []);
 
   const aiDocsMarkdown = useMemo(() => {
-    const endpointDetails = endpointSections.map((ep) => {
-      const rest = apiEndpointById.get(ep.id);
-      const params = ep.params.length
-        ? ep.params.map((p) => `- \`${p.name}\` (\`${p.type}\`): ${p.desc}`).join("\n")
-        : "- None";
-      const restContract = rest
-        ? `\nREST: \`${rest.method} ${rest.path}\`\nRequired header: \`x-api-key: YOUR_API_KEY\``
-        : "";
-      return `### ${ep.title}\nLink: [${docsBaseUrl}/${ep.id}](${docsBaseUrl}/${ep.id})\nSDK: \`${ep.signature}\`${restContract}\nParameters:\n${params}\n\nSDK example:\n\`\`\`javascript\n${ep.example}\n\`\`\``;
-    }).join("\n\n");
+    const endpointDetails = endpointSections
+      .map((ep) => {
+        const rest = apiEndpointById.get(ep.id);
+        const params = ep.params.length
+          ? ep.params
+              .map((p) => `- \`${p.name}\` (\`${p.type}\`): ${p.desc}`)
+              .join("\n")
+          : "- None";
+        const restContract = rest
+          ? `\nREST: \`${rest.method} ${rest.path}\`\nRequired header: \`x-api-key: YOUR_API_KEY\``
+          : "";
+        return `### ${ep.title}\nLink: [${docsBaseUrl}/${ep.id}](${docsBaseUrl}/${ep.id})\nSDK: \`${ep.signature}\`${restContract}\nParameters:\n${params}\n\nSDK example:\n\`\`\`javascript\n${ep.example}\n\`\`\``;
+      })
+      .join("\n\n");
 
-    const sectionLinks = ["installation","quickstart","pnr-status","train-info","live-tracking","train-history","station-live","train-search","seat-availability","fare-lookup","cancelled-trains","validation","errors"]
-      .map((id) => { const s = flatSections.find((i) => i.id === id); return s ? `- [${s.label}](${docsBaseUrl}/${s.id})` : null; })
-      .filter(Boolean).join("\n");
+    const sectionLinks = [
+      "installation",
+      "quickstart",
+      "pnr-status",
+      "train-info",
+      "live-tracking",
+      "train-history",
+      "station-live",
+      "train-search",
+      "seat-availability",
+      "fare-lookup",
+      "cancelled-trains",
+      "validation",
+      "errors",
+    ]
+      .map((id) => {
+        const s = flatSections.find((i) => i.id === id);
+        return s ? `- [${s.label}](${docsBaseUrl}/${s.id})` : null;
+      })
+      .filter(Boolean)
+      .join("\n");
 
     return `# RailKit - Implementation Essentials\n\n## Official Links\n- Docs: [${docsBaseUrl}](${docsBaseUrl})\n- NPM: [${packageInfo.links.npm}](${packageInfo.links.npm})\n- GitHub: [${packageInfo.links.github}](${packageInfo.links.github})\n\n## REST API\n- Base URL: \`${directApiBaseUrl}\`\n- Auth header: \`x-api-key: YOUR_API_KEY\`\n- Direct REST access requires the Advance plan.\n\n## SDK Quick Setup\n\`\`\`bash\n${installSnippet}\n\`\`\`\n\n\`\`\`javascript\n${quickStartSnippet}\n\`\`\`\n\n## Section Links\n${sectionLinks}\n\n## Endpoint Contracts\n${endpointDetails}\n\n## Required Input Rules\n- PNR: exactly 10 digits\n- Train number: exactly 5 digits (string)\n- Date: DD-MM-YYYY\n- Station code: uppercase\n\n## Response Handling\nSuccess: \`{ success: true, data: { ... } }\`\nError: \`{ success: false, message: "..." }\`\n\nAlso handle:\n\`\`\`ts\n${responseFormats.error}\n\`\`\``;
   }, [directApiBaseUrl, flatSections]);
 
   const copyInstall = async () => {
-    try { await navigator.clipboard.writeText(installSnippet); setCopiedInstall(true); setTimeout(() => setCopiedInstall(false), 1400); } catch {}
+    try {
+      await navigator.clipboard.writeText(installSnippet);
+      setCopiedInstall(true);
+      setTimeout(() => setCopiedInstall(false), 1400);
+    } catch {}
   };
   const copyAIDocsMarkdown = async () => {
-    try { await navigator.clipboard.writeText(aiDocsMarkdown); setCopiedAIMarkdown(true); setTimeout(() => setCopiedAIMarkdown(false), 1800); } catch {}
+    try {
+      await navigator.clipboard.writeText(aiDocsMarkdown);
+      setCopiedAIMarkdown(true);
+      setTimeout(() => setCopiedAIMarkdown(false), 1800);
+    } catch {}
   };
 
   return (
@@ -528,193 +719,556 @@ export default function DocsPage({ activeSlug = "introduction" }: { activeSlug?:
         }
       `}</style>
 
-            {/* ── Introduction ── */}
-            {activeSlug === "introduction" && <section id="introduction" className="docs-section docs-reveal">
-              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 12 }}>
-                RailKit developer platform
-              </p>
-              <h1 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: "clamp(32px, 4vw, 52px)", fontWeight: 400, lineHeight: 1.05, letterSpacing: "-0.025em", color: "#000", marginBottom: 16, maxWidth: 640 }}>
-                Railway API documentation,{" "}
-                <em style={{ fontStyle: "italic", color: "#6F6F6F" }}>built for production.</em>
-              </h1>
-              <p style={{ fontSize: 15, fontWeight: 300, lineHeight: 1.75, color: "#6F6F6F", maxWidth: 560, marginBottom: 28 }}>
-                Use the typed Node.js SDK or call the REST API directly. Both integrations cover PNR status,
-                train info, live tracking, station boards, train search, seat availability, and cancellations.
-              </p>
+      {/* ── Introduction ── */}
+      {activeSlug === "introduction" && (
+        <section id="introduction" className="docs-section docs-reveal">
+          <p
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: "#9ca3af",
+              marginBottom: 12,
+            }}
+          >
+            RailKit developer platform
+          </p>
+          <h1
+            style={{
+              fontFamily: "'Instrument Serif', Georgia, serif",
+              fontSize: "clamp(32px, 4vw, 52px)",
+              fontWeight: 400,
+              lineHeight: 1.05,
+              letterSpacing: "-0.025em",
+              color: "#000",
+              marginBottom: 16,
+              maxWidth: 640,
+            }}
+          >
+            Railway API documentation,{" "}
+            <em style={{ fontStyle: "italic", color: "#6F6F6F" }}>
+              built for production.
+            </em>
+          </h1>
+          <p
+            style={{
+              fontSize: 15,
+              fontWeight: 300,
+              lineHeight: 1.75,
+              color: "#6F6F6F",
+              maxWidth: 560,
+              marginBottom: 28,
+            }}
+          >
+            Use the typed Node.js SDK or call the REST API directly. Both
+            integrations cover PNR status, train info, live tracking, station
+            boards, train search, seat availability, and cancellations.
+          </p>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
-                <IntegrationTabs value={setupView} onChange={setSetupView} />
-                <span style={{ fontSize: 12, color: "#9ca3af" }}>
-                  {setupView === "sdk" ? "Typed package for Node.js" : "Direct HTTP access for Advance plan"}
-                </span>
-              </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+              marginBottom: 20,
+            }}
+          >
+            <IntegrationTabs value={setupView} onChange={setSetupView} />
+            <span style={{ fontSize: 12, color: "#9ca3af" }}>
+              {setupView === "sdk"
+                ? "Typed package for Node.js"
+                : "Direct HTTP access for Advance plan"}
+            </span>
+          </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 32 }}>
-                <Link href="/dashboard" className="docs-chip docs-chip-primary">
-                  Open Dashboard <ChevronRight size={13} />
-                </Link>
-                <a href="https://www.npmjs.com/package/railkit" target="_blank" rel="noreferrer" className="docs-chip">
-                  NPM Package
-                </a>
-                <button type="button" onClick={copyAIDocsMarkdown} className="docs-chip">
-                  {copiedAIMarkdown ? "Copied ✓" : "Copy AI Markdown"}
-                </button>
-                <Link href="/dashboard" className="docs-chip">
-                  Playground <ChevronRight size={13} />
-                </Link>
-              </div>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              marginBottom: 32,
+            }}
+          >
+            <Link href="/dashboard" className="docs-chip docs-chip-primary">
+              Open Dashboard <ChevronRight size={13} />
+            </Link>
+            <a
+              href="https://www.npmjs.com/package/railkit"
+              target="_blank"
+              rel="noreferrer"
+              className="docs-chip"
+            >
+              NPM Package
+            </a>
+            <button
+              type="button"
+              onClick={copyAIDocsMarkdown}
+              className="docs-chip"
+            >
+              {copiedAIMarkdown ? "Copied ✓" : "Copy AI Markdown"}
+            </button>
+            <Link href="/dashboard" className="docs-chip">
+              Playground <ChevronRight size={13} />
+            </Link>
+          </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
-                {[
-                  { label: "Endpoints", value: "9" },
-                  { label: "Runtime", value: "Node 14+" },
-                  { label: "Auth", value: "API Key" },
-                  { label: "Access", value: "SDK + REST" },
-                ].map((stat) => (
-                  <div key={stat.label} className="docs-card docs-card-lift" style={{ padding: "14px 16px" }}>
-                    <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 6 }}>{stat.label}</p>
-                    <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 14, fontWeight: 500, color: "#000" }}>{stat.value}</p>
-                  </div>
-                ))}
-              </div>
-            </section>}
-
-            {/* ── Installation ── */}
-            {activeSlug === "installation" && <section id="installation" className="docs-section">
-              <DocsSectionHeader title={setupView === "sdk" ? "SDK Installation" : "REST API Access"} icon={Package} />
-              {setupView === "sdk" ? (
-                <>
-                  <div className="docs-card" style={{ marginBottom: 12 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 16px", borderBottom: "1px solid #21262d", background: "#0d1117" }}>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57", display: "block" }} />
-                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#febc2e", display: "block" }} />
-                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840", display: "block" }} />
-                      </div>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280" }}>Terminal</span>
-                      <button type="button" onClick={copyInstall}
-                        style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#9ca3af", background: "transparent", border: "1px solid #374151", borderRadius: 6, padding: "3px 10px", cursor: "pointer" }}>
-                        {copiedInstall ? "Copied" : "Copy"}
-                      </button>
-                    </div>
-                    <div style={{ background: "#0d1117", padding: "14px 18px" }}>
-                      <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: "#6ee7b7" }}>{installSnippet}</code>
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
-                    <DocsInfoPanel title="Requirements" items={["Node.js 14+", "Active internet connection", "Valid API key in environment variables"]} />
-                    <DocsInfoPanel title="Supported Platforms" items={["Node.js apps and scripts", "Express servers", "Next.js App Router projects", "React Native environments"]} />
-                  </div>
-                </>
-              ) : (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
-                  <DocsInfoPanel title="Base URL" items={[directApiBaseUrl]} />
-                  <DocsInfoPanel title="Authentication" items={["Send x-api-key with every request", "Keep API keys on your server", "Direct REST access requires the Advance plan"]} />
-                </div>
-              )}
-            </section>}
-
-            {/* ── Quick Start ── */}
-            {activeSlug === "quickstart" && <section id="quickstart" className="docs-section">
-              <DocsSectionHeader title="Quick Start" icon={Rocket} />
-              <div style={{ marginBottom: 10, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.07)", background: "#fafafa", fontSize: 13, color: "#374151", lineHeight: 1.6 }}>
-                {setupView === "sdk" ? (
-                  <>Call <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, background: "rgba(0,0,0,0.05)", padding: "1px 5px", borderRadius: 4 }}>configure(apiKey)</code> once at app startup before any request method.</>
-                ) : (
-                  <>Send <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, background: "rgba(0,0,0,0.05)", padding: "1px 5px", borderRadius: 4 }}>x-api-key</code> with every request. Never expose keys in browser code.</>
-                )}
-              </div>
-              {setupView === "rest" && <LanguageTabs value={quickStartLanguage} onChange={setQuickStartLanguage} />}
-              <DocsCodePanel
-                key={setupView === "sdk" ? "sdk" : quickStartLanguage}
-                language={setupView === "sdk" ? "javascript" : apiLanguageMeta[quickStartLanguage].syntax}
-                code={setupView === "sdk" ? quickStartSnippet : buildRestSnippet(directApiBaseUrl, apiEndpointDocs[0].examplePath, quickStartLanguage)}
-                bodyMinHeight={setupView === "rest" ? 276 : undefined}
-                swapping
-              />
-            </section>}
-
-            {/* ── Endpoints ── */}
-            {endpointSections.filter((ep) => ep.id === activeSlug).map((ep) => {
-              return (
-                <section key={ep.id} id={ep.id} className="docs-section">
-                  <DocsSectionHeader title={ep.title} icon={ep.icon} />
-                  <EndpointDocsCard endpoint={ep} baseUrl={directApiBaseUrl} />
-                </section>
-              );
-            })}
-
-            {/* ── Playground ── */}
-            {activeSlug === "playground" && <section id="playground" className="docs-section">
-              <DocsSectionHeader title="Playground" icon={Gamepad2} />
-              <div className="docs-card" style={{ padding: "20px" }}>
-                <p style={{ fontSize: 14, fontWeight: 300, lineHeight: 1.7, color: "#6F6F6F", marginBottom: 16, maxWidth: 520 }}>
-                  The live playground is available inside your user panel. Run real API calls with your account key and inspect latency plus JSON responses.
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+              gap: 10,
+            }}
+          >
+            {[
+              { label: "Endpoints", value: "9" },
+              { label: "Runtime", value: "Node 14+" },
+              { label: "Auth", value: "API Key" },
+              { label: "Access", value: "SDK + REST" },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="docs-card docs-card-lift"
+                style={{ padding: "14px 16px" }}
+              >
+                <p
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color: "#9ca3af",
+                    marginBottom: 6,
+                  }}
+                >
+                  {stat.label}
                 </p>
-                <Link href="/dashboard" className="docs-chip docs-chip-primary">
-                  Open Playground <ChevronRight size={13} />
-                </Link>
+                <p
+                  style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: "#000",
+                  }}
+                >
+                  {stat.value}
+                </p>
               </div>
-            </section>}
+            ))}
+          </div>
+        </section>
+      )}
 
-            {/* ── Validation ── */}
-            {activeSlug === "validation" && <section id="validation" className="docs-section">
-              <DocsSectionHeader title="Input Validation" icon={CheckCircle} />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 10 }}>
-                <DocsInfoPanel title="PNR" items={["Exactly 10 digits", "Numeric input only", "Reject malformed values early"]} />
-                <DocsInfoPanel title="Train Number" items={["Exactly 5 digits", "Treat as string to preserve zeros", "No spaces or symbols"]} />
-                <DocsInfoPanel title="Date" items={["DD-MM-YYYY format", "Validate real calendar date", "Use same format across APIs"]} />
-                <DocsInfoPanel title="Station Code" items={["Uppercase station code", "Examples: NDLS, BCT, HWH", "Trim extra whitespace"]} />
+      {/* ── Installation ── */}
+      {activeSlug === "installation" && (
+        <section id="installation" className="docs-section">
+          <DocsSectionHeader
+            title={setupView === "sdk" ? "SDK Installation" : "REST API Access"}
+            icon={Package}
+          />
+          {setupView === "sdk" ? (
+            <>
+              <div className="docs-card" style={{ marginBottom: 12 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "11px 16px",
+                    borderBottom: "1px solid #21262d",
+                    background: "#0d1117",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: "#ff5f57",
+                        display: "block",
+                      }}
+                    />
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: "#febc2e",
+                        display: "block",
+                      }}
+                    />
+                    <span
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: "#28c840",
+                        display: "block",
+                      }}
+                    />
+                  </div>
+                  <span
+                    style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: 11,
+                      color: "#6b7280",
+                    }}
+                  >
+                    Terminal
+                  </span>
+                  <button
+                    type="button"
+                    onClick={copyInstall}
+                    style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: 11,
+                      color: "#9ca3af",
+                      background: "transparent",
+                      border: "1px solid #374151",
+                      borderRadius: 6,
+                      padding: "3px 10px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {copiedInstall ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                <div style={{ background: "#0d1117", padding: "14px 18px" }}>
+                  <code
+                    style={{
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontSize: 13,
+                      color: "#6ee7b7",
+                    }}
+                  >
+                    {installSnippet}
+                  </code>
+                </div>
               </div>
-            </section>}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: 10,
+                }}
+              >
+                <DocsInfoPanel
+                  title="Requirements"
+                  items={[
+                    "Node.js 14+",
+                    "Active internet connection",
+                    "Valid API key in environment variables",
+                  ]}
+                />
+                <DocsInfoPanel
+                  title="Supported Platforms"
+                  items={[
+                    "Node.js apps and scripts",
+                    "Express servers",
+                    "Next.js App Router projects",
+                    "React Native environments",
+                  ]}
+                />
+              </div>
+            </>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 10,
+              }}
+            >
+              <DocsInfoPanel title="Base URL" items={[directApiBaseUrl]} />
+              <DocsInfoPanel
+                title="Authentication"
+                items={[
+                  "Send x-api-key with every request",
+                  "Keep API keys on your server",
+                  "Direct REST access requires the Advance plan",
+                ]}
+              />
+            </div>
+          )}
+        </section>
+      )}
 
-            {/* ── Status codes ── */}
-            {activeSlug === "status-codes" && <section id="status-codes" className="docs-section">
-              <DocsSectionHeader title="Status Codes" icon={BarChart3} />
-              <div className="docs-card" style={{ overflowX: "auto" }}>
-                <table className="docs-table">
-                  <thead>
-                    <tr>
-                      {["Code", "Full Form", "Description"].map((h) => <th key={h}>{h}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      ["CNF", "Confirmed", "Seat or berth is confirmed"],
-                      ["WL", "Waiting List", "Seat not confirmed yet"],
-                      ["RAC", "Reservation Against Cancellation", "Partial seat allocation"],
-                      ["CAN", "Cancelled", "Ticket is cancelled"],
-                      ["PQWL", "Pooled Quota WL", "Pooled quota waiting"],
-                      ["TQWL", "Tatkal Quota WL", "Tatkal waiting"],
-                      ["GNWL", "General WL", "General waiting list"],
-                    ].map(([code, full, desc]) => (
-                      <tr key={code}>
-                        <td><code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, background: "#f5f5f5", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 5, padding: "2px 7px" }}>{code}</code></td>
-                        <td style={{ fontWeight: 500, color: "#000" }}>{full}</td>
-                        <td style={{ color: "#6F6F6F", fontWeight: 300 }}>{desc}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>}
+      {/* ── Quick Start ── */}
+      {activeSlug === "quickstart" && (
+        <section id="quickstart" className="docs-section">
+          <DocsSectionHeader title="Quick Start" icon={Rocket} />
+          <div
+            style={{
+              marginBottom: 10,
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid rgba(0,0,0,0.07)",
+              background: "#fafafa",
+              fontSize: 13,
+              color: "#374151",
+              lineHeight: 1.6,
+            }}
+          >
+            {setupView === "sdk" ? (
+              <>
+                Call{" "}
+                <code
+                  style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 12,
+                    background: "rgba(0,0,0,0.05)",
+                    padding: "1px 5px",
+                    borderRadius: 4,
+                  }}
+                >
+                  configure(apiKey)
+                </code>{" "}
+                once at app startup before any request method.
+              </>
+            ) : (
+              <>
+                Send{" "}
+                <code
+                  style={{
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 12,
+                    background: "rgba(0,0,0,0.05)",
+                    padding: "1px 5px",
+                    borderRadius: 4,
+                  }}
+                >
+                  x-api-key
+                </code>{" "}
+                with every request. Never expose keys in browser code.
+              </>
+            )}
+          </div>
+          {setupView === "rest" && (
+            <LanguageTabs
+              value={quickStartLanguage}
+              onChange={setQuickStartLanguage}
+            />
+          )}
+          <DocsCodePanel
+            key={setupView === "sdk" ? "sdk" : quickStartLanguage}
+            language={
+              setupView === "sdk"
+                ? "javascript"
+                : apiLanguageMeta[quickStartLanguage].syntax
+            }
+            code={
+              setupView === "sdk"
+                ? quickStartSnippet
+                : buildRestSnippet(
+                    directApiBaseUrl,
+                    apiEndpointDocs[0].examplePath,
+                    quickStartLanguage,
+                  )
+            }
+            bodyMinHeight={setupView === "rest" ? 276 : undefined}
+            swapping
+          />
+        </section>
+      )}
 
-            {/* ── Error handling ── */}
-            {activeSlug === "errors" && <section id="errors" className="docs-section" style={{ marginBottom: 64 }}>
-              <DocsSectionHeader title="Error Handling" icon={AlertTriangle} />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10, marginBottom: 10 }}>
-                <DocsResponsePanel tone="success" title="Success Response" code={`{\n  success: true,\n  data: { ... }\n}`} />
-                <DocsResponsePanel tone="error" title="Error Response" code={`{\n  success: false,\n  message: "Error message"\n}`} />
-              </div>
-              <DocsInfoPanel title="Common Error Scenarios" items={[
-                "Missing configure(apiKey) call",
-                "Invalid or expired API key (401)",
-                "Inactive API key (403)",
-                "Rate limit exceeded (429)",
-                "Invalid train/PNR/date inputs",
-                "Temporary upstream timeout or API outage",
-              ]} />
-            </section>}
+      {/* ── Endpoints ── */}
+      {endpointSections
+        .filter((ep) => ep.id === activeSlug)
+        .map((ep) => {
+          return (
+            <section key={ep.id} id={ep.id} className="docs-section">
+              <DocsSectionHeader title={ep.title} icon={ep.icon} />
+              <EndpointDocsCard endpoint={ep} baseUrl={directApiBaseUrl} />
+            </section>
+          );
+        })}
+
+      {/* ── Playground ── */}
+      {activeSlug === "playground" && (
+        <section id="playground" className="docs-section">
+          <DocsSectionHeader title="Playground" icon={Gamepad2} />
+          <div className="docs-card" style={{ padding: "20px" }}>
+            <p
+              style={{
+                fontSize: 14,
+                fontWeight: 300,
+                lineHeight: 1.7,
+                color: "#6F6F6F",
+                marginBottom: 16,
+                maxWidth: 520,
+              }}
+            >
+              The live playground is available inside your user panel. Run real
+              API calls with your account key and inspect latency plus JSON
+              responses.
+            </p>
+            <Link href="/dashboard" className="docs-chip docs-chip-primary">
+              Open Playground <ChevronRight size={13} />
+            </Link>
+          </div>
+        </section>
+      )}
+
+      {/* ── Validation ── */}
+      {activeSlug === "validation" && (
+        <section id="validation" className="docs-section">
+          <DocsSectionHeader title="Input Validation" icon={CheckCircle} />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+              gap: 10,
+            }}
+          >
+            <DocsInfoPanel
+              title="PNR"
+              items={[
+                "Exactly 10 digits",
+                "Numeric input only",
+                "Reject malformed values early",
+              ]}
+            />
+            <DocsInfoPanel
+              title="Train Number"
+              items={[
+                "Exactly 5 digits",
+                "Treat as string to preserve zeros",
+                "No spaces or symbols",
+              ]}
+            />
+            <DocsInfoPanel
+              title="Date"
+              items={[
+                "DD-MM-YYYY format",
+                "Validate real calendar date",
+                "Use same format across APIs",
+              ]}
+            />
+            <DocsInfoPanel
+              title="Station Code"
+              items={[
+                "Uppercase station code",
+                "Examples: NDLS, BCT, HWH",
+                "Trim extra whitespace",
+              ]}
+            />
+          </div>
+        </section>
+      )}
+
+      {/* ── Status codes ── */}
+      {activeSlug === "status-codes" && (
+        <section id="status-codes" className="docs-section">
+          <DocsSectionHeader title="Status Codes" icon={BarChart3} />
+          <div className="docs-card" style={{ overflowX: "auto" }}>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  {["Code", "Full Form", "Description"].map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["CNF", "Confirmed", "Seat or berth is confirmed"],
+                  ["WL", "Waiting List", "Seat not confirmed yet"],
+                  [
+                    "RAC",
+                    "Reservation Against Cancellation",
+                    "Partial seat allocation",
+                  ],
+                  ["CAN", "Cancelled", "Ticket is cancelled"],
+                  ["PQWL", "Pooled Quota WL", "Pooled quota waiting"],
+                  ["TQWL", "Tatkal Quota WL", "Tatkal waiting"],
+                  ["GNWL", "General WL", "General waiting list"],
+                ].map(([code, full, desc]) => (
+                  <tr key={code}>
+                    <td>
+                      <code
+                        style={{
+                          fontFamily: "'JetBrains Mono', monospace",
+                          fontSize: 11,
+                          background: "#f5f5f5",
+                          border: "1px solid rgba(0,0,0,0.07)",
+                          borderRadius: 5,
+                          padding: "2px 7px",
+                        }}
+                      >
+                        {code}
+                      </code>
+                    </td>
+                    <td style={{ fontWeight: 500, color: "#000" }}>{full}</td>
+                    <td style={{ color: "#6F6F6F", fontWeight: 300 }}>
+                      {desc}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* ── Error handling ── */}
+      {activeSlug === "errors" && (
+        <section
+          id="errors"
+          className="docs-section"
+          style={{ marginBottom: 64 }}
+        >
+          <DocsSectionHeader title="Error Handling" icon={AlertTriangle} />
+          <div className="docs-card" style={{ overflowX: "auto", marginBottom: 10 }}>
+            <table className="docs-table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Meaning</th>
+                  <th>Backend response</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["200", "Success", "{ success: true, data: { ... } }"],
+                  ["400", "Bad request — invalid input or upstream request rejected", "{ success: false, error: \"Invalid date format. Use DD-MM-YYYY.\" }"],
+                  ["401", "Unauthorized — API key missing or invalid", "{ success: false, error: \"Invalid API key format\" }"],
+                  ["403", "Forbidden — API key inactive", "{ success: false, error: \"API key is inactive\" }"],
+                  ["404", "Not found — requested record does not exist", "{ success: false, error: \"Train history record not found\" }"],
+                  ["429", "Too many requests — usage limit exceeded", "{ success: false, error: \"Usage limit exceeded\" }"],
+                  ["500", "Server error — backend or upstream failure", "{ success: false, error: \"Internal server error\" }"],
+                ].map(([status, meaning, response]) => (
+                  <tr key={status}>
+                    <td>
+                      <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 600, color: status === "200" ? "#15803d" : "#b91c1c" }}>
+                        {status}
+                      </code>
+                    </td>
+                    <td style={{ color: "#374151", fontWeight: 400 }}>{meaning}</td>
+                    <td>
+                      <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6F6F6F" }}>
+                        {response}
+                      </code>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <DocsInfoPanel
+            title="Common Error Scenarios"
+            items={[
+              "Missing configure(apiKey) call",
+              "Invalid or expired API key (401)",
+              "Inactive API key (403)",
+              "Rate limit exceeded (429)",
+              "Invalid train/PNR/date inputs",
+              "Temporary upstream timeout or API outage",
+            ]}
+          />
+        </section>
+      )}
     </>
   );
 }
@@ -756,14 +1310,26 @@ function LanguageTabs({
   onChange: (value: ApiCodeLanguage) => void;
 }) {
   return (
-    <div style={{ display: "flex", justifyContent: "flex-end", gap: 2, marginBottom: 8 }} aria-label="Code language">
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        gap: 2,
+        marginBottom: 8,
+      }}
+      aria-label="Code language"
+    >
       {(Object.keys(apiLanguageMeta) as ApiCodeLanguage[]).map((language) => (
         <button
           key={language}
           type="button"
           aria-pressed={value === language}
           className={`docs-language-tab ${value === language ? "docs-language-tab-active" : ""}`}
-          style={value === language ? { background: "#0d1117", borderRadius: 6 } : undefined}
+          style={
+            value === language
+              ? { background: "#0d1117", borderRadius: 6 }
+              : undefined
+          }
           onClick={() => onChange(language)}
         >
           {apiLanguageMeta[language].label}
@@ -776,33 +1342,106 @@ function LanguageTabs({
 function EndpointParams({ params }: { params: EndpointSection["params"] }) {
   if (!params.length) return null;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 8, marginBottom: 14 }}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+        gap: 8,
+        marginBottom: 14,
+      }}
+    >
       {params.map((param) => (
         <div key={param.name} className="docs-param">
-          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, fontWeight: 500, color: "#000", marginBottom: 3 }}>{param.name}</p>
-          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280", marginBottom: 5 }}>{param.type}</p>
-          <p style={{ fontSize: 12, lineHeight: 1.55, color: "#6F6F6F", fontWeight: 300 }}>{param.desc}</p>
+          <p
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 12,
+              fontWeight: 500,
+              color: "#000",
+              marginBottom: 3,
+            }}
+          >
+            {param.name}
+          </p>
+          <p
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 11,
+              color: "#6b7280",
+              marginBottom: 5,
+            }}
+          >
+            {param.type}
+          </p>
+          <p
+            style={{
+              fontSize: 12,
+              lineHeight: 1.55,
+              color: "#6F6F6F",
+              fontWeight: 300,
+            }}
+          >
+            {param.desc}
+          </p>
         </div>
       ))}
     </div>
   );
 }
 
-function EndpointDocsCard({ endpoint, baseUrl }: { endpoint: EndpointSection; baseUrl: string }) {
+function EndpointDocsCard({
+  endpoint,
+  baseUrl,
+}: {
+  endpoint: EndpointSection;
+  baseUrl: string;
+}) {
   const [view, setView] = useState<IntegrationView>("sdk");
   const [language, setLanguage] = useState<ApiCodeLanguage>("javascript");
   const rest = apiEndpointById.get(endpoint.id);
 
   return (
     <div className="docs-card" style={{ padding: "20px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
-        <p style={{ fontSize: 14, fontWeight: 300, lineHeight: 1.7, color: "#6F6F6F", maxWidth: 620 }}>{endpoint.description}</p>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 16,
+          flexWrap: "wrap",
+          marginBottom: 14,
+        }}
+      >
+        <p
+          style={{
+            fontSize: 14,
+            fontWeight: 300,
+            lineHeight: 1.7,
+            color: "#6F6F6F",
+            maxWidth: 620,
+          }}
+        >
+          {endpoint.description}
+        </p>
         <IntegrationTabs value={view} onChange={setView} compact />
       </div>
 
       {view === "sdk" ? (
         <div key="sdk" className="docs-code-swap">
-          <code style={{ display: "block", fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#000", background: "#f5f5f5", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 8, padding: "9px 12px", marginBottom: 14, overflowX: "auto" }}>
+          <code
+            style={{
+              display: "block",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 12,
+              color: "#000",
+              background: "#f5f5f5",
+              border: "1px solid rgba(0,0,0,0.07)",
+              borderRadius: 8,
+              padding: "9px 12px",
+              marginBottom: 14,
+              overflowX: "auto",
+            }}
+          >
             {endpoint.signature}
           </code>
           <EndpointParams params={endpoint.params} />
@@ -819,6 +1458,15 @@ function EndpointDocsCard({ endpoint, baseUrl }: { endpoint: EndpointSection; ba
           />
         </div>
       ) : null}
+      <div style={{ marginTop: 14 }}>
+        <DocsResponsePanel
+          tone={
+            endpoint.response.includes('"success": false') ? "error" : "success"
+          }
+          title="Example response "
+          code={endpoint.response}
+        />
+      </div>
     </div>
   );
 }
@@ -838,14 +1486,58 @@ function RestEndpointPanel({
 }) {
   return (
     <>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 12px", marginBottom: 8, overflowX: "auto", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 8, background: "#f5f5f5" }}>
-        <span className="docs-method-badge" style={{ marginLeft: 0, fontSize: 9, padding: "2px 6px" }}>{endpoint.method}</span>
-        <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#000", whiteSpace: "nowrap" }}>{endpoint.path}</code>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 9,
+          padding: "9px 12px",
+          marginBottom: 8,
+          overflowX: "auto",
+          border: "1px solid rgba(0,0,0,0.07)",
+          borderRadius: 8,
+          background: "#f5f5f5",
+        }}
+      >
+        <span
+          className="docs-method-badge"
+          style={{ marginLeft: 0, fontSize: 9, padding: "2px 6px" }}
+        >
+          {endpoint.method}
+        </span>
+        <code
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 12,
+            color: "#000",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {endpoint.path}
+        </code>
       </div>
-      <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280", overflowWrap: "anywhere", marginBottom: 6 }}>
-        {baseUrl}{endpoint.examplePath}
+      <p
+        style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 11,
+          color: "#6b7280",
+          overflowWrap: "anywhere",
+          marginBottom: 6,
+        }}
+      >
+        {baseUrl}
+        {endpoint.examplePath}
       </p>
-      <p style={{ fontSize: 12, lineHeight: 1.6, color: "#6F6F6F", marginBottom: 14 }}>{endpoint.notes}</p>
+      <p
+        style={{
+          fontSize: 12,
+          lineHeight: 1.6,
+          color: "#6F6F6F",
+          marginBottom: 14,
+        }}
+      >
+        {endpoint.notes}
+      </p>
       <EndpointParams params={params} />
       <LanguageTabs value={language} onChange={onLanguageChange} />
       <DocsCodePanel
@@ -859,10 +1551,36 @@ function RestEndpointPanel({
   );
 }
 
-function DocsSectionHeader({ title, icon: Icon }: { title: string; icon: LucideIcon }) {
+function DocsSectionHeader({
+  title,
+  icon: Icon,
+}: {
+  title: string;
+  icon: LucideIcon;
+}) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, background: "#f5f5f5", border: "1px solid rgba(0,0,0,0.07)", color: "#000", flexShrink: 0 }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        marginBottom: 14,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 32,
+          height: 32,
+          borderRadius: 8,
+          background: "#f5f5f5",
+          border: "1px solid rgba(0,0,0,0.07)",
+          color: "#000",
+          flexShrink: 0,
+        }}
+      >
         <Icon size={15} />
       </div>
       <h2 className="docs-section-title">{title}</h2>
@@ -873,11 +1591,41 @@ function DocsSectionHeader({ title, icon: Icon }: { title: string; icon: LucideI
 function DocsInfoPanel({ title, items }: { title: string; items: string[] }) {
   return (
     <div className="docs-info-panel">
-      <p style={{ fontSize: 12, fontWeight: 600, color: "#000", marginBottom: 10 }}>{title}</p>
+      <p
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: "#000",
+          marginBottom: 10,
+        }}
+      >
+        {title}
+      </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {items.map((item) => (
-          <div key={item} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 13, color: "#6F6F6F", fontWeight: 300, lineHeight: 1.55 }}>
-            <span style={{ width: 4, height: 4, borderRadius: "50%", background: "#9ca3af", flexShrink: 0, marginTop: 6 }} aria-hidden />
+          <div
+            key={item}
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 8,
+              fontSize: 13,
+              color: "#6F6F6F",
+              fontWeight: 300,
+              lineHeight: 1.55,
+            }}
+          >
+            <span
+              style={{
+                width: 4,
+                height: 4,
+                borderRadius: "50%",
+                background: "#9ca3af",
+                flexShrink: 0,
+                marginTop: 6,
+              }}
+              aria-hidden
+            />
             {item}
           </div>
         ))}
@@ -886,12 +1634,152 @@ function DocsInfoPanel({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function DocsResponsePanel({ title, code, tone }: { title: string; code: string; tone: "success" | "error" }) {
+function DocsResponsePanel({
+  title,
+  code,
+  tone,
+}: {
+  title: string;
+  code: string;
+  tone: "success" | "error";
+}) {
   const isSuccess = tone === "success";
+  const statusCode = isSuccess
+    ? 200
+    : code.includes('"historyKey"')
+      ? 404
+      : 400;
+  let jsonValue: object | null = null;
+
+  try {
+    const parsed = JSON.parse(code);
+    if (parsed && typeof parsed === "object") jsonValue = parsed;
+  } catch {
+    // Keep syntax-highlighted fallback for non-JSON reference snippets.
+  }
+
   return (
-    <div style={{ borderRadius: 12, border: `1px solid ${isSuccess ? "rgba(0,0,0,0.07)" : "rgba(220,38,38,0.12)"}`, background: isSuccess ? "#fafafa" : "#fff8f8", padding: 16 }}>
-      <p style={{ fontSize: 12, fontWeight: 600, color: isSuccess ? "#000" : "#b91c1c", marginBottom: 10 }}>{title}</p>
-      <pre style={{ margin: 0, fontFamily: "'JetBrains Mono', monospace", fontSize: 12, lineHeight: 1.7, color: isSuccess ? "#374151" : "#b91c1c" }}>{code}</pre>
+    <div
+      style={{
+        height: 460,
+        overflow: "hidden",
+        borderRadius: 12,
+        border: `1px solid ${isSuccess ? "#dbe5df" : "#f0d5d5"}`,
+        background: "#0d1117",
+        boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: "10px 14px",
+          borderBottom: "1px solid #21262d",
+          background: "#161b22",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+          <span
+            style={{
+              width: 9,
+              height: 9,
+              borderRadius: "50%",
+              background: "#ff5f57",
+            }}
+          />
+          <span
+            style={{
+              width: 9,
+              height: 9,
+              borderRadius: "50%",
+              background: "#febc2e",
+            }}
+          />
+          <span
+            style={{
+              width: 9,
+              height: 9,
+              borderRadius: "50%",
+              background: "#28c840",
+            }}
+          />
+          <span
+            style={{
+              marginLeft: 5,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 11,
+              color: "#8b949e",
+            }}
+          >
+            {title}
+          </span>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 10,
+          }}
+        >
+          <span
+            style={{
+              color: isSuccess ? "#7ee787" : "#ff7b72",
+              fontWeight: 600,
+            }}
+          >
+            {statusCode}
+          </span>
+          <span style={{ color: "#8b949e" }}>JSON</span>
+        </div>
+      </div>
+      <div style={{ height: "calc(100% - 45px)", overflow: "auto" }}>
+        {jsonValue ? (
+          <ReactJson
+            src={jsonValue}
+            name={false}
+            theme="monokai"
+            iconStyle="triangle"
+            indentWidth={2}
+            collapsed={false}
+            collapseStringsAfterLength={100}
+            displayObjectSize
+            displayDataTypes={false}
+            enableClipboard
+            quotesOnKeys
+            style={{
+              margin: 0,
+              minHeight: 120,
+              padding: "14px 18px",
+              background: "#0d1117",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 12,
+              lineHeight: 1.7,
+            }}
+          />
+        ) : (
+          <SyntaxHighlighter
+            language="json"
+            style={nightOwl}
+            wrapLongLines
+            customStyle={{
+              margin: 0,
+              minHeight: 120,
+              padding: "16px 18px",
+              background: "#0d1117",
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 12,
+              lineHeight: 1.7,
+            }}
+            codeTagProps={{ style: { fontFamily: "inherit" } }}
+          >
+            {code}
+          </SyntaxHighlighter>
+        )}
+      </div>
     </div>
   );
 }
@@ -908,18 +1796,72 @@ function DocsCodePanel({
   swapping?: boolean;
 }) {
   return (
-    <div className={`docs-card docs-code-wrap ${swapping ? "docs-code-swap" : ""}`}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", borderBottom: "1px solid #21262d", background: "#0d1117" }}>
-        <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57" }} />
-        <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#febc2e" }} />
-        <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840" }} />
-        <span style={{ marginLeft: 8, fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280" }}>{language}</span>
+    <div
+      className={`docs-card docs-code-wrap ${swapping ? "docs-code-swap" : ""}`}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "10px 16px",
+          borderBottom: "1px solid #21262d",
+          background: "#0d1117",
+        }}
+      >
+        <span
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: "50%",
+            background: "#ff5f57",
+          }}
+        />
+        <span
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: "50%",
+            background: "#febc2e",
+          }}
+        />
+        <span
+          style={{
+            width: 10,
+            height: 10,
+            borderRadius: "50%",
+            background: "#28c840",
+          }}
+        />
+        <span
+          style={{
+            marginLeft: 8,
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11,
+            color: "#6b7280",
+          }}
+        >
+          {language}
+        </span>
       </div>
-      <div style={{ background: "#0d1117", overflowX: "auto", minHeight: bodyMinHeight }}>
+      <div
+        style={{
+          background: "#0d1117",
+          overflowX: "auto",
+          minHeight: bodyMinHeight,
+        }}
+      >
         <SyntaxHighlighter
           language={language}
           style={nightOwl}
-          customStyle={{ margin: 0, fontSize: 12.5, lineHeight: 1.75, background: "transparent", padding: "16px 18px", minWidth: "max-content" }}
+          customStyle={{
+            margin: 0,
+            fontSize: 12.5,
+            lineHeight: 1.75,
+            background: "transparent",
+            padding: "16px 18px",
+            minWidth: "max-content",
+          }}
         >
           {code}
         </SyntaxHighlighter>

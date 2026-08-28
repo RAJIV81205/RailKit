@@ -348,6 +348,92 @@ if (result.success) {
   }
 }`,
   },
+  {
+    id: "station-by-code",
+    title: "Station Lookup by Code",
+    icon: MapPin,
+    description: "Resolve a station code to its name and coordinates.",
+    signature: "stationByCode(stationCode: string)",
+    params: [{ name: "stationCode", type: "string", desc: "Station code such as NDLS or HWH" }],
+    example: `const result = await fetch("/api/station/NDLS").then((res) => res.json());
+
+if (result.success) {
+  console.log(result.data.code, result.data.name);
+}`,
+    response: `{
+  "success": true,
+  "data": { "code": "NDLS", "name": "NEW DELHI", "lat": 28.642464, "lon": 77.220154 }
+}`,
+  },
+  {
+    id: "station-search",
+    title: "Station Search by Name",
+    icon: Search,
+    description: "Find up to 10 matching stations by partial name.",
+    signature: "stationsByName(name: string)",
+    params: [{ name: "name", type: "string", desc: "At least 2 characters; partial matching supported" }],
+    example: `const result = await fetch(
+  "/api/stations/search?name=delhi"
+).then((res) => res.json());
+
+result.data.stations.forEach((station) => {
+  console.log(station.name, station.code);
+});`,
+    response: `{
+  "success": true,
+  "data": {
+    "query": "delhi",
+    "count": 10,
+    "stations": [
+      { "code": "ANDI", "name": "ADARSH NAGAR DELHI", "lat": 28.714265, "lon": 77.166767 },
+      { "code": "DAZ", "name": "DELHI AZADPUR", "lat": 28.703086, "lon": 77.177153 }
+    ]
+  }
+}`,
+  },
+  {
+    id: "train-by-number",
+    title: "Train Lookup by Number",
+    icon: Train,
+    description: "Resolve a train number to its stored train name.",
+    signature: "trainByNumber(trainNumber: string)",
+    params: [{ name: "trainNumber", type: "string", desc: "Exactly 5 numeric digits" }],
+    example: `const result = await fetch("/api/train/12345").then((res) => res.json());
+
+if (result.success) {
+  console.log(result.data.trainNo, result.data.trainName);
+}`,
+    response: `{
+  "success": true,
+  "data": { "trainNo": "12345", "trainName": "HWH GHY SARAIGHAT EXPRESS" }
+}`,
+  },
+  {
+    id: "train-name-search",
+    title: "Train Search by Name",
+    icon: Search,
+    description: "Find up to 10 trains matching a partial train name.",
+    signature: "trainsByName(name: string)",
+    params: [{ name: "name", type: "string", desc: "At least 2 characters; partial matching supported" }],
+    example: `const result = await fetch(
+  "/api/trains/search?name=rajdhani"
+).then((res) => res.json());
+
+result.data.trains.forEach((train) => {
+  console.log(train.trainName, train.trainNo);
+});`,
+    response: `{
+  "success": true,
+  "data": {
+    "query": "rajdhani",
+    "count": 10,
+    "trains": [
+      { "trainNo": "12301", "trainName": "RAJDHANI EXPRES" },
+      { "trainNo": "12302", "trainName": "HWH RAJDHANI" }
+    ]
+  }
+}`,
+  },
 ];
 
 
@@ -436,6 +522,38 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     examplePath: "/api/cancelled",
     notes:
       "Returns fully and partially cancelled trains. No parameters required.",
+  },
+  {
+    id: "station-by-code",
+    name: "Get Station by Code",
+    method: "GET",
+    path: "/api/station/:stationCode",
+    examplePath: "/api/station/NDLS",
+    notes: "Station code must be 1-5 letters or digits.",
+  },
+  {
+    id: "station-search",
+    name: "Search Stations by Name",
+    method: "GET",
+    path: "/api/stations/search?name=...",
+    examplePath: "/api/stations/search?name=delhi",
+    notes: "Name must contain at least 2 characters. Returns at most 10 matches.",
+  },
+  {
+    id: "train-by-number",
+    name: "Get Train by Number",
+    method: "GET",
+    path: "/api/train/:trainNumber",
+    examplePath: "/api/train/12345",
+    notes: "Train number must be exactly 5 numeric digits.",
+  },
+  {
+    id: "train-name-search",
+    name: "Search Trains by Name",
+    method: "GET",
+    path: "/api/trains/search?name=...",
+    examplePath: "/api/trains/search?name=rajdhani",
+    notes: "Name must contain at least 2 characters. Returns at most 10 matches.",
   },
 ] as const;
 

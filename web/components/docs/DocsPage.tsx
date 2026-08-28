@@ -161,6 +161,10 @@ export default function DocsPage({
       "seat-availability",
       "fare-lookup",
       "cancelled-trains",
+      "station-by-code",
+      "station-search",
+      "train-by-number",
+      "train-name-search",
       "validation",
       "errors",
     ]
@@ -501,7 +505,7 @@ export default function DocsPage({
             }}
           >
             {[
-              { label: "Endpoints", value: "9" },
+              { label: "Endpoints", value: "13" },
               { label: "Runtime", value: "Node 14+" },
               { label: "Auth", value: "API Key" },
               { label: "Access", value: "SDK + REST" },

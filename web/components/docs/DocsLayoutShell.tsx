@@ -71,7 +71,7 @@ export default function DocsLayoutShell({ children }: { children: React.ReactNod
                         aria-current={isActive ? "page" : undefined}
                       >
                         <Icon size={14} style={{ flexShrink: 0 }} />
-                        <span>{section.label}</span>
+                        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{section.label}</span>
                         {apiEndpointIds.has(section.id) && <span className="docs-method-badge">GET</span>}
                       </Link>
                     );
@@ -98,4 +98,3 @@ export default function DocsLayoutShell({ children }: { children: React.ReactNod
     </div>
   );
 }
-

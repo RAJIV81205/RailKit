@@ -70,6 +70,15 @@ export const sidebarGroups: SidebarGroup[] = [
     ],
   },
   {
+    title: "Lookup",
+    items: [
+      { id: "station-by-code", label: "Station Lookup", icon: MapPin },
+      { id: "station-search", label: "Station Search", icon: Search },
+      { id: "train-by-number", label: "Train Lookup", icon: Train },
+      { id: "train-name-search", label: "Train Search by Name", icon: Search },
+    ],
+  },
+  {
     title: "Tools",
     items: [
       { id: "playground", label: "Playground", icon: Gamepad2 },
@@ -100,6 +109,10 @@ export const sections: Array<{ id: string; label: string; icon: LucideIcon }> = 
   { id: "seat-availability", label: "Seat Availability", icon: Armchair },
   { id: "fare-lookup", label: "Fare Lookup", icon: IndianRupee },
   { id: "cancelled-trains", label: "Cancelled Trains", icon: CircleX },
+  { id: "station-by-code", label: "Station Lookup", icon: MapPin },
+  { id: "station-search", label: "Station Search", icon: Search },
+  { id: "train-by-number", label: "Train Lookup", icon: Train },
+  { id: "train-name-search", label: "Train Search by Name", icon: Search },
   { id: "playground", label: "Playground", icon: Gamepad2 },
   { id: "validation", label: "Input Validation", icon: CheckCircle },
   { id: "status-codes", label: "Status Codes", icon: BarChart3 },

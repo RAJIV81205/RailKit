@@ -1018,52 +1018,27 @@ function LanguageTabs({
   );
 }
 
-function EndpointParams({ params }: { params: EndpointDoc["params"] }) {
+function EndpointParams({ endpointId, params }: { endpointId: string; params: EndpointDoc["params"] }) {
   if (!params.length) return null;
+  const getLocation = (name: string) => endpointId === "station-live" && name === "hours" || endpointId === "train-search" && name === "date" ? "QUERY" : "PATH";
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-        gap: 8,
-        marginBottom: 14,
-      }}
-    >
-      {params.map((param) => (
-        <div key={param.name} className="docs-param">
-          <p
-            style={{
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 12,
-              fontWeight: 500,
-              color: "#000",
-              marginBottom: 3,
-            }}
-          >
-            {param.name}
-          </p>
-          <p
-            style={{
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 11,
-              color: "#6b7280",
-              marginBottom: 5,
-            }}
-          >
-            {param.type}
-          </p>
-          <p
-            style={{
-              fontSize: 12,
-              lineHeight: 1.55,
-              color: "#6F6F6F",
-              fontWeight: 300,
-            }}
-          >
-            {param.desc}
-          </p>
-        </div>
-      ))}
+    <div className="docs-card" style={{ overflowX: "auto", marginBottom: 16 }}>
+      <table className="docs-table">
+        <thead><tr><th>Name</th><th>In</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+        <tbody>
+          {params.map((param) => {
+            const location = getLocation(param.name);
+            const required = location === "PATH";
+            return <tr key={param.name}>
+              <td><code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{param.name}</code></td>
+              <td><code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#6b7280" }}>{location}</code></td>
+              <td><code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: "#6b7280" }}>{param.type}</code></td>
+              <td><span style={{ color: required ? "#15803d" : "#6b7280", fontSize: 11, fontWeight: 600 }}>{required ? "YES" : "NO"}</span></td>
+              <td style={{ color: "#6F6F6F", fontSize: 12, lineHeight: 1.5 }}>{param.desc}</td>
+            </tr>;
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -1081,6 +1056,17 @@ function EndpointDocsCard({
 
   return (
     <div className="docs-card" style={{ padding: "20px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 12px", marginBottom: 18, overflowX: "auto", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 8, background: "#f8faf9" }}>
+        {view === "sdk" ? (
+          <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#111827", whiteSpace: "nowrap" }}>{endpoint.signature}</code>
+        ) : (
+          <>
+            <span className="docs-method-badge" style={{ marginLeft: 0, fontSize: 9, padding: "3px 7px" }}>{endpoint.method}</span>
+            <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#111827", whiteSpace: "nowrap" }}>{endpoint.path}</code>
+          </>
+        )}
+      </div>
+      <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 7 }}>Description</p>
       <div
         style={{
           display: "flex",
@@ -1107,23 +1093,9 @@ function EndpointDocsCard({
 
       {view === "sdk" ? (
         <div key="sdk" className="docs-code-swap">
-          <code
-            style={{
-              display: "block",
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 12,
-              color: "#000",
-              background: "#f5f5f5",
-              border: "1px solid rgba(0,0,0,0.07)",
-              borderRadius: 8,
-              padding: "9px 12px",
-              marginBottom: 14,
-              overflowX: "auto",
-            }}
-          >
-            {endpoint.signature}
-          </code>
-          <EndpointParams params={endpoint.params} />
+          <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 7 }}>Parameters</p>
+          <EndpointParams endpointId={endpoint.id} params={endpoint.params} />
+          <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 7 }}>Code Example</p>
           <DocsCodePanel language="javascript" code={endpoint.example} />
         </div>
       ) : rest ? (
@@ -1138,11 +1110,12 @@ function EndpointDocsCard({
         </div>
       ) : null}
       <div style={{ marginTop: 14 }}>
+        <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 7 }}>Response Example</p>
         <DocsResponsePanel
           tone={
             endpoint.response.includes('"success": false') ? "error" : "success"
           }
-          title="Example response "
+          title="JSON response"
           code={endpoint.response}
         />
       </div>
@@ -1165,36 +1138,6 @@ function RestEndpointPanel({
 }) {
   return (
     <>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 9,
-          padding: "9px 12px",
-          marginBottom: 8,
-          overflowX: "auto",
-          border: "1px solid rgba(0,0,0,0.07)",
-          borderRadius: 8,
-          background: "#f5f5f5",
-        }}
-      >
-        <span
-          className="docs-method-badge"
-          style={{ marginLeft: 0, fontSize: 9, padding: "2px 6px" }}
-        >
-          {endpoint.method}
-        </span>
-        <code
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 12,
-            color: "#000",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {endpoint.path}
-        </code>
-      </div>
       <p
         style={{
           fontFamily: "'JetBrains Mono', monospace",
@@ -1217,7 +1160,7 @@ function RestEndpointPanel({
       >
         {endpoint.notes}
       </p>
-      <EndpointParams params={params} />
+      <EndpointParams endpointId={endpoint.id} params={params} />
       <LanguageTabs value={language} onChange={onLanguageChange} />
       <DocsCodePanel
         key={language}

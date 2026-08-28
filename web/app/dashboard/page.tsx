@@ -31,6 +31,7 @@ import {
 import { auth } from "../../lib/firebase";
 import { TOPUP_OPTIONS } from "../../lib/constants";
 import { endpointDocs } from "../../components/docs/endpointDocs";
+import ApiPlayground from "../../components/playground/ApiPlayground";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type DbUser = {
@@ -1883,7 +1884,8 @@ export default function DashboardPage() {
             )}
 
             {/* ── Playground ────────────────────────────────────────────── */}
-            {activeTab === "playground" && (
+            {activeTab === "playground" && <ApiPlayground apiKey={dbUser.apiKey} variant="light" />}
+            {false && activeTab === "playground" && (
               <div className="grid grid-cols-[1.05fr_0.95fr] gap-4 max-[1100px]:grid-cols-1">
                 <div className={dashboardCardClass}>
                   <div className="mb-2.5 flex flex-wrap items-center justify-between gap-3">
@@ -2216,7 +2218,7 @@ export default function DashboardPage() {
                     </button>
                     {playgroundStatusCode !== null && (
                       <span
-                        className={`rounded-md border px-2 py-[3px] text-[11px] font-semibold ${playgroundStatusCode < 400 ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#16a34a]" : "border-[#fecaca] bg-[#fef2f2] text-[#dc2626]"}`}
+                        className={`rounded-md border px-2 py-[3px] text-[11px] font-semibold ${playgroundStatusCode! < 400 ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#16a34a]" : "border-[#fecaca] bg-[#fef2f2] text-[#dc2626]"}`}
                       >
                         HTTP {playgroundStatusCode}
                       </span>
@@ -2611,4 +2613,3 @@ export default function DashboardPage() {
     </>
   );
 }
-

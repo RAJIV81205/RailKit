@@ -18,6 +18,7 @@ import {
   searchTrainBetweenStations,
   trackTrain,
 } from "railkit";
+import ApiPlayground from "../../components/playground/ApiPlayground";
 import {
   Area,
   AreaChart,
@@ -3246,7 +3247,8 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {activeTab === "playground" && (
+          {activeTab === "playground" && <ApiPlayground apiKey={adminApiKey} variant="dark" />}
+          {false && activeTab === "playground" && (
             <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1.1fr 0.9fr" }}>
               <div style={{ background: "#0f1117", border: "1px solid #1e2330", borderRadius: 12, padding: 20 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, gap: 10 }}>
@@ -3802,9 +3804,9 @@ export default function AdminPanel() {
                   {playgroundStatus !== null && (
                     <span
                       style={{
-                        color: playgroundStatus < 400 ? "#6ee7b7" : "#fca5a5",
-                        background: playgroundStatus < 400 ? "#0f2a1d" : "#2a0f0f",
-                        border: `1px solid ${playgroundStatus < 400 ? "#1a4731" : "#4a1f1f"}`,
+                        color: playgroundStatus! < 400 ? "#6ee7b7" : "#fca5a5",
+                        background: playgroundStatus! < 400 ? "#0f2a1d" : "#2a0f0f",
+                        border: `1px solid ${playgroundStatus! < 400 ? "#1a4731" : "#4a1f1f"}`,
                         borderRadius: 6,
                         padding: "3px 8px",
                         fontSize: 11,

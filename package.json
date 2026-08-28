@@ -1,6 +1,6 @@
 {
   "name": "railkit",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "🚂 Complete Node.js SDK for Indian Railways - Check PNR status, train schedules, live running status, seat availability, station information and more. Promise-based API with TypeScript support.",
   "keywords": [
     "railkit",

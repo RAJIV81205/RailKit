@@ -161,6 +161,7 @@ export default function DocsPage({
       "seat-availability",
       "fare-lookup",
       "cancelled-trains",
+      "station-timetable",
       "station-by-code",
       "station-search",
       "train-by-number",
@@ -505,7 +506,7 @@ export default function DocsPage({
             }}
           >
             {[
-              { label: "Endpoints", value: "13" },
+              { label: "Endpoints", value: "14" },
               { label: "Runtime", value: "Node 14+" },
               { label: "Auth", value: "API Key" },
               { label: "Access", value: "SDK + REST" },
@@ -1024,7 +1025,7 @@ function LanguageTabs({
 
 function EndpointParams({ endpointId, params }: { endpointId: string; params: EndpointDoc["params"] }) {
   if (!params.length) return null;
-  const getLocation = (name: string) => endpointId === "station-live" && name === "hours" || endpointId === "train-search" && name === "date" ? "QUERY" : "PATH";
+  const getLocation = (name: string) => endpointId === "station-live" && name === "hours" || endpointId === "train-search" && name === "date" || endpointId === "station-timetable" && name === "date" ? "QUERY" : "PATH";
   return (
     <div className="docs-card" style={{ overflowX: "auto", marginBottom: 16 }}>
       <table className="docs-table">

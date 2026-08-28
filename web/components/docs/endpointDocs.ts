@@ -349,6 +349,42 @@ if (result.success) {
 }`,
   },
   {
+    id: "station-timetable",
+    title: "Station Train Timetable",
+    icon: Building2,
+    description: "Get the complete scheduled train timetable for a station on a nearby running date.",
+    signature: "trainTimetableAtStation(stationCode: string, date?: string)",
+    params: [
+      { name: "stationCode", type: "string", desc: "Station code such as ASN or NDLS" },
+      { name: "date", type: "string", desc: "Optional DD-MM-YYYY date; only today, yesterday, or tomorrow is accepted" },
+    ],
+    example: `const result = await fetch(
+  "/api/station/ASN/timetable?date=28-08-2026"
+).then((res) => res.json());
+
+if (result.success) {
+  console.log(result.data.totalTrains);
+  console.log(result.data.trains[0].trainName);
+}`,
+    response: `{
+  "success": true,
+  "data": {
+    "summary": "168 Trains scheduled at ASN - ASANSOL JN. on 28-Aug-2026",
+    "station": "ASN",
+    "date": "28-Aug-2026",
+    "totalTrains": 168,
+    "trains": [{
+      "trainNo": "15052", "trainName": "GKP KOAA EXP",
+      "source": "GKP", "sourceName": "Gorakhpur Jn",
+      "destination": "KOAA", "destinationName": "Kolkatta Terminal",
+      "trainType": "Mail Express", "classes": "1A,2A,3A,SL,GEN,PWD",
+      "runningDays": "",
+      "arrival": "00:01", "departure": "00:11"
+    }]
+  }
+}`,
+  },
+  {
     id: "station-by-code",
     title: "Station Lookup by Code",
     icon: MapPin,
@@ -522,6 +558,14 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     examplePath: "/api/cancelled",
     notes:
       "Returns fully and partially cancelled trains. No parameters required.",
+  },
+  {
+    id: "station-timetable",
+    name: "Get Station Train Timetable",
+    method: "GET",
+    path: "/api/station/:stationCode/timetable?date=DD-MM-YYYY",
+    examplePath: "/api/station/ASN/timetable?date=28-08-2026",
+    notes: "Date is optional, must use DD-MM-YYYY format, and can only be today, yesterday, or tomorrow. Defaults to today.",
   },
   {
     id: "station-by-code",

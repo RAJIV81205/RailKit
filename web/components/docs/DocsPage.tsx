@@ -3,6 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
+import type { ThemeObject } from "react-json-view";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { packageInfo, responseFormats, sidebarGroups } from "./docsData";
@@ -46,6 +47,25 @@ const apiEndpointById = new Map(
 );
 
 const ReactJson = dynamic(() => import("react-json-view"), { ssr: false });
+
+const nightOwlJsonTheme: ThemeObject = {
+  base00: "#0d1117",
+  base01: "#161b22",
+  base02: "#21262d",
+  base03: "#637777",
+  base04: "#8b949e",
+  base05: "#d6deeb",
+  base06: "#d6deeb",
+  base07: "#ffffff",
+  base08: "#ff5874",
+  base09: "#ecc48d",
+  base0A: "#f78c6c",
+  base0B: "#addb67",
+  base0C: "#7fdbca",
+  base0D: "#82aaff",
+  base0E: "#c792ea",
+  base0F: "#d3423e",
+};
 
 const apiLanguageMeta: Record<
   ApiCodeLanguage,
@@ -1741,14 +1761,14 @@ function DocsResponsePanel({
           <ReactJson
             src={jsonValue}
             name={false}
-            theme="monokai"
+            theme={nightOwlJsonTheme}
             iconStyle="triangle"
             indentWidth={2}
             collapsed={false}
             collapseStringsAfterLength={100}
             displayObjectSize
             displayDataTypes={false}
-            enableClipboard
+            enableClipboard={false}
             quotesOnKeys
             style={{
               margin: 0,

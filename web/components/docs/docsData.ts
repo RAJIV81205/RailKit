@@ -39,6 +39,7 @@ export type SidebarItem = {
   id: string;
   label: string;
   icon: LucideIcon;
+  badge?: string;
 };
 
 export type SidebarGroup = {
@@ -63,10 +64,20 @@ export const sidebarGroups: SidebarGroup[] = [
       { id: "live-tracking", label: "Live Tracking", icon: MapPin },
       { id: "train-history", label: "Train History", icon: History },
       { id: "station-live", label: "Live at Station", icon: Building2 },
+      { id: "station-timetable", label: "Station Timetable", icon: Building2, badge: "NEW" },
       { id: "train-search", label: "Train Search", icon: Search },
       { id: "seat-availability", label: "Seat Availability", icon: Armchair },
       { id: "fare-lookup", label: "Fare Lookup", icon: IndianRupee },
       { id: "cancelled-trains", label: "Cancelled Trains", icon: CircleX },
+    ],
+  },
+  {
+    title: "Lookup",
+    items: [
+      { id: "station-by-code", label: "Station Lookup", icon: MapPin, badge: "NEW" },
+      { id: "station-search", label: "Station Search", icon: Search, badge: "NEW" },
+      { id: "train-by-number", label: "Train Lookup", icon: Train, badge: "NEW" },
+      { id: "train-name-search", label: "Train Search by Name", icon: Search, badge: "NEW" },
     ],
   },
   {
@@ -100,6 +111,11 @@ export const sections: Array<{ id: string; label: string; icon: LucideIcon }> = 
   { id: "seat-availability", label: "Seat Availability", icon: Armchair },
   { id: "fare-lookup", label: "Fare Lookup", icon: IndianRupee },
   { id: "cancelled-trains", label: "Cancelled Trains", icon: CircleX },
+  { id: "station-by-code", label: "Station Lookup", icon: MapPin },
+  { id: "station-search", label: "Station Search", icon: Search },
+  { id: "train-by-number", label: "Train Lookup", icon: Train },
+  { id: "train-name-search", label: "Train Search by Name", icon: Search },
+  { id: "station-timetable", label: "Station Timetable", icon: Building2 },
   { id: "playground", label: "Playground", icon: Gamepad2 },
   { id: "validation", label: "Input Validation", icon: CheckCircle },
   { id: "status-codes", label: "Status Codes", icon: BarChart3 },

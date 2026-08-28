@@ -30,7 +30,7 @@ import {
 } from "railkit";
 import { auth } from "../../lib/firebase";
 import { TOPUP_OPTIONS } from "../../lib/constants";
-import { apiEndpointDocs } from "../../components/docs/apiEndpointDocs";
+import { endpointDocs } from "../../components/docs/endpointDocs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type DbUser = {
@@ -1848,7 +1848,7 @@ export default function DashboardPage() {
                     </SyntaxHighlighter>
                   </div>
                 </div>
-                {apiEndpointDocs.map((endpoint) => (
+                {endpointDocs.map((endpoint) => (
                   <div key={endpoint.path} className={dashboardCardClass}>
                     <div className="mb-2 flex flex-wrap items-center gap-2.5">
                       <span className="rounded-md border border-[#bbf7d0] bg-[#f0fdf4] px-2 py-0.5 text-[11px] font-bold text-[#16a34a]">
@@ -2611,3 +2611,4 @@ export default function DashboardPage() {
     </>
   );
 }
+

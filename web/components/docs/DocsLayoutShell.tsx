@@ -4,10 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useSidebar } from "../SidebarProvider";
-import { apiEndpointDocs } from "./apiEndpointDocs";
+import { endpointDocs } from "./endpointDocs";
 import { sidebarGroups } from "./docsData";
 
-const apiEndpointIds = new Set(apiEndpointDocs.map((endpoint) => endpoint.id));
+const apiEndpointIds = new Set(endpointDocs.map((endpoint) => endpoint.id));
 
 export default function DocsLayoutShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -98,3 +98,4 @@ export default function DocsLayoutShell({ children }: { children: React.ReactNod
     </div>
   );
 }
+

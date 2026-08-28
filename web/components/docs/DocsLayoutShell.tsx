@@ -30,12 +30,14 @@ export default function DocsLayoutShell({ children }: { children: React.ReactNod
         .docs-sidebar::-webkit-scrollbar { width: 4px; }
         .docs-sidebar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 4px; }
         .docs-sidebar-group-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #9ca3af; padding: 0 10px; margin-bottom: 4px; margin-top: 4px; }
-        .docs-sidebar-btn { display: flex; width: 100%; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: none; background: transparent; font-family: 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: 400; color: #6F6F6F; cursor: pointer; text-align: left; transition: background 0.15s, color 0.15s; text-decoration: none; }
+        .docs-sidebar-btn { position: relative; display: flex; width: 100%; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: none; background: transparent; font-family: 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: 400; color: #6F6F6F; cursor: pointer; text-align: left; transition: background 0.15s, color 0.15s; text-decoration: none; }
         .docs-sidebar-btn:hover { background: rgba(0,0,0,0.04); color: #000; }
         .docs-sidebar-btn-active { background: #000; color: #fff; font-weight: 500; }
         .docs-sidebar-btn-active:hover { background: #111; color: #fff; }
         .docs-method-badge { margin-left: auto; border: 1px solid #bbf7d0; border-radius: 5px; background: #f0fdf4; color: #15803d; padding: 1px 5px; font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 600; letter-spacing: 0.04em; line-height: 1.5; }
         .docs-sidebar-btn-active .docs-method-badge { border-color: rgba(255,255,255,0.28); background: rgba(255,255,255,0.12); color: #bbf7d0; }
+        .docs-sidebar-new-badge { position: absolute; top: 4px; left: 4px; z-index: 2; width: 7px; height: 7px; transform: rotate(45deg); border: 1px solid #93c5fd; border-radius: 2px; background: #3b82f6; pointer-events: none; }
+        .docs-sidebar-btn-active .docs-sidebar-new-badge { border-color: rgba(191,219,254,0.4); background: rgba(239,246,255,0.14); color: #bfdbfe; }
         .docs-main { min-width: 0; max-width: 100%; overflow-x: hidden; }
       `}</style>
 
@@ -70,6 +72,7 @@ export default function DocsLayoutShell({ children }: { children: React.ReactNod
                         className={`docs-sidebar-btn ${isActive ? "docs-sidebar-btn-active" : ""}`}
                         aria-current={isActive ? "page" : undefined}
                       >
+                        {section.badge && <span aria-hidden="true" className="docs-sidebar-new-badge" />}
                         <Icon size={14} style={{ flexShrink: 0 }} />
                         <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{section.label}</span>
                         {apiEndpointIds.has(section.id) && <span className="docs-method-badge">GET</span>}

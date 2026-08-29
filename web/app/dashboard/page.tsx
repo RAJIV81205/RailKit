@@ -1163,7 +1163,7 @@ export default function DashboardPage() {
   );
   const directApiBaseUrl =
     process.env.NEXT_PUBLIC_DIRECT_API_BASE_URL ||
-    "https://railkit-api.rajivdubey.dev";
+    "https://api.railkit.in";
 
   const apiLanguageMeta: Record<
     ApiCodeLanguage,

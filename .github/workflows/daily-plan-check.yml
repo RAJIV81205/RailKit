@@ -38,4 +38,4 @@ jobs:
         run: |
           curl --fail --show-error --silent \
             --max-time 120 \
-            "https://railkit-api.rajivdubey.dev/update-station"
+            "https://api.railkit.in/update-station"

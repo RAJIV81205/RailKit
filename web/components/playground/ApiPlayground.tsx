@@ -476,7 +476,7 @@ export default function ApiPlayground({
               URL
             </span>
             <code className={`min-w-0 truncate font-mono text-xs ${muted}`}>
-              https://railkit-api.rajivdubey.dev{requestUrl}
+              https://api.railkit.in{requestUrl}
             </code>
           </div>
           {selected === "cancelled" ? (

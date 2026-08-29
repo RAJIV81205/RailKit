@@ -83,7 +83,7 @@ const welcomeTemplateHtml = (user: IUser): string => {
           <tr>
             <td style="background: #18181b; padding: 36px 40px 28px; text-align: center;">
               <img
-                src="https://railkit.rajivdubey.dev/icon.png"
+                src="https://railkit.in/icon.png"
                 alt="RailKit"
                 width="52" height="52"
                 style="border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); display: block; margin: 0 auto 14px;"
@@ -165,7 +165,7 @@ const welcomeTemplateHtml = (user: IUser): string => {
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
-                    <a href="https://railkit.rajivdubey.dev/dashboard" target="_blank" rel="noopener noreferrer"
+                    <a href="https://railkit.in/dashboard" target="_blank" rel="noopener noreferrer"
                       style="
                         display: inline-block;
                         background: #18181b;
@@ -191,7 +191,7 @@ const welcomeTemplateHtml = (user: IUser): string => {
             <td style="background: #fafafa; border-top: 1px solid #e4e4e7; padding: 20px 40px; text-align: center;">
               <p style="margin: 0 0 4px; font-size: 13px; color: #71717a;">
                 Built with ❤️ by Rajiv Dubey ·
-                <a href="https://railkit.rajivdubey.dev" style="color: #18181b; text-decoration: none;">railkit.rajivdubey.dev</a>
+                <a href="https://railkit.in" style="color: #18181b; text-decoration: none;">railkit.in</a>
               </p>
               <p style="margin: 0; font-size: 11px; color: #d4d4d8;">
                 You're receiving this because you subscribed with ${user.email}
@@ -228,7 +228,7 @@ const billingExpiredTemplateHtml = (user: BillingExpiredEmailUser): string => {
           <tr>
             <td style="background:#18181b;padding:36px 40px 28px;text-align:center;">
               <img
-                src="https://railkit.rajivdubey.dev/icon-dark.png"
+                src="https://railkit.in/icon-dark.png"
                 alt="RailKit"
                 width="52"
                 height="52"
@@ -253,7 +253,7 @@ const billingExpiredTemplateHtml = (user: BillingExpiredEmailUser): string => {
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center">
-                    <a href="https://railkit.rajivdubey.dev/pricing" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;letter-spacing:0.2px;">
+                    <a href="https://railkit.in/pricing" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;letter-spacing:0.2px;">
                       Renew plan
                     </a>
                   </td>
@@ -265,7 +265,7 @@ const billingExpiredTemplateHtml = (user: BillingExpiredEmailUser): string => {
             <td style="background:#fafafa;border-top:1px solid #e4e4e7;padding:20px 40px;text-align:center;">
               <p style="margin:0 0 4px;font-size:13px;color:#71717a;">
                 RailKit ·
-                <a href="https://railkit.rajivdubey.dev" style="color:#18181b;text-decoration:none;">railkit.rajivdubey.dev</a>
+                <a href="https://railkit.in" style="color:#18181b;text-decoration:none;">railkit.in</a>
               </p>
               <p style="margin:0;font-size:11px;color:#d4d4d8;">
                 Transactional billing email for ${user.email}

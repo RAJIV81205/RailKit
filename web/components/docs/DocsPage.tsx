@@ -114,7 +114,7 @@ const seats  = await getAvailability("12496","ASN","DDU","27-12-2025","2A","GN")
 const fare   = await fareLookup("12313","ASN","NDLS","06-06-2026","3A","GN");
 const cancelled = await cancelList();`;
 
-const docsBaseUrl = "https://railkit.rajivdubey.dev/docs";
+const docsBaseUrl = "https://railkit.in/docs";
 
 export default function DocsPage({
   activeSlug = "introduction",

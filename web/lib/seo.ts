@@ -32,7 +32,7 @@ export const OG_IMAGE_WIDTH = 512;
 export const OG_IMAGE_HEIGHT = 512;
 
 export function getSiteUrl(): string {
-  const raw = "https://railkit.rajivdubey.dev";
+  const raw = "https://railkit.in";
   return raw.replace(/\/+$/, "");
 }
 

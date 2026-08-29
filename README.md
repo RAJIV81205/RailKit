@@ -37,7 +37,7 @@ npm install railkit
 
 ## 🔑 Getting an API Key
 
-1. Visit **[railkit.rajivdubey.dev](https://railkit.rajivdubey.dev)**
+1. Visit **[railkit.in](https://railkit.in)**
 2. Sign up and navigate to your Dashboard
 3. Generate an API key from the **API Keys** section
 4. Copy the key — you'll use it in the next step
@@ -843,7 +843,7 @@ Used by both `getAvailability` and `fareLookup`.
 ## 🙋 Support
 
 - **Issues:** [GitHub Issues](https://github.com/RAJIV81205/railkit/issues)
-- **Docs:** [railkit.rajivdubey.dev/docs](https://railkit.rajivdubey.dev/docs)
+- **Docs:** [railkit.in/docs](https://railkit.in/docs)
 - **Discussions:** [GitHub Discussions](https://github.com/RAJIV81205/railkit/discussions)
 
 

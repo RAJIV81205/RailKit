@@ -130,6 +130,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en-IN" suppressHydrationWarning>
+      <head>
+        <script
+          defer
+          src="https://cloud.umami.is/script.js"
+          data-website-id="a0e51ee3-7749-4821-8569-24f44e9c6978"
+        />
+      </head>
       <body className={`${notoSans.variable} ${landingSans.variable} ${landingSerif.variable} ${codeFont.variable} antialiased`}>
         <noscript>
           <iframe

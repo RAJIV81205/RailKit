@@ -11,11 +11,14 @@ import { endpointDocs, type EndpointDoc } from "./endpointDocs";
 import {
   AlertTriangle,
   BarChart3,
+  Building2,
   CheckCircle,
   ChevronRight,
   Gamepad2,
   Package,
   Rocket,
+  Ticket,
+  Train,
   type LucideIcon,
 } from "lucide-react";
 
@@ -115,6 +118,39 @@ const fare   = await fareLookup("12313","ASN","NDLS","06-06-2026","3A","GN");
 const cancelled = await cancelList();`;
 
 const docsBaseUrl = "https://railkit.in/docs";
+
+const introductionEndpointGroups = [
+  {
+    title: "Trains",
+    icon: Train,
+    endpointIds: [
+      "train-info",
+      "live-tracking",
+      "train-history",
+      "train-search",
+      "seat-availability",
+      "fare-lookup",
+      "cancelled-trains",
+      "train-by-number",
+      "train-name-search",
+    ],
+  },
+  {
+    title: "PNR Status",
+    icon: Ticket,
+    endpointIds: ["pnr-status"],
+  },
+  {
+    title: "Stations",
+    icon: Building2,
+    endpointIds: [
+      "station-live",
+      "station-timetable",
+      "station-by-code",
+      "station-search",
+    ],
+  },
+] as const;
 
 export default function DocsPage({
   activeSlug = "introduction",
@@ -291,6 +327,97 @@ export default function DocsPage({
           transform: translateY(-2px);
           border-color: rgba(0,0,0,0.12);
           box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+        }
+
+        /* ── Introduction endpoint index ── */
+        .docs-endpoint-index { margin-top: 40px; }
+        .docs-endpoint-group + .docs-endpoint-group { margin-top: 32px; }
+        .docs-endpoint-group-title {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 10px;
+          color: #64748b;
+          font-size: 12px;
+          font-weight: 600;
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+        }
+        .docs-endpoint-group-title svg { color: #2563eb; }
+        .docs-endpoint-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 10px;
+        }
+        .docs-endpoint-card {
+          display: block;
+          min-width: 0;
+          min-height: 116px;
+          padding: 14px 16px;
+          border: 1px solid #e2e8f0;
+          border-radius: 13px;
+          background: #fff;
+          color: inherit;
+          text-decoration: none;
+          transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+          touch-action: manipulation;
+        }
+        .docs-endpoint-card:hover {
+          transform: translateY(-1px);
+          border-color: #bfdbfe;
+          box-shadow: 0 8px 22px rgba(37, 99, 235, 0.07);
+        }
+        .docs-endpoint-card:active { transform: translateY(0); }
+        .docs-endpoint-card:focus-visible {
+          outline: 3px solid rgba(37, 99, 235, 0.28);
+          outline-offset: 2px;
+        }
+        .docs-endpoint-card-top {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          gap: 12px;
+          margin-bottom: 7px;
+        }
+        .docs-endpoint-method {
+          flex: 0 0 auto;
+          border: 1px solid #a7f3d0;
+          border-radius: 4px;
+          background: #ecfdf5;
+          color: #047857;
+          padding: 2px 7px;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 9px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          line-height: 1.4;
+        }
+        .docs-endpoint-path {
+          min-width: 0;
+          color: #64748b;
+          font-family: 'JetBrains Mono', monospace;
+          font-size: 10px;
+          line-height: 1.5;
+          overflow-wrap: anywhere;
+          text-align: right;
+        }
+        .docs-endpoint-title {
+          margin-bottom: 4px;
+          color: #0f172a;
+          font-size: 13px;
+          font-weight: 500;
+          line-height: 1.4;
+        }
+        .docs-endpoint-description {
+          color: #64748b;
+          font-size: 11px;
+          line-height: 1.55;
+        }
+
+        @media (max-width: 720px) {
+          .docs-endpoint-index { margin-top: 32px; }
+          .docs-endpoint-grid { grid-template-columns: minmax(0, 1fr); }
+          .docs-endpoint-card { min-height: 0; }
         }
 
         /* ── Code block ── */
@@ -506,7 +633,7 @@ export default function DocsPage({
             }}
           >
             {[
-              { label: "Endpoints", value: "14" },
+              { label: "Endpoints", value: String(endpointDocs.length) },
               { label: "Runtime", value: "Node 14+" },
               { label: "Auth", value: "API Key" },
               { label: "Access", value: "SDK + REST" },
@@ -540,6 +667,73 @@ export default function DocsPage({
                 </p>
               </div>
             ))}
+          </div>
+
+          <div className="docs-endpoint-index">
+            <h2
+              style={{
+                fontFamily: "'Instrument Serif', Georgia, serif",
+                fontSize: 30,
+                fontWeight: 400,
+                lineHeight: 1.15,
+                letterSpacing: "-0.015em",
+                color: "#0f172a",
+                marginBottom: 8,
+              }}
+            >
+              Available endpoints
+            </h2>
+            <p
+              style={{
+                maxWidth: 560,
+                marginBottom: 24,
+                color: "#64748b",
+                fontSize: 13,
+                lineHeight: 1.65,
+              }}
+            >
+              Browse every REST endpoint. Select one for parameters, examples,
+              and response contracts.
+            </p>
+
+            {introductionEndpointGroups.map((group) => {
+              const GroupIcon = group.icon;
+              const endpoints = group.endpointIds
+                .map((id) => endpointDocsById.get(id))
+                .filter((endpoint): endpoint is EndpointDoc => Boolean(endpoint));
+
+              return (
+                <section key={group.title} className="docs-endpoint-group">
+                  <h3 className="docs-endpoint-group-title">
+                    <GroupIcon size={15} strokeWidth={1.8} aria-hidden="true" />
+                    {group.title}
+                  </h3>
+                  <div className="docs-endpoint-grid">
+                    {endpoints.map((endpoint) => (
+                      <Link
+                        key={endpoint.id}
+                        href={`/docs/${endpoint.id}`}
+                        prefetch={false}
+                        className="docs-endpoint-card"
+                      >
+                        <div className="docs-endpoint-card-top">
+                          <span className="docs-endpoint-method">
+                            {endpoint.method}
+                          </span>
+                          <code className="docs-endpoint-path">
+                            {endpoint.path}
+                          </code>
+                        </div>
+                        <p className="docs-endpoint-title">{endpoint.title}</p>
+                        <p className="docs-endpoint-description">
+                          {endpoint.description}
+                        </p>
+                      </Link>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         </section>
       )}

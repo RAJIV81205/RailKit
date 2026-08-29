@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import type { ThemeObject } from "react-json-view";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/hljs";
-import { packageInfo, responseFormats, sidebarGroups } from "./docsData";
+import { packageInfo, sidebarGroups } from "./docsData";
 import { endpointDocs, type EndpointDoc } from "./endpointDocs";
 import {
   AlertTriangle,
@@ -14,7 +14,10 @@ import {
   Building2,
   CheckCircle,
   ChevronRight,
+  Copy,
+  ExternalLink,
   Gamepad2,
+  KeyRound,
   Package,
   Rocket,
   Ticket,
@@ -119,6 +122,77 @@ const cancelled = await cancelList();`;
 
 const docsBaseUrl = "https://railkit.in/docs";
 
+const sdkExampleOverrides: Partial<Record<EndpointDoc["id"], string>> = {
+  "station-timetable": `const result = await trainTimetableAtStation(
+  "ASN",
+  "28-08-2026",
+);`,
+  "station-by-code": `const result = await stationByCode("NDLS");
+
+if (result.success) {
+  console.log(result.data.code, result.data.name);
+}`,
+  "station-search": `const result = await stationsByName("delhi");
+
+if (result.success) {
+  console.log(result.data.stations);
+}`,
+  "train-by-number": `const result = await trainByNumber("12345");
+
+if (result.success) {
+  console.log(result.data.trainNo, result.data.trainName);
+}`,
+  "train-name-search": `const result = await trainsByName("rajdhani");
+
+if (result.success) {
+  console.log(result.data.trains);
+}`,
+};
+
+function getSdkFunctionName(endpoint: EndpointDoc) {
+  return endpoint.signature.slice(0, endpoint.signature.indexOf("("));
+}
+
+function buildSdkEndpointSnippet(endpoint: EndpointDoc) {
+  const functionName = getSdkFunctionName(endpoint);
+  const usage = sdkExampleOverrides[endpoint.id] || endpoint.example;
+
+  return `import { configure, ${functionName} } from "railkit";
+
+configure(process.env.RAILKIT_API_KEY);
+
+${usage}`;
+}
+
+function getEndpointParamLocation(endpointId: string, name: string) {
+  const queryParams: Record<string, readonly string[]> = {
+    "station-live": ["hours"],
+    "train-search": ["date"],
+    "station-timetable": ["date"],
+    "station-search": ["name"],
+    "train-name-search": ["name"],
+  };
+
+  return queryParams[endpointId]?.includes(name) ? "query" : "path";
+}
+
+function isSdkParamOptional(endpointId: string, name: string) {
+  return (
+    (endpointId === "live-tracking" && name === "date") ||
+    (endpointId === "station-live" && name === "hours") ||
+    (endpointId === "train-search" && name === "date") ||
+    (endpointId === "station-timetable" && name === "date")
+  );
+}
+
+function isRestParamOptional(endpointId: string, name: string) {
+  return (
+    (endpointId === "station-live" && name === "hours") ||
+    (endpointId === "train-search" && name === "date") ||
+    (endpointId === "station-timetable" && name === "date")
+  );
+}
+
 const introductionEndpointGroups = [
   {
     title: "Trains",
@@ -159,7 +233,7 @@ export default function DocsPage({
 }) {
   const [copiedInstall, setCopiedInstall] = useState(false);
   const [copiedAIMarkdown, setCopiedAIMarkdown] = useState(false);
-  const [setupView, setSetupView] = useState<IntegrationView>("sdk");
+  const [setupView] = useState<IntegrationView>("sdk");
   const [quickStartLanguage, setQuickStartLanguage] =
     useState<ApiCodeLanguage>("javascript");
 
@@ -171,17 +245,57 @@ export default function DocsPage({
 
   const aiDocsMarkdown = useMemo(() => {
     const endpointDetails = endpointDocs
-      .map((ep) => {
-        const rest = endpointDocsById.get(ep.id);
+      .map((ep, index) => {
         const params = ep.params.length
-          ? ep.params
-              .map((p) => `- \`${p.name}\` (\`${p.type}\`): ${p.desc}`)
-              .join("\n")
-          : "- None";
-        const restContract = rest
-          ? `\nREST: \`${rest.method} ${rest.path}\`\nRequired header: \`x-api-key: YOUR_API_KEY\``
-          : "";
-        return `### ${ep.title}\nLink: [${docsBaseUrl}/${ep.id}](${docsBaseUrl}/${ep.id})\nSDK: \`${ep.signature}\`${restContract}\nParameters:\n${params}\n\nSDK example:\n\`\`\`javascript\n${ep.example}\n\`\`\``;
+          ? `| Name | Type | REST location | SDK required | REST required | Description |
+|---|---|---|---|---|---|
+${ep.params
+  .map(
+    (param) =>
+      `| \`${param.name}\` | \`${param.type}\` | ${getEndpointParamLocation(ep.id, param.name)} | ${isSdkParamOptional(ep.id, param.name) ? "No" : "Yes"} | ${isRestParamOptional(ep.id, param.name) ? "No" : "Yes"} | ${param.desc} |`,
+  )
+  .join("\n")}`
+          : "No parameters.";
+
+        return `### ${index + 1}. ${ep.title}
+
+- ID: \`${ep.id}\`
+- Purpose: ${ep.description}
+- Documentation: [${docsBaseUrl}/${ep.id}](${docsBaseUrl}/${ep.id})
+- SDK function: \`${ep.signature}\`
+- REST contract: \`${ep.method} ${ep.path}\`
+- Complete REST URL example: \`${directApiBaseUrl}${ep.examplePath}\`
+- Endpoint notes: ${ep.notes}
+
+#### Parameters
+
+${params}
+
+Parameter order matters. For SDK calls, follow SDK signature. For REST calls, follow REST path exactly; fare lookup uses different argument/path ordering.
+
+#### Complete SDK example
+
+\`\`\`javascript
+${buildSdkEndpointSnippet(ep)}
+\`\`\`
+
+#### Complete REST JavaScript example
+
+\`\`\`javascript
+${buildRestSnippet(directApiBaseUrl, ep.examplePath, "javascript")}
+\`\`\`
+
+#### Complete REST cURL example
+
+\`\`\`bash
+${buildRestSnippet(directApiBaseUrl, ep.examplePath, "curl")}
+\`\`\`
+
+#### Sample successful response
+
+\`\`\`json
+${ep.response}
+\`\`\``;
       })
       .join("\n\n");
 
@@ -203,6 +317,7 @@ export default function DocsPage({
       "train-by-number",
       "train-name-search",
       "validation",
+      "status-codes",
       "errors",
     ]
       .map((id) => {
@@ -212,7 +327,154 @@ export default function DocsPage({
       .filter(Boolean)
       .join("\n");
 
-    return `# RailKit - Implementation Essentials\n\n## Official Links\n- Docs: [${docsBaseUrl}](${docsBaseUrl})\n- NPM: [${packageInfo.links.npm}](${packageInfo.links.npm})\n- GitHub: [${packageInfo.links.github}](${packageInfo.links.github})\n\n## REST API\n- Base URL: \`${directApiBaseUrl}\`\n- Auth header: \`x-api-key: YOUR_API_KEY\`\n- Direct REST access requires the Advance plan.\n\n## SDK Quick Setup\n\`\`\`bash\n${installSnippet}\n\`\`\`\n\n\`\`\`javascript\n${quickStartSnippet}\n\`\`\`\n\n## Section Links\n${sectionLinks}\n\n## Endpoint Contracts\n${endpointDetails}\n\n## Required Input Rules\n- PNR: exactly 10 digits\n- Train number: exactly 5 digits (string)\n- Date: DD-MM-YYYY\n- Station code: uppercase\n\n## Response Handling\nSuccess: \`{ success: true, data: { ... } }\`\nError: \`{ success: false, message: "..." }\`\n\nAlso handle:\n\`\`\`ts\n${responseFormats.error}\n\`\`\``;
+    return `# RailKit — Complete AI Integration Reference
+
+This document is self-contained context for an AI model or developer integrating RailKit. Use only contracts documented here. Do not invent endpoint paths, parameter names, enum values, or response fields. Railway data is live and response values shown below are examples, not constants.
+
+## Product and official sources
+
+- Product: RailKit Indian Railways data service
+- Documentation: [${docsBaseUrl}](${docsBaseUrl})
+- Dashboard and API keys: [https://railkit.in/dashboard](https://railkit.in/dashboard)
+- npm package: [${packageInfo.links.npm}](${packageInfo.links.npm})
+- GitHub: [${packageInfo.links.github}](${packageInfo.links.github})
+- Package name: \`railkit\`
+- Runtime: Node.js 14 or newer
+- Module format: ESM named imports
+
+## Choose one integration mode
+
+### Node.js SDK
+
+- Recommended for Node.js, Express, Next.js server code, and other supported server runtimes.
+- Install with \`${installSnippet}\`.
+- Import named functions from \`railkit\`.
+- Call \`configure(apiKey)\` once during server startup before any endpoint function.
+- Every endpoint function returns a Promise resolving to a result object.
+- Always test \`result.success\` before reading \`result.data\`.
+
+### Direct REST API
+
+- Base URL: \`${directApiBaseUrl}\`
+- Authentication header on every request: \`x-api-key: YOUR_API_KEY\`
+- Optional request header: \`accept: application/json\`
+- All documented endpoints use HTTP GET.
+- Direct REST access requires the Advance plan.
+- Check both HTTP status and parsed JSON body.
+- URL-encode dynamic path and query values when constructing URLs from user input.
+
+## Security requirements
+
+- Keep API keys in server-side environment variables such as \`RAILKIT_API_KEY\`.
+- Never hard-code, log, commit, or expose an API key in browser/client code.
+- Route browser requests through your own authenticated backend.
+- Rotate a key from the RailKit dashboard if it is exposed.
+
+## Complete SDK setup
+
+\`\`\`bash
+${installSnippet}
+\`\`\`
+
+\`\`\`javascript
+${quickStartSnippet}
+\`\`\`
+
+## Complete SDK export list
+
+\`\`\`ts
+configure(apiKey: string): void
+checkPNRStatus(pnr: string): Promise<any>
+getTrainInfo(trainNumber: string): Promise<any>
+trackTrain(trainNumber: string, date?: string): Promise<any>
+getTrainHistory(trainNumber: string, journeyDate: string): Promise<any>
+liveAtStation(stationCode: string, hours?: 2 | 4 | 8): Promise<any>
+searchTrainBetweenStations(fromStnCode: string, toStnCode: string, date?: string): Promise<any>
+getAvailability(trainNo: string, fromStnCode: string, toStnCode: string, date: string, coach: string, quota: string): Promise<any>
+fareLookup(trainNo: string, fromStnCode: string, toStnCode: string, date: string, travelClass: string, quota: string): Promise<any>
+cancelList(): Promise<any>
+stationByCode(stationCode: string): Promise<any>
+stationsByName(name: string): Promise<any>
+trainByNumber(trainNumber: string): Promise<any>
+trainsByName(name: string): Promise<any>
+trainTimetableAtStation(stationCode: string, date?: string): Promise<any>
+\`\`\`
+
+## Input and enum rules
+
+- PNR: exactly 10 numeric digits; treat as a string.
+- Train number: exactly 5 numeric digits; treat as a string to preserve leading zeros.
+- Date: \`DD-MM-YYYY\`; validate that it is a real calendar date.
+- Live tracking SDK date: optional and defaults to today; REST date path segment is required and accepts \`today\`.
+- Station code: uppercase, 1–5 letters or digits; examples: \`NDLS\`, \`BCT\`, \`HWH\`.
+- Station or train name search: at least 2 characters; returns at most 10 matches.
+- Live station hours: \`2\`, \`4\`, or \`8\`; default is \`2\`.
+- Seat-availability classes: \`2S\`, \`SL\`, \`3A\`, \`3E\`, \`2A\`, \`1A\`, \`CC\`, \`EC\`.
+- Seat-availability quotas: \`GN\`, \`LD\`, \`SS\`, \`TQ\`.
+- Fare classes: \`1A\`, \`2A\`, \`3A\`, \`3E\`, \`CC\`, \`EC\`, \`EA\`, \`FC\`, \`SL\`, \`2S\`, \`VS\`, \`CH\`, \`HS\`, \`VC\`, \`VA\`.
+- Fare quotas: \`GN\`, \`TQ\`, \`PT\`, \`LD\`, \`DF\`, \`FT\`, \`LB\`, \`YU\`, \`DP\`, \`HP\`, \`PH\`, \`SS\`.
+- Station timetable date: optional, limited to today, yesterday, or tomorrow; omission defaults to today.
+
+## Response contract and error handling
+
+Successful response:
+
+\`\`\`json
+{ "success": true, "data": {} }
+\`\`\`
+
+Failed response:
+
+\`\`\`json
+{ "success": false, "error": "Description of what went wrong" }
+\`\`\`
+
+Never access \`data\` before checking \`success\`. Do not assume every endpoint returns the same fields inside \`data\`; use each endpoint's sample schema below.
+
+| HTTP status | Meaning | Integration action |
+|---|---|---|
+| 200 | Success | Read JSON and verify \`success === true\`. |
+| 400 | Invalid input or rejected upstream request | Fix request; do not retry unchanged input. |
+| 401 | Missing or invalid API key | Verify server-side key and \`x-api-key\` header. |
+| 403 | Inactive key or unavailable access | Reactivate key or verify plan access. |
+| 404 | Requested record not found | Treat as unavailable data; verify identifiers/date. |
+| 429 | Monthly usage limit exceeded | Stop retries; inspect account usage or increase limit. |
+| 500 | Backend or upstream failure | Retry later with bounded exponential backoff. |
+
+Also handle network failures and timeouts with \`try/catch\`. Never retry 400, 401, 403, or 404 responses without changing request/auth state.
+
+## PNR status codes
+
+- \`CNF\`: Confirmed
+- \`WL\`: Waiting List
+- \`RAC\`: Reservation Against Cancellation
+- \`CAN\`: Cancelled
+- \`PQWL\`: Pooled Quota Waiting List
+- \`TQWL\`: Tatkal Quota Waiting List
+- \`RLWL\`: Remote Location Waiting List
+- \`GNWL\`: General Waiting List
+
+## Endpoint contracts (${endpointDocs.length} total)
+
+${endpointDetails}
+
+## Integration checklist
+
+1. Choose SDK or REST; do not mix their parameter ordering.
+2. Create and store API key server-side.
+3. Validate all user inputs before calling RailKit.
+4. For SDK, call \`configure\` once before other functions.
+5. For REST, attach \`x-api-key\` to every request.
+6. Check HTTP status where available, then check JSON \`success\`.
+7. Read only fields documented for selected endpoint.
+8. Handle empty arrays, nullable fields, unavailable live data, timeouts, and documented errors.
+9. Avoid long-lived caching for live tracking, seat availability, PNR, and station-live results.
+10. Keep links below available for current human-readable documentation.
+
+## Documentation section links
+
+${sectionLinks}
+`;
   }, [directApiBaseUrl, flatSections]);
 
   const copyInstall = async () => {
@@ -348,11 +610,14 @@ export default function DocsPage({
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 10px;
+          max-width: 900px;
         }
         .docs-endpoint-card {
           display: block;
+          width: 100%;
           min-width: 0;
-          min-height: 116px;
+          height: 116px;
+          overflow: hidden;
           padding: 14px 16px;
           border: 1px solid #e2e8f0;
           border-radius: 13px;
@@ -393,31 +658,42 @@ export default function DocsPage({
           line-height: 1.4;
         }
         .docs-endpoint-path {
+          display: block;
+          flex: 1 1 auto;
           min-width: 0;
+          overflow: hidden;
           color: #64748b;
           font-family: 'JetBrains Mono', monospace;
           font-size: 10px;
           line-height: 1.5;
-          overflow-wrap: anywhere;
+          text-overflow: ellipsis;
           text-align: right;
+          white-space: nowrap;
         }
         .docs-endpoint-title {
+          overflow: hidden;
           margin-bottom: 4px;
           color: #0f172a;
           font-size: 13px;
           font-weight: 500;
           line-height: 1.4;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
         .docs-endpoint-description {
+          display: -webkit-box;
+          overflow: hidden;
           color: #64748b;
           font-size: 11px;
           line-height: 1.55;
+          -webkit-box-orient: vertical;
+          -webkit-line-clamp: 2;
         }
 
         @media (max-width: 720px) {
           .docs-endpoint-index { margin-top: 32px; }
           .docs-endpoint-grid { grid-template-columns: minmax(0, 1fr); }
-          .docs-endpoint-card { min-height: 0; }
+          .docs-endpoint-card { height: 116px; }
         }
 
         /* ── Code block ── */
@@ -450,6 +726,64 @@ export default function DocsPage({
           border-color: #000;
         }
         .docs-chip-primary:hover { background: #1a1a1a; border-color: #1a1a1a; }
+
+        .docs-hero-actions {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 8px;
+          max-width: 760px;
+          margin-bottom: 32px;
+        }
+        .docs-hero-action {
+          display: inline-flex;
+          min-width: 0;
+          min-height: 44px;
+          align-items: center;
+          justify-content: center;
+          gap: 7px;
+          padding: 9px 12px;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          background: #fff;
+          color: #334155;
+          font-family: 'Inter', system-ui, sans-serif;
+          font-size: 12px;
+          font-weight: 500;
+          line-height: 1.2;
+          text-decoration: none;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+          touch-action: manipulation;
+        }
+        .docs-hero-action:hover {
+          border-color: #cbd5e1;
+          background: #f8fafc;
+          color: #0f172a;
+        }
+        .docs-hero-action:active { background: #f1f5f9; }
+        .docs-hero-action:focus-visible {
+          outline: 3px solid rgba(37, 99, 235, 0.28);
+          outline-offset: 2px;
+        }
+        .docs-hero-action-primary {
+          border-color: #0f172a;
+          background: #0f172a;
+          color: #fff;
+        }
+        .docs-hero-action-primary:hover {
+          border-color: #1e293b;
+          background: #1e293b;
+          color: #fff;
+        }
+        .docs-hero-action svg { flex: 0 0 auto; }
+
+        @media (max-width: 820px) {
+          .docs-hero-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 420px) {
+          .docs-hero-actions { grid-template-columns: minmax(0, 1fr); }
+        }
 
         .docs-integration-tabs {
           display: inline-flex;
@@ -526,7 +860,7 @@ export default function DocsPage({
         .docs-reveal { animation: docs-rise 0.6s ease both; }
 
         @media (prefers-reduced-motion: reduce) {
-          .docs-reveal, .docs-card-lift, .docs-chip, .docs-code-swap { animation: none; transform: none; transition: none; }
+          .docs-reveal, .docs-card-lift, .docs-chip, .docs-hero-action, .docs-endpoint-card, .docs-code-swap { animation: none; transform: none; transition: none; }
         }
       `}</style>
 
@@ -577,52 +911,42 @@ export default function DocsPage({
             boards, train search, seat availability, and cancellations.
           </p>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              flexWrap: "wrap",
-              marginBottom: 20,
-            }}
-          >
-            <IntegrationTabs value={setupView} onChange={setSetupView} />
-            <span style={{ fontSize: 12, color: "#9ca3af" }}>
-              {setupView === "sdk"
-                ? "Typed package for Node.js"
-                : "Direct HTTP access for Advance plan"}
-            </span>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              marginBottom: 32,
-            }}
-          >
-            <Link href="/dashboard" className="docs-chip docs-chip-primary">
-              Open Dashboard <ChevronRight size={13} />
+          <div className="docs-hero-actions" aria-label="Documentation actions">
+            <Link
+              href="/dashboard"
+              className="docs-hero-action docs-hero-action-primary"
+            >
+              <KeyRound size={15} aria-hidden="true" />
+              Get API key
+              <ChevronRight size={14} aria-hidden="true" />
+            </Link>
+            <Link href="/docs/playground" className="docs-hero-action">
+              <Gamepad2 size={15} aria-hidden="true" />
+              Open playground
             </Link>
             <a
               href="https://www.npmjs.com/package/railkit"
               target="_blank"
               rel="noreferrer"
-              className="docs-chip"
+              className="docs-hero-action"
             >
-              NPM Package
+              <Package size={15} aria-hidden="true" />
+              npm package
+              <ExternalLink size={13} aria-hidden="true" />
             </a>
             <button
               type="button"
               onClick={copyAIDocsMarkdown}
-              className="docs-chip"
+              className="docs-hero-action"
+              aria-live="polite"
             >
-              {copiedAIMarkdown ? "Copied ✓" : "Copy AI Markdown"}
+              {copiedAIMarkdown ? (
+                <CheckCircle size={15} aria-hidden="true" />
+              ) : (
+                <Copy size={15} aria-hidden="true" />
+              )}
+              {copiedAIMarkdown ? "AI markdown copied" : "Copy AI markdown"}
             </button>
-            <Link href="/dashboard" className="docs-chip">
-              Playground <ChevronRight size={13} />
-            </Link>
           </div>
 
           <div
@@ -715,12 +1039,13 @@ export default function DocsPage({
                         href={`/docs/${endpoint.id}`}
                         prefetch={false}
                         className="docs-endpoint-card"
+                        aria-label={`${endpoint.title}: ${endpoint.method} ${endpoint.path}`}
                       >
                         <div className="docs-endpoint-card-top">
                           <span className="docs-endpoint-method">
                             {endpoint.method}
                           </span>
-                          <code className="docs-endpoint-path">
+                          <code className="docs-endpoint-path" title={endpoint.path}>
                             {endpoint.path}
                           </code>
                         </div>
@@ -1219,15 +1544,14 @@ function LanguageTabs({
 
 function EndpointParams({ endpointId, params }: { endpointId: string; params: EndpointDoc["params"] }) {
   if (!params.length) return null;
-  const getLocation = (name: string) => endpointId === "station-live" && name === "hours" || endpointId === "train-search" && name === "date" || endpointId === "station-timetable" && name === "date" ? "QUERY" : "PATH";
   return (
     <div className="docs-card" style={{ overflowX: "auto", marginBottom: 16 }}>
       <table className="docs-table">
         <thead><tr><th>Name</th><th>In</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
         <tbody>
           {params.map((param) => {
-            const location = getLocation(param.name);
-            const required = location === "PATH";
+            const location = getEndpointParamLocation(endpointId, param.name).toUpperCase();
+            const required = !isRestParamOptional(endpointId, param.name);
             return <tr key={param.name}>
               <td><code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{param.name}</code></td>
               <td><code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#6b7280" }}>{location}</code></td>

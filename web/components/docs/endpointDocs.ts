@@ -106,10 +106,14 @@ if (result.success) {
     icon: MapPin,
     description:
       "Track live train movement with station-by-station arrival and delay context.",
-    signature: "trackTrain(trainNumber: string, date: string)",
+    signature: "trackTrain(trainNumber: string, date?: string)",
     params: [
       { name: "trainNumber", type: "string", desc: "5-digit train number" },
-      { name: "date", type: "string", desc: "Journey date in DD-MM-YYYY" },
+      {
+        name: "date",
+        type: "string",
+        desc: "Optional SDK journey date in DD-MM-YYYY; defaults to today. REST requires DD-MM-YYYY or today.",
+      },
     ],
     example: `const result = await trackTrain("12345", "28-08-2026");
 

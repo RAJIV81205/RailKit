@@ -4,15 +4,8 @@ import Image from "next/image";
 import { headers } from "next/headers";
 import {
   ArrowRight,
-  CircleX,
   CheckCircle2,
   Github,
-  IndianRupee,
-  MapPin,
-  Receipt,
-  Search,
-  Ticket,
-  Train,
   Users,
   Twitter,
 } from "lucide-react";
@@ -25,6 +18,7 @@ import {
 } from "../lib/seo";
 import { CinematicHero } from "../components/CinematicHero";
 import { MoochiFollower } from "../components/MoochiFollower";
+import { endpointDocs } from "../components/docs/endpointDocs";
 
 export const metadata: Metadata = {
   ...buildMetadata({
@@ -109,68 +103,13 @@ async function getEnterpriseShowcaseUsers(): Promise<EnterpriseShowcaseUser[]> {
 /* ─────────────────────────────────────────────
    Static data
 ───────────────────────────────────────────── */
-const endpoints = [
-  {
-    icon: Ticket,
-    title: "PNR Status",
-    method: "checkPNRStatus",
-    description:
-      "Current passenger and booking status from a 10-digit PNR number.",
-  },
-  {
-    icon: Train,
-    title: "Train Info",
-    method: "getTrainInfo",
-    description: "Route, stops, schedule, and running-day information.",
-  },
-  {
-    icon: MapPin,
-    title: "Live Tracking",
-    method: "trackTrain",
-    description: "Live movement, station timeline, and delay context.",
-  },
-  {
-    icon: Search,
-    title: "Train Search",
-    method: "searchTrainBetweenStations",
-    description:
-      "Find trains between two stations with useful timetable data.",
-  },
-  {
-    icon: CheckCircle2,
-    title: "Seat Availability",
-    method: "getAvailability",
-    description: "Availability and fare details by class, quota, and date.",
-  },
-  {
-    icon: Users,
-    title: "Station Board",
-    method: "liveAtStation",
-    description:
-      "Arrivals, departures, and trains passing through a station.",
-  },
-  {
-    icon: IndianRupee,
-    title: "Fare Lookup",
-    method: "fareLookup",
-    description:
-      "Fare, concession, and booking-class breakdown between two stations.",
-  },
-  {
-    icon: Receipt,
-    title: "Train History",
-    method: "trainHistory",
-    description:
-      "Persisted historical journey record by train number and date.",
-  },
-  {
-    icon: CircleX,
-    title: "Cancelled Trains",
-    method: "cancelList",
-    description:
-      "Fully and partially cancelled trains, including affected route segments.",
-  },
-];
+const endpoints = endpointDocs.map((endpoint) => ({
+  id: endpoint.id,
+  icon: endpoint.icon,
+  title: endpoint.title,
+  method: endpoint.signature.slice(0, endpoint.signature.indexOf("(")),
+  description: endpoint.description,
+}));
 
 /* ─────────────────────────────────────────────
    Page
@@ -244,15 +183,7 @@ export default async function LandingPage() {
     softwareVersion: "4.1.0",
     downloadUrl: "https://www.npmjs.com/package/railkit",
     codeRepository: "https://github.com/RAJIV81205/railkit",
-    featureList: [
-      "PNR Status API",
-      "Live Train Tracking",
-      "Seat Availability API",
-      "Train Search Between Stations",
-      "Station Live Board",
-      "Train Schedule and Route Info",
-      "Fully and Partially Cancelled Trains",
-    ],
+    featureList: endpoints.map((endpoint) => endpoint.title),
     author: {
       "@type": "Person",
       name: "Rajiv Dubey",
@@ -345,7 +276,7 @@ export default async function LandingPage() {
           <div className="lp-section-head">
             <p className="lp-eyebrow">What it includes</p>
             <h2 className="lp-h2">
-              Nine methods.
+              {endpoints.length} methods.
               <br />
               Every use case.
             </h2>
@@ -357,14 +288,19 @@ export default async function LandingPage() {
 
           <div className="lp-endpoints">
             {endpoints.map((ep) => (
-              <article key={ep.method} className="lp-ep-card">
+              <Link
+                key={ep.id}
+                href={`/docs/${ep.id}`}
+                prefetch={false}
+                className="lp-ep-card"
+              >
                 <div className="lp-ep-icon" aria-hidden>
                   <ep.icon size={17} />
                 </div>
                 <div className="lp-ep-title">{ep.title}</div>
                 <code className="lp-ep-method">{ep.method}()</code>
                 <p className="lp-ep-desc">{ep.description}</p>
-              </article>
+              </Link>
             ))}
           </div>
         </div>
@@ -384,7 +320,7 @@ export default async function LandingPage() {
               </h2>
               <p className="lp-body">
                 Works in API routes, background jobs, support tools, or mobile
-                app backends. One key, one import, nine methods.
+                app backends. One key, one import, {endpoints.length} methods.
               </p>
               <ul className="lp-checklist">
                 {[
@@ -692,11 +628,22 @@ export default async function LandingPage() {
         @media (max-width: 480px) { .lp-endpoints { grid-template-columns: 1fr; border-radius: 12px; } }
 
         .lp-ep-card {
+          display: block;
           background: #fff;
+          color: inherit;
           padding: 24px 20px;
+          text-decoration: none;
           transition: background 0.2s;
+          touch-action: manipulation;
         }
         .lp-ep-card:hover { background: #fafafa; }
+        .lp-ep-card:active { background: #f3f4f6; }
+        .lp-ep-card:focus-visible {
+          position: relative;
+          z-index: 1;
+          outline: 3px solid rgba(37, 99, 235, 0.35);
+          outline-offset: -3px;
+        }
         .lp-ep-icon {
           display: flex;
           align-items: center;

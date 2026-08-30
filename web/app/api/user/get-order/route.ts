@@ -100,6 +100,9 @@ export async function GET(request: Request) {
         order: {
           orderId: latestOrder?.orderId,
           planType: latestOrder?.planType,
+          entitlementVersion: latestOrder?.entitlementVersion ?? null,
+          billingInterval: latestOrder?.billingInterval ?? null,
+          termMonths: latestOrder?.termMonths ?? null,
           amount: latestOrder?.amount,
           currency: latestOrder?.currency,
           status: latestOrder?.status,

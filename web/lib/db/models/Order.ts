@@ -35,6 +35,12 @@ const orderSchema = new mongoose.Schema(
       enum: ["pro", "advance"],
       required: true,
     },
+    entitlementVersion: { type: Number, enum: [1, 2], default: null },
+    billingInterval: { type: String, enum: ["month", "year"], default: null },
+    termMonths: { type: Number, default: null, min: 1 },
+    monthlyLimit: { type: Number, default: null, min: 0 },
+    entitlementStartsAt: { type: Date, default: null },
+    entitlementEndsAt: { type: Date, default: null },
     amount: {
       type: Number,
       required: true,

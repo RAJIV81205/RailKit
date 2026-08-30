@@ -55,6 +55,9 @@ export async function GET() {
 				orders: orders.map((order) => ({
 					_id: order._id.toString(),
 					orderId: order.orderId,
+					planType: order.planType,
+					billingInterval: order.billingInterval ?? null,
+					entitlementVersion: order.entitlementVersion ?? null,
 					amount: order.amount,
 					currency: order.currency,
 					status: order.status,

@@ -147,10 +147,12 @@ export default function PricingClient({
   initialPlans,
   initialOfferEndsAt,
   initialContactEmail,
+  initialBillingV2Enabled,
 }: {
   initialPlans: PricingPlan[];
   initialOfferEndsAt: string | null;
   initialContactEmail: string;
+  initialBillingV2Enabled: boolean;
 }) {
   return (
     <Suspense fallback={<PricingPageSkeleton />}>
@@ -158,6 +160,7 @@ export default function PricingClient({
         initialPlans={initialPlans}
         initialOfferEndsAt={initialOfferEndsAt}
         initialContactEmail={initialContactEmail}
+        initialBillingV2Enabled={initialBillingV2Enabled}
       />
     </Suspense>
   );
@@ -264,9 +267,10 @@ function useCountdown(offerEndsAt: string | null): TimeLeft {
 // ─── Payment modal ────────────────────────────────────────────────────────────
 
 function PaymentModal({
-  selectedPlan, isCreatingOrder, onConfirm, onCancel,
+  selectedPlan, billingInterval, isCreatingOrder, onConfirm, onCancel,
 }: {
   selectedPlan: PaidPlanType;
+  billingInterval: "month" | "year";
   isCreatingOrder: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -318,7 +322,7 @@ function PaymentModal({
         </h3>
         <p className="mt-3 text-sm leading-7 text-[#6F6F6F]">
           A secure Cashfree popup will open to complete payment for the{" "}
-          <span className="font-semibold text-black uppercase">{selectedPlan}</span> plan.
+          <span className="font-semibold text-black uppercase">{selectedPlan}</span> plan ({billingInterval === "year" ? "annual" : "monthly"}).
         </p>
         <ul className="mt-6 space-y-2.5">
           {["256-bit SSL encrypted transaction", "Payment processed by Cashfree — card data never stored here", "Instant plan activation on success"].map((item) => (
@@ -470,11 +474,12 @@ function RestartPlanCautionModal({
 // ─── Main page content ────────────────────────────────────────────────────────
 
 function PricingPageContent({
-  initialPlans, initialOfferEndsAt, initialContactEmail,
+  initialPlans, initialOfferEndsAt, initialContactEmail, initialBillingV2Enabled,
 }: {
   initialPlans: PricingPlan[];
   initialOfferEndsAt: string | null;
   initialContactEmail: string;
+  initialBillingV2Enabled: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -484,6 +489,7 @@ function PricingPageContent({
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showRestartWarningModal, setShowRestartWarningModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PaidPlanType | null>(null);
+  const [billingInterval, setBillingInterval] = useState<"month" | "year">("month");
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
 
   const timeLeft = useCountdown(initialOfferEndsAt);
@@ -549,6 +555,7 @@ function PricingPageContent({
 
   const openPaymentModal = (planType: PaidPlanType | "free") => {
     if (planType === "free") return;
+    if (!initialBillingV2Enabled) { showNotice("info", "New billing plans are temporarily unavailable."); return; }
     if (authState.status === "loading") { showNotice("info", "Please wait while we check your login status."); return; }
     if (authState.status === "unauthenticated") { router.push("/auth?redirect=/pricing"); return; }
     setSelectedPlan(planType);
@@ -567,7 +574,7 @@ function PricingPageContent({
     setIsCreatingOrder(true);
     dismissNotice();
     try {
-      const response = await fetch("/api/user/create-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ planType: selectedPlan }) });
+      const response = await fetch("/api/user/create-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ planType: selectedPlan, billingInterval }) });
       const data = await response.json();
       const order = data?.order as CreatedPaymentOrder | undefined;
       if (!response.ok || !order?.orderId || !order?.paymentSessionId) throw new Error(data?.message || "Unable to create order. Please try again.");
@@ -588,11 +595,8 @@ function PricingPageContent({
     const isLoading = authState.status === "loading";
     const isAuthed = authState.status === "authenticated";
     const currentPlan = isAuthed ? (authState as { plan: "free" | PaidPlanType }).plan : null;
-    if (isAuthed && currentPlan === "advance") {
-      if (plan.planType === "advance") return { label: "Restart Plan", disabled: false, action: () => openRestartWarningModal("advance") };
-      if (plan.planType === "pro") return { label: "Downgrade Unavailable", disabled: true, action: () => {} };
-      return { label: "Included", disabled: true, action: () => {} };
-    }
+    if (!initialBillingV2Enabled && plan.planType !== "free") return { label: "Coming soon", disabled: true, action: () => {} };
+    if (isAuthed && currentPlan && currentPlan !== "free") return { label: "Current plan active", disabled: true, action: () => {} };
     if (plan.planType === "free") return { label: plan.buttonText, disabled: false, action: () => router.push("/auth?redirect=/pricing") };
     if (isLoading) return { label: "Checking Login…", disabled: true, action: () => {} };
     if (!isAuthed) return { label: "Login to Continue", disabled: false, action: () => router.push("/auth?redirect=/pricing") };
@@ -684,14 +688,26 @@ function PricingPageContent({
             </div>
           )}
 
+          <div className="mb-8 flex justify-center" role="group" aria-label="Billing interval">
+            <div className="inline-flex rounded-full border border-black/10 bg-[#f7f7f7] p-1">
+              {(["month", "year"] as const).map((interval) => (
+                <button key={interval} type="button" onClick={() => setBillingInterval(interval)}
+                  className={`rounded-full px-5 py-2 text-sm ${billingInterval === interval ? "bg-black text-white" : "text-[#6F6F6F]"}`}>
+                  {interval === "month" ? "Monthly" : "Annual"}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* ── Pricing cards ── */}
           <section aria-label="Pricing plans" className="pr-a5">
             <div className="grid gap-5 lg:grid-cols-3">
               {initialPlans.map((plan) => {
                 const btnState = getButtonState(plan);
                 const isPopular = plan.planType === "advance";
-                const originalDisplay = plan.originalPrice ?? plan.price;
-                const discountPercent = plan.originalPrice ? getDiscountPercent(plan.originalPrice, plan.price) : null;
+                const displayPrice = billingInterval === "year" ? (plan.annualPrice ?? plan.price) : plan.price;
+                const originalDisplay = billingInterval === "year" ? (plan.annualOriginalPrice ?? displayPrice) : (plan.originalPrice ?? displayPrice);
+                const discountPercent = originalDisplay ? getDiscountPercent(originalDisplay, displayPrice) : null;
 
                 return (
                   <article key={plan.id} aria-label={`${plan.name} plan`}
@@ -738,10 +754,10 @@ function PricingPageContent({
                       )}
                       <div className="flex items-end gap-2">
                         <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: "clamp(40px,5vw,56px)", fontWeight: 400, lineHeight: 1, color: isPopular ? "#fff" : "#000", letterSpacing: "-0.03em" }}>
-                          {plan.price}
+                          {displayPrice}
                         </span>
                         <span className="mb-1.5 text-sm" style={{ color: isPopular ? "rgba(255,255,255,0.45)" : "#9ca3af" }}>
-                          {plan.period}
+                          {billingInterval === "year" ? "/year" : plan.period}
                         </span>
                       </div>
 
@@ -902,6 +918,7 @@ function PricingPageContent({
       {showPaymentModal && selectedPlan && (
         <PaymentModal
           selectedPlan={selectedPlan}
+          billingInterval={billingInterval}
           isCreatingOrder={isCreatingOrder}
           onConfirm={startPayment}
           onCancel={() => { if (!isCreatingOrder) { setShowPaymentModal(false); setSelectedPlan(null); } }}

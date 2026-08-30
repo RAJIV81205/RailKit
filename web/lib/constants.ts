@@ -20,6 +20,8 @@ export type PricingPlan = {
   buttonText: string;
   popular?: boolean;
   colorTheme: PlanTheme;
+  annualPrice?: string;
+  annualOriginalPrice?: string;
 };
 
 export type ManagedPlan = {
@@ -35,6 +37,8 @@ export type ManagedPlan = {
   popular?: boolean;
   colorTheme: PlanTheme;
   limit: number;
+  annualPrice?: number;
+  annualOriginalPrice?: number;
   userPlan?: "pro" | "enterprise" | null;
 };
 
@@ -88,6 +92,8 @@ export const PLAN_CONFIG: PlanConfigShape = {
       popular: false,
       colorTheme: "slate",
       limit: 5000,
+      annualPrice: 708,
+      annualOriginalPrice: 1068,
       userPlan: "pro",
     },
     {
@@ -109,6 +115,8 @@ export const PLAN_CONFIG: PlanConfigShape = {
       popular: true,
       colorTheme: "emerald",
       limit: 10000,
+      annualPrice: 1068,
+      annualOriginalPrice: 1188,
       userPlan: "enterprise",
     },
   ],
@@ -124,6 +132,7 @@ export function isPaidPlanType(value: unknown): value is PaidPlanType {
 
 export function getPublicPlanConfig() {
   return {
+    billingV2Enabled: process.env.BILLING_V2_ENABLED === "true",
     offerEndsAt: PLAN_CONFIG.offerEndsAt,
     contactEmail: PLAN_CONFIG.contactEmail,
     plans: PRICING_PLANS.map((plan) => ({
@@ -133,13 +142,15 @@ export function getPublicPlanConfig() {
   };
 }
 
-export function getPaidPlanRuntime(planType: PaidPlanType) {
+export function getPaidPlanRuntime(planType: PaidPlanType, billingInterval: "month" | "year" = "month") {
   const plan = PLAN_CONFIG.plans.find((item) => item.planType === planType);
   if (!plan) return null;
 
   return {
-    amount: Math.max(0, Number(plan.price) || 0),
+    amount: Math.max(0, Number(billingInterval === "year" ? plan.annualPrice : plan.price) || 0),
     limit: Math.max(0, Number(plan.limit) || 0),
+    termMonths: billingInterval === "year" ? 12 : 1,
+    billingInterval,
     userPlan: (plan.userPlan ||
       (planType === "advance" ? "enterprise" : "pro")) as "pro" | "enterprise",
   };
@@ -154,6 +165,12 @@ export const PRICING_PLANS: PricingPlan[] = PLAN_CONFIG.plans.map((plan) => ({
       : undefined,
   price: formatINR(plan.price),
   period: plan.period,
+  annualPrice:
+    typeof plan.annualPrice === "number" ? formatINR(plan.annualPrice) : undefined,
+  annualOriginalPrice:
+    typeof plan.annualOriginalPrice === "number"
+      ? formatINR(plan.annualOriginalPrice)
+      : undefined,
   description: plan.description,
   features: plan.features,
   planType: plan.planType,
@@ -298,7 +315,8 @@ export const TERMS_AND_CONDITIONS: LegalDocument = {
     {
       heading: "Subscription Plans & Request Packs",
       items: [
-        "Paid subscription plans remain valid for the duration specified at the time of purchase, typically thirty (30) days unless otherwise stated.",
+        "Legacy paid subscriptions remain valid under their original terms. New plans are available monthly or annually as shown at checkout.",
+        "New annual plans are paid upfront for twelve (12) months; included request quota renews monthly during that term.",
         "Request Packs are add-ons available only for an active paid subscription and are not standalone products.",
         "Purchasing a Request Pack increases the API request quota available under the associated active paid subscription.",
         "A Request Pack purchase does not renew, extend, or otherwise modify the subscription's validity period.",

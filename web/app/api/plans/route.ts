@@ -8,6 +8,7 @@ export async function GET() {
     return NextResponse.json(
       {
         success: true,
+        billingV2Enabled: config.billingV2Enabled,
         offerEndsAt: config.offerEndsAt,
         contactEmail: config.contactEmail,
         plans: config.plans,

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/db";
 import User from "@/lib/db/models/User";
 import { sendBillingExpiredEmail } from "@/lib/services/email";
+import { syncV2Entitlement } from "@/lib/billing/entitlements";
 
 /**
  * Daily cron job to check and update user plans based on billing dates.
@@ -82,6 +83,7 @@ export async function POST(req: Request) {
             { expirationDate: { $lte: now } },
           ],
         },
+        { entitlementVersion: 2, quotaPeriodEnd: { $lte: now } },
       ],
     });
 
@@ -100,6 +102,16 @@ export async function POST(req: Request) {
     // Expiry email is sent only in same execution path as paid-plan downgrade.
 
     const updatePromises = users.map(async (user) => {
+      if (user.entitlementVersion === 2) {
+        const result = syncV2Entitlement(user, now);
+        if (!result.changed) return user;
+        const savedUser = await user.save();
+        if (result.expired) {
+          await sendBillingExpiredEmail({ name: savedUser.name, email: savedUser.email });
+        }
+        return savedUser;
+      }
+
       // Snapshot booleans from DB state BEFORE any mutations
       const hasActiveExpiration =
         user.expirationDate != null &&

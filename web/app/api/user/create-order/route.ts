@@ -44,6 +44,10 @@ export async function POST(request: Request) {
   try {
     await connectToDatabase();
 
+    if (process.env.BILLING_V2_ENABLED !== "true") {
+      return NextResponse.json({ success: false, message: "new billing plans are temporarily unavailable" }, { status: 503 });
+    }
+
     const token = await getAuthTokenFromCookies();
     if (!token) {
       return unauthorizedResponse();
@@ -60,7 +64,7 @@ export async function POST(request: Request) {
       return unauthorizedResponse();
     }
 
-    const body = (await request.json()) as { planType?: string };
+    const body = (await request.json()) as { planType?: string; billingInterval?: string };
     if (!isPaidPlanType(body.planType)) {
       return NextResponse.json(
         { success: false, message: "invalid plan type" },
@@ -68,7 +72,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const planConfig = getPaidPlanRuntime(body.planType);
+    const billingInterval = body.billingInterval === "year" ? "year" : body.billingInterval === "month" ? "month" : null;
+    if (!billingInterval) {
+      return NextResponse.json({ success: false, message: "billingInterval must be month or year" }, { status: 400 });
+    }
+
+    // Existing users are never rewritten. V2 users cannot double-purchase.
+    if (user.plan !== "free" && user.expirationDate && user.expirationDate.getTime() > Date.now()) {
+      return NextResponse.json({ success: false, message: "active plan cannot be changed before expiry" }, { status: 409 });
+    }
+
+    const planConfig = getPaidPlanRuntime(body.planType, billingInterval);
     if (!planConfig) {
       return NextResponse.json(
         { success: false, message: "plan config not found" },
@@ -83,6 +97,10 @@ export async function POST(request: Request) {
       cfOrderId: null,
       paymentSessionId: null,
       planType: body.planType,
+      entitlementVersion: 2,
+      billingInterval,
+      termMonths: planConfig.termMonths,
+      monthlyLimit: planConfig.limit,
       amount: planConfig.amount,
       currency: "INR",
       status: "created",
@@ -105,9 +123,10 @@ export async function POST(request: Request) {
         return_url: getAppReturnUrl(),
         notify_url: getWebhookUrl(),
       },
-      order_note: `${body.planType} plan for railkit`,
+      order_note: `${body.planType} ${billingInterval} plan for railkit`,
       order_tags: {
         plan_type: body.planType,
+        billing_interval: billingInterval,
       },
     };
 

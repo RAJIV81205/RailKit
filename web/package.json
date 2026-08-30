@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "cleanup-audit-logs": "npx tsx scripts/cleanupAuditLogs.ts",
-    "cleanup-audit-logs:dry-run": "npx tsx scripts/cleanupAuditLogs.ts --dry-run"
+    "cleanup-audit-logs:dry-run": "npx tsx scripts/cleanupAuditLogs.ts --dry-run",
+    "reconcile-entitlements": "npx tsx scripts/reconcileEntitlements.ts"
   },
   "dependencies": {
     "@react-pdf/renderer": "^4.5.1",

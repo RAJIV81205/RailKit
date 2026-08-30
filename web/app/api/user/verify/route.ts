@@ -137,6 +137,10 @@ export async function GET(request: Request) {
           plan: user.plan,
           billingDate: user.billingDate,
           expirationDate: user.expirationDate,
+          entitlementVersion: user.entitlementVersion ?? null,
+          billingInterval: user.billingInterval ?? null,
+          baseLimit: user.baseLimit ?? null,
+          addonLimit: user.addonLimit ?? null,
         },
         logs: {
           timelineDays,

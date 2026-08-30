@@ -58,6 +58,25 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    // Null/1 = legacy entitlement behavior. 2 = interval-aware entitlement.
+    entitlementVersion: {
+      type: Number,
+      enum: [1, 2],
+      default: null,
+      index: true,
+    },
+
+    billingInterval: {
+      type: String,
+      enum: ["month", "year"],
+      default: null,
+    },
+
+    baseLimit: { type: Number, default: null, min: 0 },
+    addonLimit: { type: Number, default: null, min: 0 },
+    quotaPeriodStart: { type: Date, default: null },
+    quotaPeriodEnd: { type: Date, default: null, index: true },
+
     // ── Trust & moderation state ────────────────────────────────────────────
     // Tracks whether the account has been flagged for review or banned.
     // `active` still controls runtime access; `status` records moderation history.

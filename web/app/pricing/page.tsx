@@ -23,7 +23,7 @@ export const metadata: Metadata = buildMetadata({
     "indian railways api cost",
     "railway api for developers pricing",
     "irctc api rate limit pricing",
-    "irctc api monthly cost",
+    "irctc api monthly and annual cost",
   ],
 });
 
@@ -42,6 +42,7 @@ export default async function PricingPage() {
   const plans = JSON.parse(JSON.stringify(config?.plans || []));
   const offerEndsAt = config?.offerEndsAt ?? null;
   const contactEmail = config?.contactEmail || "lucky81205+railkit@gmail.com";
+  const billingV2Enabled = config?.billingV2Enabled ?? false;
 
   return (
     <>
@@ -52,7 +53,8 @@ export default async function PricingPage() {
       <PricingClient
         initialPlans={plans}
         initialOfferEndsAt={offerEndsAt}
-        initialContactEmail={contactEmail}
+      initialContactEmail={contactEmail}
+      initialBillingV2Enabled={billingV2Enabled}
       />
     </>
   );

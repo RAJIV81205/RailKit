@@ -2,6 +2,7 @@ import Order, { OrderDocument } from "@/lib/db/models/Order";
 import User from "@/lib/db/models/User";
 import { getPaidPlanRuntime, type PaidPlanType } from "@/lib/constants";
 import { sendWelcomeEmail } from "../services/email";
+import { grantV2Plan } from "@/lib/billing/entitlements";
 
 type PaymentStateInput = {
   orderId: string;
@@ -85,7 +86,17 @@ export async function applyOrderPaymentState(input: PaymentStateInput) {
   }
 
   try {
-    await grantPlanToUser(creditedOrder.userId.toString(), creditedOrder.planType);
+    if (creditedOrder.entitlementVersion === 2 && creditedOrder.billingInterval) {
+      const user = await User.findById(creditedOrder.userId);
+      if (!user) throw new Error(`User not found while fulfilling order: ${creditedOrder.userId}`);
+      const entitlement = grantV2Plan(user, creditedOrder.planType, creditedOrder.billingInterval);
+      await user.save();
+      await Order.findByIdAndUpdate(creditedOrder._id, {
+        $set: { entitlementStartsAt: entitlement.startsAt, entitlementEndsAt: entitlement.endsAt },
+      });
+    } else {
+      await grantPlanToUser(creditedOrder.userId.toString(), creditedOrder.planType);
+    }
   } catch (error) {
     await Order.findByIdAndUpdate(creditedOrder._id, {
       $set: {

@@ -28,6 +28,7 @@ const limitTopupSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    expiresAt: { type: Date, default: null, index: true },
     amount: {
       type: Number,
       required: true,

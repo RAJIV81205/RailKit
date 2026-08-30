@@ -107,7 +107,7 @@ export async function applyOrderPaymentState(input: PaymentStateInput) {
   }
 
   try {
-    await sendWelcomeEmail(creditedOrder.userId.toString());
+    await sendWelcomeEmail(creditedOrder.userId.toString(), creditedOrder.orderId);
   } catch (error) {
     console.error("Welcome email failed after plan grant:", error);
   }

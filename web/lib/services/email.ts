@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import User from "../db/models/User";
+import Order from "../db/models/Order";
 import { addOneMonth, capitalize, formatDate, generateInvoicePdf } from "./invoice";
 
 const resend = new Resend(process.env.RESEND_API_KEY!);
@@ -10,6 +11,20 @@ interface IUser {
   plan: string;
   billingDate?: Date | null;
   limit: number;
+}
+
+interface IOrder {
+  orderId: string;
+  planType: string;
+  billingInterval?: "month" | "year" | null;
+  termMonths?: number | null;
+  monthlyLimit?: number | null;
+  entitlementStartsAt?: Date | null;
+  entitlementEndsAt?: Date | null;
+  transactionReference?: string | null;
+  amount: number;
+  currency?: string | null;
+  createdAt?: Date | null;
 }
 
 interface BillingExpiredEmailUser {
@@ -43,10 +58,19 @@ export type SendRawHtmlBatchEmailResult = {
 
 // ─── Email Template ──────────────────────────────────────────────────────────
 
-const welcomeTemplateHtml = (user: IUser): string => {
+const welcomeTemplateHtml = (user: IUser, order: IOrder): string => {
   const firstName = user.name.split(" ")[0];
-  const billingDate = user.billingDate ? new Date(user.billingDate) : new Date();
-  const nextBillingDate = addOneMonth(billingDate);
+  const billingDate = order.entitlementStartsAt
+    ? new Date(order.entitlementStartsAt)
+    : user.billingDate
+      ? new Date(user.billingDate)
+      : new Date();
+  const nextQuotaReset = addOneMonth(billingDate);
+  const planEndsAt = order.entitlementEndsAt
+    ? new Date(order.entitlementEndsAt)
+    : nextQuotaReset;
+  const intervalLabel = order.billingInterval === "year" ? "Annual" : "Monthly";
+  const monthlyLimit = order.monthlyLimit ?? user.limit;
 
   return `
 <!DOCTYPE html>
@@ -112,10 +136,14 @@ const welcomeTemplateHtml = (user: IUser): string => {
                 working with IRCTC data easy for developers, and it genuinely means a lot when someone finds it useful.
               </p>
               <p style="margin: 0 0 14px; font-size: 15px; line-height: 1.75; color: #3f3f46;">
-                You're on the <strong style="color: #18181b;">${capitalize(user.plan)} Plan</strong> —
-                that gives you <strong style="color: #18181b;">${user.limit.toLocaleString("en-IN")} API calls/month</strong>,
-                renewing on <strong style="color: #18181b;">${formatDate(nextBillingDate)}</strong>.
+                You're on the <strong style="color: #18181b;">${capitalize(user.plan)} ${intervalLabel} Plan</strong> —
+                that gives you <strong style="color: #18181b;">${monthlyLimit.toLocaleString("en-IN")} API calls/month</strong>.
+                Your quota refreshes on <strong style="color: #18181b;">${formatDate(nextQuotaReset)}</strong>, and your plan is valid through
+                <strong style="color: #18181b;">${formatDate(planEndsAt)}</strong>.
                 Your invoice is attached to this email.
+              </p>
+              <p style="margin: 0 0 14px; font-size: 13px; line-height: 1.7; color: #71717a;">
+                Order ${order.orderId}. Add-on requests remain available across monthly quota refreshes and expire when this plan ends.
               </p>
               <p style="margin: 0 0 28px; font-size: 15px; line-height: 1.75; color: #3f3f46;">
                 If you ever need a higher limit, a custom plan, or just run into something that's not working right —
@@ -283,15 +311,19 @@ const billingExpiredTemplateHtml = (user: BillingExpiredEmailUser): string => {
 
 // ─── Send Welcome Email (with Invoice) ───────────────────────────────────────
 
-export async function sendWelcomeEmail(userId: string) {
-  const user = await User.findById(userId);
+export async function sendWelcomeEmail(userId: string, orderId: string) {
+  const [user, order] = await Promise.all([
+    User.findById(userId),
+    Order.findOne({ orderId }),
+  ]);
   if (!user) throw new Error("User not found");
+  if (!order) throw new Error("Order not found");
 
   // Generate invoice PDF — if this fails, we still want the email to send,
   // so we catch and log, then send without attachment.
   let invoicePdf: Buffer | null = null;
   try {
-    invoicePdf = await generateInvoicePdf(user);
+    invoicePdf = await generateInvoicePdf(user, order);
   } catch (err) {
     console.error("Invoice generation failed, sending email without attachment:", err);
   }
@@ -302,8 +334,8 @@ export async function sendWelcomeEmail(userId: string) {
     from: `${senderName} <${senderEmail}>`,
     to: [user.email],
     replyTo: `${replyToName} <${replyToEmail}>`,
-    subject: `Thanks for subscribing, ${firstName}! 🚆 Invoice inside`,
-    html: welcomeTemplateHtml(user),
+    subject: `${order.billingInterval === "year" ? "Annual" : "Monthly"} RailKit plan active — invoice inside`,
+    html: welcomeTemplateHtml(user, order),
     ...(invoicePdf && {
       attachments: [
         {

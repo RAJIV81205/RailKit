@@ -19,6 +19,20 @@ export interface InvoiceUser {
   limit: number;
 }
 
+export interface InvoiceOrder {
+  orderId: string;
+  planType: string;
+  billingInterval?: "month" | "year" | null;
+  termMonths?: number | null;
+  monthlyLimit?: number | null;
+  entitlementStartsAt?: Date | null;
+  entitlementEndsAt?: Date | null;
+  transactionReference?: string | null;
+  amount: number;
+  currency?: string | null;
+  createdAt?: Date | null;
+}
+
 type InvoicePlanDetails = {
   displayName: string;
   amount: number;
@@ -27,7 +41,13 @@ type InvoicePlanDetails = {
 type InvoiceData = {
   user: InvoiceUser;
   billingDate: Date;
-  nextBillingDate: Date;
+  serviceEndsAt: Date;
+  billingInterval: "month" | "year";
+  monthlyLimit: number;
+  termMonths: number;
+  orderId: string;
+  transactionReference: string | null;
+  currency: string;
   invoiceNumber: string;
   planDetails: InvoicePlanDetails;
   amountDue: number;
@@ -38,8 +58,18 @@ let cachedLogoSrc: string | null | undefined;
 
 export function addOneMonth(date: Date): Date {
   const d = new Date(date);
-  d.setMonth(d.getMonth() + 1);
+  const day = d.getUTCDate();
+  d.setUTCDate(1);
+  d.setUTCMonth(d.getUTCMonth() + 1);
+  const lastDay = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+  d.setUTCDate(Math.min(day, lastDay));
   return d;
+}
+
+function addMonths(date: Date, months: number): Date {
+  let result = new Date(date);
+  for (let index = 0; index < months; index += 1) result = addOneMonth(result);
+  return result;
 }
 
 export function formatDate(date: Date): string {
@@ -54,17 +84,17 @@ export function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
-function formatCurrency(amount: number): string {
+function formatCurrency(amount: number, currency = "INR"): string {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: "INR",
+    currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(Math.max(0, Number(amount) || 0));
 }
 
-async function getInvoicePlanDetails(user: InvoiceUser): Promise<InvoicePlanDetails> {
-  const normalizedPlan = user.plan.toLowerCase();
+async function getInvoicePlanDetails(user: InvoiceUser, order: InvoiceOrder): Promise<InvoicePlanDetails> {
+  const normalizedPlan = order.planType.toLowerCase();
 
   try {
     const plan =
@@ -75,19 +105,19 @@ async function getInvoicePlanDetails(user: InvoiceUser): Promise<InvoicePlanDeta
     if (!plan) {
       return {
         displayName: `${capitalize(user.plan)} Plan`,
-        amount: 0,
+        amount: order.amount,
       };
     }
 
     return {
       displayName: plan.name || `${capitalize(user.plan)} Plan`,
-      amount: Math.max(0, Number(plan.price) || 0),
+      amount: Math.max(0, Number(order.amount) || 0),
     };
   } catch (error) {
     console.error("Failed to resolve plan config for invoice:", error);
     return {
       displayName: `${capitalize(user.plan)} Plan`,
-      amount: 0,
+      amount: Math.max(0, Number(order.amount) || 0),
     };
   }
 }
@@ -113,16 +143,32 @@ function getLogoSrc() {
   return cachedLogoSrc;
 }
 
-function buildInvoiceData(user: InvoiceUser): Promise<InvoiceData> {
-  return getInvoicePlanDetails(user).then((planDetails) => {
-    const billingDate = user.billingDate ? new Date(user.billingDate) : new Date();
-    const nextBillingDate = addOneMonth(billingDate);
-    const invoiceNumber = `INV-${Date.now()}`;
+function buildInvoiceData(user: InvoiceUser, order: InvoiceOrder): Promise<InvoiceData> {
+  return getInvoicePlanDetails(user, order).then((planDetails) => {
+    const billingInterval = order.billingInterval === "year" ? "year" : "month";
+    const termMonths = order.termMonths ?? (billingInterval === "year" ? 12 : 1);
+    const billingDate = order.entitlementStartsAt
+      ? new Date(order.entitlementStartsAt)
+      : order.createdAt
+        ? new Date(order.createdAt)
+        : user.billingDate
+          ? new Date(user.billingDate)
+          : new Date();
+    const serviceEndsAt = order.entitlementEndsAt
+      ? new Date(order.entitlementEndsAt)
+      : addMonths(billingDate, termMonths);
+    const invoiceNumber = `INV-${order.orderId}`;
 
     return {
       user,
       billingDate,
-      nextBillingDate,
+      serviceEndsAt,
+      billingInterval,
+      monthlyLimit: order.monthlyLimit ?? user.limit,
+      termMonths,
+      orderId: order.orderId,
+      transactionReference: order.transactionReference ?? null,
+      currency: order.currency || "INR",
       invoiceNumber,
       planDetails,
       amountDue: 0,
@@ -295,9 +341,8 @@ const styles = StyleSheet.create({
 });
 
 function InvoiceDocument({ data }: { data: InvoiceData }) {
-  const itemDescription = `${data.user.limit.toLocaleString("en-IN")} API calls/month · Valid till ${formatDate(
-    data.nextBillingDate,
-  )}`;
+  const intervalLabel = data.billingInterval === "year" ? "Annual" : "Monthly";
+  const itemDescription = `${intervalLabel} prepaid plan · ${data.monthlyLimit.toLocaleString("en-IN")} API calls/month · ${data.termMonths} month${data.termMonths === 1 ? "" : "s"} · Valid through ${formatDate(data.serviceEndsAt)}`;
 
   return (
     <Document
@@ -345,12 +390,12 @@ function InvoiceDocument({ data }: { data: InvoiceData }) {
               <Text style={styles.metaValue}>Paid</Text>
             </View>
             <View style={styles.metaRow}>
-              <Text style={styles.metaLabel}>Due Date:</Text>
-              <Text style={styles.metaValue}>{formatDate(data.nextBillingDate)}</Text>
+              <Text style={styles.metaLabel}>Service Ends:</Text>
+              <Text style={styles.metaValue}>{formatDate(data.serviceEndsAt)}</Text>
             </View>
             <View style={styles.dueBox}>
               <Text style={styles.dueLabel}>Amount Due:</Text>
-              <Text style={styles.dueValue}>{formatCurrency(data.amountDue)}</Text>
+              <Text style={styles.dueValue}>{formatCurrency(data.amountDue, data.currency)}</Text>
             </View>
           </View>
         </View>
@@ -368,27 +413,26 @@ function InvoiceDocument({ data }: { data: InvoiceData }) {
               <Text style={styles.itemDescription}>{itemDescription}</Text>
             </View>
             <Text style={styles.qtyCell}>1</Text>
-            <Text style={styles.rateCell}>{formatCurrency(data.planDetails.amount)}</Text>
-            <Text style={styles.amountCell}>{formatCurrency(data.planDetails.amount)}</Text>
+            <Text style={styles.rateCell}>{formatCurrency(data.planDetails.amount, data.currency)}</Text>
+            <Text style={styles.amountCell}>{formatCurrency(data.planDetails.amount, data.currency)}</Text>
           </View>
         </View>
 
         <View style={styles.totals}>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total:</Text>
-            <Text>{formatCurrency(data.planDetails.amount)}</Text>
+            <Text>{formatCurrency(data.planDetails.amount, data.currency)}</Text>
           </View>
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Amount Paid:</Text>
-            <Text>{formatCurrency(data.planDetails.amount)}</Text>
+            <Text>{formatCurrency(data.planDetails.amount, data.currency)}</Text>
           </View>
         </View>
 
         <View style={styles.notes}>
           <Text style={styles.sectionLabel}>Notes:</Text>
           <Text style={styles.noteParagraph}>
-            Thank you for subscribing to RailKit! If you need a higher limit or have any
-            questions, reply to this email or reach me on Signal.
+            Order: {data.orderId}{data.transactionReference ? ` · Payment reference: ${data.transactionReference}` : ""}. Included quota refreshes monthly. Purchased add-ons remain available until this plan ends.
           </Text>
 
           <Text style={styles.sectionLabel}>Terms:</Text>
@@ -399,7 +443,7 @@ function InvoiceDocument({ data }: { data: InvoiceData }) {
   );
 }
 
-export async function generateInvoicePdf(user: InvoiceUser): Promise<Buffer> {
-  const data = await buildInvoiceData(user);
+export async function generateInvoicePdf(user: InvoiceUser, order: InvoiceOrder): Promise<Buffer> {
+  const data = await buildInvoiceData(user, order);
   return renderToBuffer(<InvoiceDocument data={data} />);
 }

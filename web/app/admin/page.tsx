@@ -655,6 +655,7 @@ function OrderModal({ order, onClose }: { order: Order; onClose: () => void }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        padding: 16,
         zIndex: 100,
         backdropFilter: "blur(4px)",
       }}
@@ -836,6 +837,19 @@ function EditUserModal({
   const [statusReason, setStatusReason] = useState("");
   const [statusNote, setStatusNote] = useState("");
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
   return (
     <div
       onClick={onClose}
@@ -855,22 +869,31 @@ function EditUserModal({
         style={{
           background: "#0f1117",
           border: "1px solid #1e2330",
-          borderRadius: 12,
-          padding: 28,
-          width: "100%",
-          maxWidth: 440,
+          borderRadius: 16,
+          width: "min(980px, 100%)",
+          maxHeight: "calc(100vh - 32px)",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.45)",
         }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-user-title"
       >
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: 24,
+            padding: "22px 28px",
+            borderBottom: "1px solid #1e2330",
+            flexShrink: 0,
           }}
         >
           <div>
             <p
+              id="edit-user-title"
               style={{
                 color: "#e2e8f0",
                 fontWeight: 700,
@@ -894,19 +917,58 @@ function EditUserModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close edit user dialog"
             style={{
               color: "#64748b",
               background: "none",
               border: "none",
               cursor: "pointer",
-              padding: 4,
+              width: 44,
+              height: 44,
+              borderRadius: 8,
+              display: "grid",
+              placeItems: "center",
             }}
           >
             <IconX />
           </button>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(min(100%, 360px), 1fr))",
+            gap: 16,
+            padding: "24px 28px",
+            overflowY: "auto",
+            alignItems: "start",
+          }}
+        >
+          <section
+            style={{
+              border: "1px solid #1e2330",
+              borderRadius: 10,
+              padding: 16,
+              background: "#0a0d13",
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            <span
+              style={{
+                color: "#94a3b8",
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              Account & quota
+            </span>
           {/* Plan */}
           <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <span
@@ -1042,13 +1104,16 @@ function EditUserModal({
             </span>
           </label>
 
+          </section>
+
           {/* Moderation status */}
-          <div
+          <section
             style={{
               border: "1px solid #1e2330",
-              borderRadius: 8,
-              padding: 12,
+              borderRadius: 10,
+              padding: 16,
               background: "#0a0d13",
+              minWidth: 0,
               display: "flex",
               flexDirection: "column",
               gap: 10,
@@ -1202,15 +1267,16 @@ function EditUserModal({
                 fontFamily: "'JetBrains Mono', monospace",
               }}
             />
-          </div>
+          </section>
 
           {/* Billing controls */}
-          <div
+          <section
             style={{
               border: "1px solid #1e2330",
-              borderRadius: 8,
-              padding: 12,
+              borderRadius: 10,
+              padding: 16,
               background: "#0a0d13",
+              minWidth: 0,
               display: "flex",
               flexDirection: "column",
               gap: 10,
@@ -1376,6 +1442,7 @@ function EditUserModal({
                   color: "#fbbf24",
                   borderRadius: 6,
                   padding: "6px 10px",
+                  minHeight: 44,
                   fontSize: 11,
                   cursor: "pointer",
                 }}
@@ -1397,6 +1464,7 @@ function EditUserModal({
                   color: "#fb7185",
                   borderRadius: 6,
                   padding: "6px 10px",
+                  minHeight: 44,
                   fontSize: 11,
                   cursor: "pointer",
                 }}
@@ -1404,8 +1472,32 @@ function EditUserModal({
                 Clear add-ons
               </button>
             </div>
-          </div>
+          </section>
 
+          <section
+            style={{
+              border: "1px solid #1e2330",
+              borderRadius: 10,
+              padding: 16,
+              background: "#0a0d13",
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            <span
+              style={{
+                color: "#94a3b8",
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              Plan dates
+            </span>
           {/* Billing Date */}
           <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <span
@@ -1473,14 +1565,18 @@ function EditUserModal({
               }}
             />
           </label>
+          </section>
         </div>
 
         <div
           style={{
             display: "flex",
             gap: 10,
-            marginTop: 24,
+            padding: "18px 28px",
+            borderTop: "1px solid #1e2330",
             justifyContent: "flex-end",
+            flexShrink: 0,
+            background: "#0f1117",
           }}
         >
           <button
@@ -1492,6 +1588,7 @@ function EditUserModal({
               color: "#94a3b8",
               borderRadius: 6,
               padding: "8px 16px",
+              minHeight: 44,
               fontSize: 13,
               cursor: "pointer",
             }}
@@ -1527,6 +1624,7 @@ function EditUserModal({
               color: "#fff",
               borderRadius: 6,
               padding: "8px 20px",
+              minHeight: 44,
               fontSize: 13,
               cursor: "pointer",
               fontWeight: 600,

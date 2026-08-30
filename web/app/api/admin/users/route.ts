@@ -58,7 +58,6 @@ export async function PUT(req: Request) {
         { status: 400 },
       );
 
-
     const updates: Record<string, unknown> = {};
     const allowedFields = [
       "plan",
@@ -67,6 +66,11 @@ export async function PUT(req: Request) {
       "limit",
       "billingDate",
       "expirationDate",
+      "billingInterval",
+      "baseLimit",
+      "addonLimit",
+      "quotaPeriodStart",
+      "quotaPeriodEnd",
       "bannedUntil",
       "whitelisted",
     ] as const;
@@ -82,7 +86,10 @@ export async function PUT(req: Request) {
     let nextStatus: ModerationStatus | undefined;
     if ("status" in rawUpdates) {
       const candidate = rawUpdates.status;
-      if (typeof candidate !== "string" || !VALID_STATUSES.includes(candidate as ModerationStatus)) {
+      if (
+        typeof candidate !== "string" ||
+        !VALID_STATUSES.includes(candidate as ModerationStatus)
+      ) {
         return NextResponse.json(
           { success: false, message: "Invalid status" },
           { status: 400 },
@@ -91,12 +98,20 @@ export async function PUT(req: Request) {
       nextStatus = candidate as ModerationStatus;
     }
 
-    const reason = typeof rawUpdates.statusReason === "string" ? rawUpdates.statusReason.trim() : "";
-    const note = typeof rawUpdates.statusNote === "string" ? rawUpdates.statusNote.trim() : "";
+    const reason =
+      typeof rawUpdates.statusReason === "string"
+        ? rawUpdates.statusReason.trim()
+        : "";
+    const note =
+      typeof rawUpdates.statusNote === "string"
+        ? rawUpdates.statusNote.trim()
+        : "";
     const moderator = admin.email || admin.userId || "admin";
     const now = new Date();
 
-    const existingUser = await User.findById(_id).select("status statusReasons flaggedAt bannedAt bannedBy bannedUntil whitelisted");
+    const existingUser = await User.findById(_id).select(
+      "status statusReasons flaggedAt bannedAt bannedBy bannedUntil whitelisted",
+    );
     if (!existingUser) {
       return NextResponse.json(
         { success: false, message: "User not found" },
@@ -113,7 +128,11 @@ export async function PUT(req: Request) {
         note: note || null,
       };
 
-      const nextReasons = [...((existingUser.statusReasons as unknown as Array<typeof entry>) || []), entry];
+      const nextReasons = [
+        ...((existingUser.statusReasons as unknown as Array<typeof entry>) ||
+          []),
+        entry,
+      ];
 
       if (nextStatus === "banned") {
         updates.status = "banned";
@@ -146,7 +165,11 @@ export async function PUT(req: Request) {
         at: new Date(),
         note: note || null,
       };
-      const nextReasons = [...((existingUser.statusReasons as unknown as Array<typeof entry>) || []), entry];
+      const nextReasons = [
+        ...((existingUser.statusReasons as unknown as Array<typeof entry>) ||
+          []),
+        entry,
+      ];
       updates.statusReasons = nextReasons;
     }
 
@@ -157,6 +180,37 @@ export async function PUT(req: Request) {
       if (Number.isNaN(parsed.getTime())) return undefined;
       return parsed;
     };
+
+    if (
+      "billingInterval" in updates &&
+      updates.billingInterval !== null &&
+      updates.billingInterval !== "month" &&
+      updates.billingInterval !== "year"
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Invalid billingInterval" },
+        { status: 400 },
+      );
+    }
+
+    for (const field of [
+      "usage",
+      "limit",
+      "baseLimit",
+      "addonLimit",
+    ] as const) {
+      if (
+        field in updates &&
+        (typeof updates[field] !== "number" ||
+          !Number.isInteger(updates[field]) ||
+          updates[field] < 0)
+      ) {
+        return NextResponse.json(
+          { success: false, message: `Invalid ${field}` },
+          { status: 400 },
+        );
+      }
+    }
 
     if ("billingDate" in updates) {
       const normalized = normalizeNullableDate(updates.billingDate);
@@ -189,6 +243,18 @@ export async function PUT(req: Request) {
         );
       }
       updates.bannedUntil = normalized;
+    }
+
+    for (const field of ["quotaPeriodStart", "quotaPeriodEnd"] as const) {
+      if (field in updates) {
+        const normalized = normalizeNullableDate(updates[field]);
+        if (normalized === undefined)
+          return NextResponse.json(
+            { success: false, message: `Invalid ${field}` },
+            { status: 400 },
+          );
+        updates[field] = normalized;
+      }
     }
 
     const user = await User.findByIdAndUpdate(_id, updates, {

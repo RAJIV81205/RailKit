@@ -56,6 +56,11 @@ interface User {
   apiKey?: string;
   billingDate?: string | null;
   expirationDate?: string | null;
+  billingInterval?: "month" | "year" | null;
+  baseLimit?: number | null;
+  addonLimit?: number | null;
+  quotaPeriodStart?: string | null;
+  quotaPeriodEnd?: string | null;
   status?: "clean" | "flagged" | "banned";
   statusReasons?: Array<{
     reason: string;
@@ -1199,6 +1204,208 @@ function EditUserModal({
             />
           </div>
 
+          {/* Billing controls */}
+          <div
+            style={{
+              border: "1px solid #1e2330",
+              borderRadius: 8,
+              padding: 12,
+              background: "#0a0d13",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            <span
+              style={{
+                color: "#64748b",
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            >
+              Billing controls
+            </span>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ color: "#94a3b8", fontSize: 12 }}>Interval</span>
+              <select
+                value={draft.billingInterval || "month"}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    billingInterval: e.target.value as User["billingInterval"],
+                  })
+                }
+                style={{
+                  background: "#1a1f2e",
+                  border: "1px solid #2d3548",
+                  color: "#e2e8f0",
+                  borderRadius: 6,
+                  padding: "8px 10px",
+                  fontSize: 13,
+                }}
+              >
+                <option value="month">Monthly</option>
+                <option value="year">Annual</option>
+              </select>
+            </label>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+              }}
+            >
+              <label
+                style={{ display: "flex", flexDirection: "column", gap: 6 }}
+              >
+                <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                  Base quota
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  value={draft.baseLimit ?? draft.limit}
+                  onChange={(e) =>
+                    setDraft({ ...draft, baseLimit: Number(e.target.value) })
+                  }
+                  style={{
+                    background: "#1a1f2e",
+                    border: "1px solid #2d3548",
+                    color: "#e2e8f0",
+                    borderRadius: 6,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                  }}
+                />
+              </label>
+              <label
+                style={{ display: "flex", flexDirection: "column", gap: 6 }}
+              >
+                <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                  Add-on quota
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  value={draft.addonLimit ?? 0}
+                  onChange={(e) =>
+                    setDraft({ ...draft, addonLimit: Number(e.target.value) })
+                  }
+                  style={{
+                    background: "#1a1f2e",
+                    border: "1px solid #2d3548",
+                    color: "#e2e8f0",
+                    borderRadius: 6,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                  }}
+                />
+              </label>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12,
+              }}
+            >
+              <label
+                style={{ display: "flex", flexDirection: "column", gap: 6 }}
+              >
+                <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                  Quota period start
+                </span>
+                <input
+                  type="datetime-local"
+                  value={toDateTimeLocalValue(draft.quotaPeriodStart)}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      quotaPeriodStart: e.target.value
+                        ? new Date(e.target.value).toISOString()
+                        : null,
+                    })
+                  }
+                  style={{
+                    background: "#1a1f2e",
+                    border: "1px solid #2d3548",
+                    color: "#e2e8f0",
+                    borderRadius: 6,
+                    padding: "8px 10px",
+                    fontSize: 12,
+                  }}
+                />
+              </label>
+              <label
+                style={{ display: "flex", flexDirection: "column", gap: 6 }}
+              >
+                <span style={{ color: "#94a3b8", fontSize: 12 }}>
+                  Quota period end
+                </span>
+                <input
+                  type="datetime-local"
+                  value={toDateTimeLocalValue(draft.quotaPeriodEnd)}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      quotaPeriodEnd: e.target.value
+                        ? new Date(e.target.value).toISOString()
+                        : null,
+                    })
+                  }
+                  style={{
+                    background: "#1a1f2e",
+                    border: "1px solid #2d3548",
+                    color: "#e2e8f0",
+                    borderRadius: 6,
+                    padding: "8px 10px",
+                    fontSize: 12,
+                  }}
+                />
+              </label>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setDraft({ ...draft, usage: 0 })}
+                style={{
+                  background: "#1a1f2e",
+                  border: "1px solid #2d3548",
+                  color: "#fbbf24",
+                  borderRadius: 6,
+                  padding: "6px 10px",
+                  fontSize: 11,
+                  cursor: "pointer",
+                }}
+              >
+                Reset usage
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setDraft({
+                    ...draft,
+                    addonLimit: 0,
+                    limit: draft.baseLimit ?? draft.limit,
+                  })
+                }
+                style={{
+                  background: "#1a1f2e",
+                  border: "1px solid #2d3548",
+                  color: "#fb7185",
+                  borderRadius: 6,
+                  padding: "6px 10px",
+                  fontSize: 11,
+                  cursor: "pointer",
+                }}
+              >
+                Clear add-ons
+              </button>
+            </div>
+          </div>
+
           {/* Billing Date */}
           <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <span
@@ -1301,6 +1508,11 @@ function EditUserModal({
                 limit: draft.limit,
                 billingDate: draft.billingDate || null,
                 expirationDate: draft.expirationDate || null,
+                billingInterval: draft.billingInterval || "month",
+                baseLimit: draft.baseLimit ?? null,
+                addonLimit: draft.addonLimit ?? null,
+                quotaPeriodStart: draft.quotaPeriodStart || null,
+                quotaPeriodEnd: draft.quotaPeriodEnd || null,
                 bannedUntil: draft.bannedUntil || null,
                 status: draft.status,
                 whitelisted: !!draft.whitelisted,

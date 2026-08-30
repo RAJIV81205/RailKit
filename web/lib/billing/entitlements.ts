@@ -9,7 +9,9 @@ function addMonths(date: Date, months: number) {
   const day = result.getUTCDate();
   result.setUTCDate(1);
   result.setUTCMonth(result.getUTCMonth() + months);
-  const last = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+  const last = new Date(
+    Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0),
+  ).getUTCDate();
   result.setUTCDate(Math.min(day, last));
   return result;
 }
@@ -41,7 +43,26 @@ export function grantV2Plan(
 export function syncV2Entitlement(user: User, now = new Date()) {
   if (user.entitlementVersion !== 2) return { changed: false, expired: false };
 
-  if (!user.expirationDate || user.expirationDate.getTime() <= now.getTime()) {
+  // Free accounts have no term expiry. They still use monthly quota periods
+  // after migration, while preserving their existing plan/limit semantics.
+  if (user.plan === "free") {
+    if (!user.quotaPeriodEnd || !user.quotaPeriodStart)
+      return { changed: false, expired: false };
+    let changed = false;
+    while (user.quotaPeriodEnd.getTime() <= now.getTime()) {
+      user.usage = 0;
+      user.quotaPeriodStart = user.quotaPeriodEnd;
+      user.quotaPeriodEnd = addMonths(user.quotaPeriodEnd, 1);
+      user.billingDate = user.quotaPeriodStart;
+      user.limit = user.baseLimit ?? user.limit;
+      changed = true;
+    }
+    return { changed, expired: false };
+  }
+
+  // Some existing paid accounts have no expiry (admin/manual entitlement).
+  // Preserve that state: monthly quota still rolls over, term remains open.
+  if (user.expirationDate && user.expirationDate.getTime() <= now.getTime()) {
     user.plan = "free";
     user.limit = 50;
     user.usage = 0;
@@ -56,7 +77,8 @@ export function syncV2Entitlement(user: User, now = new Date()) {
     return { changed: true, expired: true };
   }
 
-  if (!user.quotaPeriodEnd || !user.quotaPeriodStart) return { changed: false, expired: false };
+  if (!user.quotaPeriodEnd || !user.quotaPeriodStart)
+    return { changed: false, expired: false };
 
   let changed = false;
   while (user.quotaPeriodEnd.getTime() <= now.getTime()) {
@@ -65,13 +87,20 @@ export function syncV2Entitlement(user: User, now = new Date()) {
     user.usage = 0;
     user.quotaPeriodStart = user.quotaPeriodEnd;
     user.quotaPeriodEnd = addMonths(user.quotaPeriodEnd, 1);
-    if (user.quotaPeriodEnd.getTime() > user.expirationDate.getTime()) {
+    if (
+      user.expirationDate &&
+      user.quotaPeriodEnd.getTime() > user.expirationDate.getTime()
+    ) {
       user.quotaPeriodEnd = user.expirationDate;
     }
     user.billingDate = user.quotaPeriodStart;
     user.limit = (user.baseLimit ?? user.limit) + (user.addonLimit ?? 0);
     changed = true;
-    if (user.quotaPeriodEnd.getTime() >= user.expirationDate.getTime()) break;
+    if (
+      user.expirationDate &&
+      user.quotaPeriodEnd.getTime() >= user.expirationDate.getTime()
+    )
+      break;
   }
 
   return { changed, expired: false };

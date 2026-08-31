@@ -15,10 +15,12 @@ type AccessPayload = {
   exp: number;
 };
 
-function key() {
-  const secret = process.env.MCP_OAUTH_SECRET || process.env.JWT_SECRET;
-  if (!secret) throw new Error("MCP_OAUTH_SECRET or JWT_SECRET is not set");
-  return createHash("sha256").update(secret).digest();
+function keys() {
+  const secrets = [process.env.MCP_OAUTH_SECRET, process.env.JWT_SECRET].filter(
+    (secret): secret is string => Boolean(secret),
+  );
+  if (!secrets.length) throw new Error("MCP_OAUTH_SECRET or JWT_SECRET is not set");
+  return [...new Set(secrets)].map((secret) => createHash("sha256").update(secret).digest());
 }
 
 const encode = (value: Buffer | string) => Buffer.from(value).toString("base64url");
@@ -26,18 +28,25 @@ const decode = (value: string) => Buffer.from(value, "base64url");
 
 function seal(payload: CodePayload | AccessPayload | { redirectUris: string[]; exp: number }) {
   const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key(), iv);
+  const cipher = createCipheriv("aes-256-gcm", keys()[0], iv);
   const encrypted = Buffer.concat([cipher.update(JSON.stringify(payload), "utf8"), cipher.final()]);
   return `mcp_${encode(iv)}.${encode(cipher.getAuthTag())}.${encode(encrypted)}`;
 }
 
 function open<T>(value: string) {
-  const parts = value.split("_")[1]?.split(".");
+  const parts = value.startsWith("mcp_") ? value.slice("mcp_".length).split(".") : null;
   if (!parts || parts.length !== 3) return null;
   try {
-    const decipher = createDecipheriv("aes-256-gcm", key(), decode(parts[0]));
-    decipher.setAuthTag(decode(parts[1]));
-    return JSON.parse(Buffer.concat([decipher.update(decode(parts[2])), decipher.final()]).toString("utf8")) as T;
+    for (const secretKey of keys()) {
+      try {
+        const decipher = createDecipheriv("aes-256-gcm", secretKey, decode(parts[0]));
+        decipher.setAuthTag(decode(parts[1]));
+        return JSON.parse(Buffer.concat([decipher.update(decode(parts[2])), decipher.final()]).toString("utf8")) as T;
+      } catch {
+        // Try next configured key for clients registered before secret rotation.
+      }
+    }
+    return null;
   } catch {
     return null;
   }

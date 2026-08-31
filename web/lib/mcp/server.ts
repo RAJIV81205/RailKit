@@ -125,6 +125,7 @@ export function createRailkitMcpServer(apiKey: string) {
     readOnlyHint: true,
     idempotentHint: true,
     openWorldHint: false,
+    destructiveHint: false,
   };
   const run = (fn: () => Promise<RailkitResult>) => callRailkit(apiKey, fn);
 

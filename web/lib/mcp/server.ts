@@ -66,6 +66,13 @@ const fareQuota = z.enum([
   "PH",
   "SS",
 ]);
+const jsonObject = z.object({}).passthrough();
+const outputSchema = {
+  success: z.boolean().optional(),
+  data: z.union([jsonObject, z.array(jsonObject)]).optional(),
+  summary: jsonObject.optional(),
+  error: z.string().optional(),
+};
 
 type RailkitResult = { success?: boolean; [key: string]: unknown };
 
@@ -86,8 +93,19 @@ function toolResult(result: RailkitResult) {
   };
 }
 
-async function callRailkit(fn: () => Promise<RailkitResult>) {
+let railkitQueue = Promise.resolve();
+
+async function callRailkit(apiKey: string, fn: () => Promise<RailkitResult>) {
+  const previous = railkitQueue;
+  let release!: () => void;
+  railkitQueue = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previous;
   try {
+    // RailKit SDK keeps API key in module-global state. Serialize calls so
+    // concurrent users cannot overwrite each other's configured key.
+    configure(apiKey);
     return toolResult(await fn());
   } catch (error) {
     const message =
@@ -96,18 +114,19 @@ async function callRailkit(fn: () => Promise<RailkitResult>) {
       isError: true,
       content: [{ type: "text" as const, text: message.slice(0, 300) }],
     };
+  } finally {
+    release();
   }
 }
 
 export function createRailkitMcpServer(apiKey: string) {
-  configure(apiKey);
-
   const server = new McpServer({ name: "railkit-mcp", version: "1.0.0" });
   const readOnly = {
     readOnlyHint: true,
     idempotentHint: true,
     openWorldHint: false,
   };
+  const run = (fn: () => Promise<RailkitResult>) => callRailkit(apiKey, fn);
 
   server.registerTool(
     "check_pnr_status",
@@ -116,9 +135,10 @@ export function createRailkitMcpServer(apiKey: string) {
       description:
         "Get current booking, passenger, journey, chart, and fare details for a 10-digit PNR.",
       inputSchema: { pnr },
+      outputSchema,
       annotations: readOnly,
     },
-    ({ pnr }) => callRailkit(() => checkPNRStatus(pnr)),
+    ({ pnr }) => run(() => checkPNRStatus(pnr)),
   );
   server.registerTool(
     "get_train_info",
@@ -127,9 +147,10 @@ export function createRailkitMcpServer(apiKey: string) {
       description:
         "Get detailed information and complete route for an exact 5-digit train number.",
       inputSchema: { trainNumber },
+      outputSchema,
       annotations: readOnly,
     },
-    ({ trainNumber }) => callRailkit(() => getTrainInfo(trainNumber)),
+    ({ trainNumber }) => run(() => getTrainInfo(trainNumber)),
   );
   server.registerTool(
     "track_train",
@@ -138,9 +159,10 @@ export function createRailkitMcpServer(apiKey: string) {
       description:
         "Get live running status, current station, delays, and station timeline. Date is DD-MM-YYYY or today.",
       inputSchema: { trainNumber, date: trackDate.optional() },
+      outputSchema,
       annotations: readOnly,
     },
-    ({ trainNumber, date }) => callRailkit(() => trackTrain(trainNumber, date)),
+    ({ trainNumber, date }) => run(() => trackTrain(trainNumber, date)),
   );
   server.registerTool(
     "get_train_history",
@@ -149,10 +171,11 @@ export function createRailkitMcpServer(apiKey: string) {
       description:
         "Get completed journey history and station-by-station delays for a train and DD-MM-YYYY journey date.",
       inputSchema: { trainNumber, journeyDate: date },
+      outputSchema,
       annotations: readOnly,
     },
     ({ trainNumber, journeyDate }) =>
-      callRailkit(() => getTrainHistory(trainNumber, journeyDate)),
+      run(() => getTrainHistory(trainNumber, journeyDate)),
   );
   server.registerTool(
     "live_at_station",
@@ -164,10 +187,11 @@ export function createRailkitMcpServer(apiKey: string) {
         stationCode,
         hours: z.union([z.literal(2), z.literal(4), z.literal(8)]).optional(),
       },
+      outputSchema,
       annotations: readOnly,
     },
     ({ stationCode, hours }) =>
-      callRailkit(() => liveAtStation(stationCode, hours)),
+      run(() => liveAtStation(stationCode, hours)),
   );
   server.registerTool(
     "search_trains",
@@ -180,10 +204,11 @@ export function createRailkitMcpServer(apiKey: string) {
         toStnCode: stationCode,
         date: date.optional(),
       },
+      outputSchema,
       annotations: readOnly,
     },
     ({ fromStnCode, toStnCode, date }) =>
-      callRailkit(() =>
+      run(() =>
         searchTrainBetweenStations(fromStnCode, toStnCode, date),
       ),
   );
@@ -201,10 +226,11 @@ export function createRailkitMcpServer(apiKey: string) {
         coach,
         quota: availabilityQuota,
       },
+      outputSchema,
       annotations: readOnly,
     },
     ({ trainNo, fromStnCode, toStnCode, date, coach, quota }) =>
-      callRailkit(() =>
+      run(() =>
         getAvailability(trainNo, fromStnCode, toStnCode, date, coach, quota),
       ),
   );
@@ -222,10 +248,11 @@ export function createRailkitMcpServer(apiKey: string) {
         travelClass,
         quota: fareQuota,
       },
+      outputSchema,
       annotations: readOnly,
     },
     ({ trainNo, fromStnCode, toStnCode, date, travelClass, quota }) =>
-      callRailkit(() =>
+      run(() =>
         fareLookup(trainNo, fromStnCode, toStnCode, date, travelClass, quota),
       ),
   );
@@ -236,9 +263,10 @@ export function createRailkitMcpServer(apiKey: string) {
       description:
         "Get fully and partially cancelled trains with affected routes and journey dates.",
       inputSchema: {},
+      outputSchema,
       annotations: readOnly,
     },
-    () => callRailkit(() => cancelList()),
+    () => run(() => cancelList()),
   );
   server.registerTool(
     "get_station_timetable",
@@ -247,10 +275,11 @@ export function createRailkitMcpServer(apiKey: string) {
       description:
         "Get scheduled trains crossing a station; optional DD-MM-YYYY date is limited by RailKit to today, yesterday, or tomorrow.",
       inputSchema: { stationCode, date: date.optional() },
+      outputSchema,
       annotations: readOnly,
     },
     ({ stationCode, date }) =>
-      callRailkit(() => trainTimetableAtStation(stationCode, date)),
+      run(() => trainTimetableAtStation(stationCode, date)),
   );
   server.registerTool(
     "get_station",
@@ -258,9 +287,10 @@ export function createRailkitMcpServer(apiKey: string) {
       title: "Get station",
       description: "Resolve a station code to station name and coordinates.",
       inputSchema: { stationCode },
+      outputSchema,
       annotations: readOnly,
     },
-    ({ stationCode }) => callRailkit(() => stationByCode(stationCode)),
+    ({ stationCode }) => run(() => stationByCode(stationCode)),
   );
   server.registerTool(
     "search_stations",
@@ -269,9 +299,10 @@ export function createRailkitMcpServer(apiKey: string) {
       description:
         "Find up to 10 stations matching a partial name of at least 2 characters.",
       inputSchema: { name: searchName },
+      outputSchema,
       annotations: readOnly,
     },
-    ({ name }) => callRailkit(() => stationsByName(name)),
+    ({ name }) => run(() => stationsByName(name)),
   );
   server.registerTool(
     "get_train",
@@ -280,9 +311,10 @@ export function createRailkitMcpServer(apiKey: string) {
       description:
         "Resolve an exact 5-digit train number to its stored train name.",
       inputSchema: { trainNumber },
+      outputSchema,
       annotations: readOnly,
     },
-    ({ trainNumber }) => callRailkit(() => trainByNumber(trainNumber)),
+    ({ trainNumber }) => run(() => trainByNumber(trainNumber)),
   );
   server.registerTool(
     "search_trains_by_name",
@@ -291,9 +323,10 @@ export function createRailkitMcpServer(apiKey: string) {
       description:
         "Find up to 10 trains matching a partial train name of at least 2 characters.",
       inputSchema: { name: searchName },
+      outputSchema,
       annotations: readOnly,
     },
-    ({ name }) => callRailkit(() => trainsByName(name)),
+    ({ name }) => run(() => trainsByName(name)),
   );
 
   return server;

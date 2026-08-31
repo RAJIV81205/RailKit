@@ -6,7 +6,12 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function unauthorized() {
-  return Response.json({ error: "Unauthorized" }, { status: 401 });
+  return Response.json({ error: "Unauthorized" }, {
+    status: 401,
+    headers: {
+      "WWW-Authenticate": 'Bearer resource_metadata="https://railkit.in/.well-known/oauth-protected-resource"',
+    },
+  });
 }
 
 async function handler(request: Request) {
@@ -28,7 +33,10 @@ async function handler(request: Request) {
       enableJsonResponse: true,
     });
     await server.connect(transport);
-    return await transport.handleRequest(request);
+    const response = await transport.handleRequest(request);
+    const headers = new Headers(response.headers);
+    headers.set("Cache-Control", "no-store");
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   } catch (error) {
     console.error(
       "MCP request failed:",

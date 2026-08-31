@@ -170,15 +170,16 @@ export default function PricingClient({
 
 function PricingPageSkeleton() {
   return (
-    <div className="min-h-screen bg-white px-6 pt-40 pb-20">
+    <div className="min-h-screen bg-white px-6 pt-36 pb-20" aria-busy="true" aria-label="Loading pricing">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-4 h-4 w-40 animate-pulse rounded-full bg-gray-100 mx-auto" />
-        <div className="mb-6 h-16 max-w-2xl animate-pulse rounded-xl bg-gray-100 mx-auto" />
-        <div className="mb-16 h-5 max-w-lg animate-pulse rounded-lg bg-gray-100 mx-auto" />
+        <div className="mx-auto mb-6 h-3 w-36 animate-pricing-shimmer rounded-full bg-[linear-gradient(90deg,#f2f2f2_25%,#fafafa_50%,#f2f2f2_75%)] [background-size:200%_100%]" />
+        <div className="mx-auto mb-6 h-20 max-w-3xl animate-pricing-shimmer rounded-2xl bg-[linear-gradient(90deg,#f2f2f2_25%,#fafafa_50%,#f2f2f2_75%)] [background-size:200%_100%]" />
+        <div className="mx-auto mb-10 h-5 max-w-lg animate-pricing-shimmer rounded-lg bg-[linear-gradient(90deg,#f2f2f2_25%,#fafafa_50%,#f2f2f2_75%)] [background-size:200%_100%]" />
+        <div className="mx-auto mb-8 h-11 w-52 animate-pricing-shimmer rounded-full bg-[linear-gradient(90deg,#f2f2f2_25%,#fafafa_50%,#f2f2f2_75%)] [background-size:200%_100%]" />
         <div className="grid gap-5 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-140 animate-pulse rounded-3xl bg-gray-50 border border-gray-100"
-              style={{ animationDelay: `${i * 80}ms` }} />
+            <div key={i} className="h-[560px] animate-pricing-shimmer rounded-[28px] border border-gray-100 bg-[linear-gradient(90deg,#fafafa_25%,#ffffff_50%,#fafafa_75%)] [background-size:200%_100%]"
+              style={{ animationDelay: `${i * 90}ms` }} />
           ))}
         </div>
       </div>
@@ -367,8 +368,10 @@ function RestartPlanCautionModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    setSecondsLeft(3);
-    setProgress(0);
+    const resetTimer = window.setTimeout(() => {
+      setSecondsLeft(3);
+      setProgress(0);
+    }, 0);
     const startedAt = Date.now();
     const timer = setInterval(() => {
       const elapsedMs = Date.now() - startedAt;
@@ -382,7 +385,10 @@ function RestartPlanCautionModal({
       }
     }, 16);
 
-    return () => clearInterval(timer);
+    return () => {
+      window.clearTimeout(resetTimer);
+      clearInterval(timer);
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -608,36 +614,6 @@ function PricingPageContent({
 
   return (
     <div className="min-h-screen bg-white text-black" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
-
-        /* Animations */
-        @keyframes pr-rise { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
-        .pr-a1 { animation: pr-rise 0.7s ease both; }
-        .pr-a2 { animation: pr-rise 0.7s ease 0.1s both; }
-        .pr-a3 { animation: pr-rise 0.7s ease 0.2s both; }
-        .pr-a4 { animation: pr-rise 0.7s ease 0.3s both; }
-        .pr-a5 { animation: pr-rise 0.7s ease 0.4s both; }
-        .pr-a6 { animation: pr-rise 0.7s ease 0.5s both; }
-        @media (prefers-reduced-motion: reduce) {
-          .pr-a1,.pr-a2,.pr-a3,.pr-a4,.pr-a5,.pr-a6 { animation: none; }
-        }
-
-        /* Card hover */
-        .pr-card { transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease; }
-        .pr-card:hover { transform: translateY(-4px); box-shadow: 0 20px 56px rgba(0,0,0,0.08); }
-        .pr-card-popular:hover { border-color: rgba(0,0,0,0.2); }
-
-        /* Pack card hover */
-        .pr-pack { transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
-        .pr-pack:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.06); border-color: rgba(0,0,0,0.12); }
-
-        /* Button */
-        .pr-btn { transition: transform 0.18s ease, background 0.18s ease, opacity 0.18s ease; }
-        .pr-btn:hover:not(:disabled) { transform: scale(1.02); }
-        .pr-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-      `}</style>
-
       <main className="px-6 pt-36 pb-24 lg:px-8">
         <div className="mx-auto max-w-7xl">
 
@@ -681,18 +657,16 @@ function PricingPageContent({
           {/* ── Notices ── */}
           <NoticeBar notice={notice} onDismiss={dismissNotice} />
 
-          {authState.status === "loading" && (
-            <div className="mb-10 flex max-w-xs mx-auto items-center gap-2 rounded-2xl border border-black/6 bg-white px-4 py-3 text-sm text-[#6F6F6F]">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Checking login status…
-            </div>
-          )}
-
-          <div className="mb-8 flex justify-center" role="group" aria-label="Billing interval">
-            <div className="inline-flex rounded-full border border-black/10 bg-[#f7f7f7] p-1">
+          <div className="pr-a4 mb-8 flex justify-center" role="group" aria-label="Billing interval">
+            <div className="relative inline-flex w-[210px] rounded-full border border-black/10 bg-[#f7f7f7] p-1">
+              <span
+                aria-hidden="true"
+                className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-black shadow-sm transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${billingInterval === "year" ? "translate-x-full" : "translate-x-0"}`}
+              />
               {(["month", "year"] as const).map((interval) => (
                 <button key={interval} type="button" onClick={() => setBillingInterval(interval)}
-                  className={`rounded-full px-5 py-2 text-sm ${billingInterval === interval ? "bg-black text-white" : "text-[#6F6F6F]"}`}>
+                  aria-pressed={billingInterval === interval}
+                  className={`relative z-10 w-1/2 rounded-full px-3 py-2 text-sm transition-colors duration-300 motion-reduce:transition-none ${billingInterval === interval ? "text-white" : "text-[#6F6F6F] hover:text-black"}`}>
                   {interval === "month" ? "Monthly" : "Annual"}
                 </button>
               ))}
@@ -711,11 +685,12 @@ function PricingPageContent({
 
                 return (
                   <article key={plan.id} aria-label={`${plan.name} plan`}
-                    className={`pr-card relative flex flex-col rounded-[28px] border p-7 ${
+                    className={`pr-card pr-plan-card relative flex flex-col rounded-[28px] border p-7 ${
                       isPopular
                         ? "pr-card-popular border-black/12 bg-[#0a0a0a] text-white shadow-[0_12px_48px_rgba(0,0,0,0.18)]"
                         : "border-black/6 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.04)]"
-                    }`}>
+                    }`}
+                    style={{ animationDelay: `${460 + initialPlans.indexOf(plan) * 100}ms` }}>
 
                     {/* Popular badge */}
                     {isPopular && (
@@ -867,7 +842,7 @@ function PricingPageContent({
 
           {/* ── Enterprise ── */}
           <section aria-label="Enterprise pricing"
-            className="mt-12 overflow-hidden rounded-[28px] p-8 sm:p-10"
+            className="pr-a6 mt-12 overflow-hidden rounded-[28px] p-8 sm:p-10"
             style={{ background: "#0a0a0a", position: "relative" }}>
             {/* Atmospheric glow */}
             <div aria-hidden style={{ position: "absolute", top: -80, right: -80, width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,255,255,0.04), transparent 70%)", pointerEvents: "none" }} />
@@ -907,7 +882,7 @@ function PricingPageContent({
           </section>
 
           {/* ── Footer note ── */}
-          <p className="mt-10 text-center text-xs leading-6 text-[#9ca3af]">
+          <p className="pr-a6 mt-10 text-center text-xs leading-6 text-[#9ca3af] [animation-delay:700ms]">
             By purchasing a premium plan, you are directly supporting this open-source project. Thank you.
           </p>
 

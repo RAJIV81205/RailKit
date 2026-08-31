@@ -10,7 +10,8 @@ function html(body: string, status = 200) {
   return new Response(body, { status, headers: {
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "no-store",
-    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+    // Redirect URI is validated as HTTPS (or loopback HTTP) before use below.
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' https: http://localhost http://127.0.0.1; base-uri 'none'; frame-ancestors 'none'",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
   } });
@@ -45,5 +46,11 @@ export async function POST(request: Request) {
   const target = new URL(redirectUri);
   target.searchParams.set("code", code);
   if (state) target.searchParams.set("state", state);
-  return Response.redirect(target, 302);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: target.toString(),
+      "Cache-Control": "no-store",
+    },
+  });
 }

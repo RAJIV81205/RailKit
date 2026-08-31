@@ -38,6 +38,8 @@ export async function GET(request: Request) {
       redirectUri: state.redirectUri,
       codeChallenge: state.codeChallenge,
       railkitApiKey: result.user.apiKey,
+      email: result.user.email,
+      name: result.user.name,
     });
     const target = new URL(state.redirectUri);
     target.searchParams.set("code", mcpCode);

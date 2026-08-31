@@ -6,12 +6,16 @@ type CodePayload = {
   redirectUri: string;
   codeChallenge: string;
   railkitApiKey: string;
+  email: string;
+  name: string;
   exp: number;
 };
 
 type AccessPayload = {
   type: "access";
   railkitApiKey: string;
+  email: string;
+  name: string;
   exp: number;
 };
 
@@ -101,14 +105,21 @@ export function exchangeAuthorizationCode(code: string, clientId: string, redire
   if (payload.clientId !== clientId || payload.redirectUri !== redirectUri) return null;
   const expected = createHash("sha256").update(verifier).digest("base64url");
   if (expected.length !== payload.codeChallenge.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(payload.codeChallenge))) return null;
-  return payload.railkitApiKey;
+  return { railkitApiKey: payload.railkitApiKey, email: payload.email, name: payload.name };
 }
 
-export function createAccessToken(railkitApiKey: string) {
-  return seal({ type: "access", railkitApiKey, exp: Date.now() + 30 * 24 * 60 * 60 * 1000 });
+export function createAccessToken(payload: Omit<AccessPayload, "type" | "exp">) {
+  return seal({ type: "access", ...payload, exp: Date.now() + 30 * 24 * 60 * 60 * 1000 });
 }
 
 export function getRailkitKeyFromAccessToken(token: string) {
   const payload = open<AccessPayload>(token);
   return payload && payload.type === "access" && payload.exp > Date.now() ? payload.railkitApiKey : null;
+}
+
+export function getUserFromAccessToken(token: string) {
+  const payload = open<AccessPayload>(token);
+  return payload && payload.type === "access" && payload.exp > Date.now()
+    ? { email: payload.email, name: payload.name }
+    : null;
 }

@@ -9,9 +9,10 @@ export function GET() {
     userinfo_endpoint: "https://railkit.in/userinfo",
     response_types_supported: ["code"],
     grant_types_supported: ["authorization_code"],
+    subject_types_supported: ["public"],
     code_challenge_methods_supported: ["S256"],
     token_endpoint_auth_methods_supported: ["none"],
     scopes_supported: ["openid", "email", "profile", "railkit:read"],
-    subject_types_supported: ["public"],
+    claims_supported: ["sub", "email", "email_verified", "name"],
   });
 }

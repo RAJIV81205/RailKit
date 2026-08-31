@@ -7,10 +7,9 @@ import {
 	Github,
 	Mail,
 	MessageCircle,
-	ShieldCheck,
 	Send,
 } from "lucide-react";
-import { buildMetadata, absoluteUrl, SITE_NAME } from "../../lib/seo";
+import { buildMetadata, absoluteUrl } from "../../lib/seo";
 
 export const metadata: Metadata = buildMetadata({
   title: "Contact",
@@ -153,18 +152,20 @@ export default function ContactPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
 			<section className="cp-hero cp-section">
+				<span aria-hidden="true" className="pointer-events-none absolute -top-48 right-[-170px] size-[560px] animate-[pricing-drift_16s_ease-in-out_infinite_alternate] rounded-full bg-[radial-gradient(circle,rgba(0,0,0,0.06),transparent_68%)] motion-reduce:animate-none" />
+				<span aria-hidden="true" className="pointer-events-none absolute -bottom-64 left-[-220px] size-[520px] animate-[pricing-drift_20s_ease-in-out_infinite_alternate_reverse] rounded-full bg-[radial-gradient(circle,rgba(0,0,0,0.05),transparent_72%)] motion-reduce:animate-none" />
 				<div className="cp-inner">
 					<p className="cp-eyebrow">Contact</p>
-					<h1 className="cp-h1">
+					<h1 className="cp-h1 animate-pricing-rise opacity-0 motion-reduce:animate-none motion-reduce:opacity-100">
 						Let&apos;s keep your railway
 						<br />
 						stack <em>moving.</em>
 					</h1>
-					<p className="cp-hero-body">
+					<p className="cp-hero-body animate-pricing-rise opacity-0 [animation-delay:120ms] motion-reduce:animate-none motion-reduce:opacity-100">
 						Choose the path that fits your need, from technical help to
 						enterprise onboarding. No long form. Just direct channels.
 					</p>
-					<div className="cp-hero-cta">
+					<div className="cp-hero-cta animate-pricing-rise opacity-0 [animation-delay:220ms] motion-reduce:animate-none motion-reduce:opacity-100">
 						<Link href="mailto:lucky81205+railkit@gmail.com" className="cp-btn-primary">
 							Email the Team
 							<ArrowRight size={15} />
@@ -186,14 +187,14 @@ export default function ContactPage() {
 
 			<section className="cp-section">
 				<div className="cp-inner">
-					<div className="cp-head">
+					<div className="cp-head animate-pricing-rise opacity-0 [animation-delay:100ms] motion-reduce:animate-none motion-reduce:opacity-100">
 						<p className="cp-eyebrow">Channels</p>
 						<h2 className="cp-h2">Three ways to reach us</h2>
 					</div>
 
 					<div className="cp-cards-grid">
-						{contactCards.map((card) => (
-							<article key={card.title} className="cp-card">
+								{contactCards.map((card, i) => (
+							<article key={card.title} className="cp-card animate-pricing-rise opacity-0 motion-reduce:animate-none motion-reduce:opacity-100" style={{ animationDelay: `${180 + i * 90}ms` }}>
 								<div className="cp-card-icon" aria-hidden>
 									<card.icon size={18} />
 								</div>
@@ -225,7 +226,7 @@ export default function ContactPage() {
 
 			<section className="cp-section cp-section-tinted">
 				<div className="cp-inner">
-					<div className="cp-head">
+					<div className="cp-head animate-pricing-rise opacity-0 [animation-delay:100ms] motion-reduce:animate-none motion-reduce:opacity-100">
 						<p className="cp-eyebrow">Community</p>
 						<h2 className="cp-h2">Build with the public ecosystem</h2>
 					</div>
@@ -235,7 +236,8 @@ export default function ContactPage() {
 							<Link
 								key={item.label}
 								href={item.href}
-								className="cp-community-item"
+								className="cp-community-item group animate-pricing-rise opacity-0 transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:animate-none motion-reduce:opacity-100"
+								style={{ animationDelay: `${180 + communityLinks.indexOf(item) * 75}ms` }}
 								target={item.href.startsWith("http") ? "_blank" : undefined}
 								rel={item.href.startsWith("http") ? "noopener noreferrer" : undefined}
 							>
@@ -246,7 +248,7 @@ export default function ContactPage() {
 									<span className="cp-community-label">{item.label}</span>
 									<span className="cp-community-sub">{item.sub}</span>
 								</span>
-								<ArrowRight size={14} className="cp-community-arrow" aria-hidden />
+								<ArrowRight size={14} className="cp-community-arrow transition-transform duration-200 group-hover:translate-x-1 group-hover:text-black motion-reduce:transition-none" aria-hidden />
 							</Link>
 						))}
 					</div>
@@ -256,7 +258,7 @@ export default function ContactPage() {
 			<section className="cp-section">
 				<div className="cp-inner">
 					<div className="cp-reliability">
-						<div className="cp-reliability-copy">
+						<div className="cp-reliability-copy animate-pricing-rise opacity-0 [animation-delay:100ms] motion-reduce:animate-none motion-reduce:opacity-100">
 							<p className="cp-eyebrow">Status & Reliability</p>
 							<h2 className="cp-h2">Built for stable production traffic</h2>
 							<p className="cp-body">
@@ -273,20 +275,20 @@ export default function ContactPage() {
 							</a>
 						</div>
 
-						<div className="cp-metrics-card">
-							<div className="cp-metric-row">
+						<div className="cp-metrics-card animate-pricing-rise opacity-0 [animation-delay:220ms] motion-reduce:animate-none motion-reduce:opacity-100">
+							<div className="cp-metric-row animate-pricing-rise [animation-delay:360ms] motion-reduce:animate-none">
 								<span className="cp-metric-label">Observed Uptime</span>
 								<span className="cp-metric-value">99.9%</span>
 							</div>
-							<div className="cp-metric-row">
+							<div className="cp-metric-row animate-pricing-rise [animation-delay:430ms] motion-reduce:animate-none">
 								<span className="cp-metric-label">Monitoring</span>
 								<span className="cp-metric-value">24x7</span>
 							</div>
-							<div className="cp-metric-row">
+							<div className="cp-metric-row animate-pricing-rise [animation-delay:500ms] motion-reduce:animate-none">
 								<span className="cp-metric-label">SDK Version</span>
 								<span className="cp-metric-value">v3.0.4</span>
 							</div>
-							<div className="cp-metric-row">
+							<div className="cp-metric-row animate-pricing-rise [animation-delay:570ms] motion-reduce:animate-none">
 								<span className="cp-metric-label">Incident Updates</span>
 								<span className="cp-metric-value">Email First</span>
 							</div>
@@ -297,14 +299,14 @@ export default function ContactPage() {
 
 			<section className="cp-section cp-section-faq">
 				<div className="cp-inner">
-					<div className="cp-head">
+					<div className="cp-head animate-pricing-rise opacity-0 [animation-delay:100ms] motion-reduce:animate-none motion-reduce:opacity-100">
 						<p className="cp-eyebrow">FAQ</p>
 						<h2 className="cp-h2">Quick answers before you reach out</h2>
 					</div>
 
 					<div className="cp-faq-list">
 						{faqs.map((item) => (
-							<details key={item.q} className="cp-faq-item">
+							<details key={item.q} className="cp-faq-item animate-pricing-rise opacity-0 transition-[border-color,box-shadow] duration-200 open:border-[#d1d5db] open:shadow-[0_10px_26px_rgba(0,0,0,0.04)] motion-reduce:animate-none motion-reduce:opacity-100" style={{ animationDelay: `${180 + faqs.indexOf(item) * 70}ms` }}>
 								<summary>{item.q}</summary>
 								<p>{item.a}</p>
 							</details>
@@ -313,7 +315,7 @@ export default function ContactPage() {
 				</div>
 			</section>
 
-			<footer className="cp-footer">
+			<footer className="cp-footer animate-pricing-rise opacity-0 [animation-delay:700ms] motion-reduce:animate-none motion-reduce:opacity-100">
 				<div className="cp-inner cp-footer-inner">
 					<p>
 						RailKit · API for PNR status, train tracking, availability,
@@ -397,7 +399,6 @@ export default function ContactPage() {
 				.cp-head {
 					margin-bottom: 34px;
 				}
-
 				.cp-eyebrow {
 					font-family: 'Inter', system-ui, sans-serif;
 					font-size: 11px;
@@ -415,7 +416,6 @@ export default function ContactPage() {
 					letter-spacing: -0.025em;
 					font-weight: 400;
 					margin: 0;
-					animation: cp-rise 0.75s ease-out both;
 					position: relative;
 					z-index: 2;
 				}
@@ -447,7 +447,6 @@ export default function ContactPage() {
 
 				.cp-hero-body {
 					margin: 20px 0 0;
-					animation: cp-rise 0.75s ease-out 0.12s both;
 				}
 
 				.cp-hero-cta {
@@ -455,7 +454,6 @@ export default function ContactPage() {
 					display: flex;
 					gap: 10px;
 					flex-wrap: wrap;
-					animation: cp-rise 0.75s ease-out 0.2s both;
 				}
 
 				.cp-btn-primary,
@@ -790,16 +788,6 @@ export default function ContactPage() {
 					color: #000;
 				}
 
-				@keyframes cp-rise {
-					from {
-						opacity: 0;
-						transform: translateY(10px);
-					}
-					to {
-						opacity: 1;
-						transform: translateY(0);
-					}
-				}
 
 				@media (max-width: 980px) {
 					.cp-cards-grid {

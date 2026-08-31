@@ -63,6 +63,16 @@
     100% { background-position: -200% 0; }
   }
 
+  @keyframes pricing-faq-open {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pricing-drift {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    to { transform: translate3d(-18px, 14px, 0) scale(1.05); }
+  }
+
   @keyframes header-fade {
     from { opacity: 0; }
     to { opacity: 1; }

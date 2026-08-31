@@ -11,6 +11,7 @@
     "cleanup-audit-logs:dry-run": "npx tsx scripts/cleanupAuditLogs.ts --dry-run"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@react-pdf/renderer": "^4.5.1",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/react-syntax-highlighter": "^15.5.13",

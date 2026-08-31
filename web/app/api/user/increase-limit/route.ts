@@ -9,7 +9,10 @@ import {
 import { connectToDatabase } from "@/lib/db/db";
 import { cashfree, getCashfreeCheckoutMode } from "@/lib/payments/cashfree";
 import { TOPUP_OPTIONS } from "@/lib/constants";
-import { syncV2Entitlement } from "@/lib/billing/entitlements";
+import {
+  getEffectiveExpirationDate,
+  syncV2Entitlement,
+} from "@/lib/billing/entitlements";
 
 // use a general numeric key type so calling code can pass `number` safely
 const TOPUP_REQUESTS: Map<number, number> = new Map(TOPUP_OPTIONS.map((option) => [option.requests, option.price]));
@@ -113,7 +116,8 @@ export async function POST(request: Request) {
       );
     }
 
-    if (user.entitlementVersion === 2 && (!user.expirationDate || user.expirationDate.getTime() <= Date.now())) {
+    const effectiveExpirationDate = getEffectiveExpirationDate(user);
+    if (user.entitlementVersion === 2 && (!effectiveExpirationDate || effectiveExpirationDate.getTime() <= Date.now())) {
       return NextResponse.json({ success: false, message: "active plan is required" }, { status: 403 });
     }
 
@@ -197,7 +201,15 @@ export async function PUT(request: Request) {
     const user = await getAuthenticatedUser();
     if (!user) return unauthorizedResponse();
 
-    if (user.entitlementVersion === 2 && (!user.expirationDate || user.expirationDate.getTime() <= Date.now())) {
+    if (!isPaidPlan(user.plan)) {
+      return NextResponse.json(
+        { success: false, message: "limit add-ons are only available on paid plans" },
+        { status: 403 }
+      );
+    }
+
+    const effectiveExpirationDate = getEffectiveExpirationDate(user);
+    if (user.entitlementVersion === 2 && (!effectiveExpirationDate || effectiveExpirationDate.getTime() <= Date.now())) {
       return NextResponse.json({ success: false, message: "active plan is required" }, { status: 403 });
     }
 
@@ -303,7 +315,7 @@ export async function PUT(request: Request) {
         typeof orderData.cf_order_id === "number" ? orderData.cf_order_id : null,
       paymentSessionId: orderData.payment_session_id || null,
       extraLimit,
-      expiresAt: user.expirationDate || null,
+        expiresAt: effectiveExpirationDate,
       amount,
       currency,
       status: "paid" as const,

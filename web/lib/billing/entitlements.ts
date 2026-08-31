@@ -4,6 +4,8 @@ import type { UserDocument } from "@/lib/db/models/User";
 
 type User = HydratedDocument<UserDocument>;
 
+const BILLING_CYCLE_MS = 30 * 24 * 60 * 60 * 1000;
+
 function addMonths(date: Date, months: number) {
   const result = new Date(date);
   const day = result.getUTCDate();
@@ -40,6 +42,18 @@ export function grantV2Plan(
   return { startsAt: now, endsAt: user.expirationDate };
 }
 
+/**
+ * Resolve plan expiry using explicit admin/payment expiry first, then the
+ * legacy 30-day billing window used by existing paid accounts.
+ */
+export function getEffectiveExpirationDate(user: Pick<UserDocument, "billingDate" | "expirationDate">) {
+  if (user.expirationDate) return user.expirationDate;
+  if (user.billingDate) {
+    return new Date(user.billingDate.getTime() + BILLING_CYCLE_MS);
+  }
+  return null;
+}
+
 export function syncV2Entitlement(user: User, now = new Date()) {
   if (user.entitlementVersion !== 2) return { changed: false, expired: false };
 
@@ -60,16 +74,16 @@ export function syncV2Entitlement(user: User, now = new Date()) {
     return { changed, expired: false };
   }
 
-  // Some existing paid accounts have no expiry (admin/manual entitlement).
-  // Preserve that state: monthly quota still rolls over, term remains open.
-  if (user.expirationDate && user.expirationDate.getTime() <= now.getTime()) {
+  const effectiveExpirationDate = getEffectiveExpirationDate(user);
+
+  if (effectiveExpirationDate && effectiveExpirationDate.getTime() <= now.getTime()) {
     user.plan = "free";
     user.limit = 50;
     user.usage = 0;
     user.baseLimit = null;
     user.addonLimit = null;
     user.billingDate = null;
-    user.expirationDate = null;
+      user.expirationDate = null;
     user.quotaPeriodStart = null;
     user.quotaPeriodEnd = null;
     user.entitlementVersion = null;
@@ -88,17 +102,17 @@ export function syncV2Entitlement(user: User, now = new Date()) {
     user.quotaPeriodStart = user.quotaPeriodEnd;
     user.quotaPeriodEnd = addMonths(user.quotaPeriodEnd, 1);
     if (
-      user.expirationDate &&
-      user.quotaPeriodEnd.getTime() > user.expirationDate.getTime()
+      effectiveExpirationDate &&
+      user.quotaPeriodEnd.getTime() > effectiveExpirationDate.getTime()
     ) {
-      user.quotaPeriodEnd = user.expirationDate;
+      user.quotaPeriodEnd = effectiveExpirationDate;
     }
     user.billingDate = user.quotaPeriodStart;
     user.limit = (user.baseLimit ?? user.limit) + (user.addonLimit ?? 0);
     changed = true;
     if (
-      user.expirationDate &&
-      user.quotaPeriodEnd.getTime() >= user.expirationDate.getTime()
+      effectiveExpirationDate &&
+      user.quotaPeriodEnd.getTime() >= effectiveExpirationDate.getTime()
     )
       break;
   }

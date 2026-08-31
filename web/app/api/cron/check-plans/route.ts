@@ -132,16 +132,20 @@ export async function POST(req: Request) {
         user.expirationDate = null;
       }
 
-      // Step 2: Apply 30-day billing rules only when no active expiry override
-      if (!hasActiveExpiration && hasExpiredBilling) {
+      // Step 2: Expired paid plans downgrade immediately. Legacy billing-only
+      // plans still use the 30-day billing window.
+      if (!hasActiveExpiration) {
         if (user.plan === "pro" || user.plan === "enterprise") {
+          if (!hasExpiredExpiration && !hasExpiredBilling) {
+            return user;
+          }
           user.plan = "free";
           user.limit = 50;
           user.usage = 0;
           shouldSendBillingExpiredEmail = true;
           user.billingDate = null;
           user.expirationDate = null; // defensive clear
-        } else if (user.plan === "free") {
+        } else if (user.plan === "free" && hasExpiredBilling) {
           user.limit = 50;
           user.usage = 0;
           user.billingDate = null;

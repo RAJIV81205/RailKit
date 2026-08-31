@@ -72,12 +72,13 @@ function fallbackNameFromEmail(email: string) {
 
 export async function authenticateWithGoogleCode(
   code: string,
-  req: Request
+  req: Request,
+  redirectUriOverride?: string,
 ): Promise<GoogleAuthResult> {
   await connectToDatabase();
 
   const googleClient = getGoogleClient();
-  const redirectUri = getGoogleRedirectUri(req);
+  const redirectUri = redirectUriOverride || getGoogleRedirectUri(req);
 
   const { tokens } = await googleClient.getToken({
     code,

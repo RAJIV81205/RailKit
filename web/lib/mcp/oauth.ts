@@ -15,6 +15,16 @@ type AccessPayload = {
   exp: number;
 };
 
+type GoogleStatePayload = {
+  type: "google_state";
+  nonce: string;
+  clientId: string;
+  redirectUri: string;
+  codeChallenge: string;
+  oauthState: string;
+  exp: number;
+};
+
 function keys() {
   const secrets = [process.env.MCP_OAUTH_SECRET, process.env.JWT_SECRET].filter(
     (secret): secret is string => Boolean(secret),
@@ -26,7 +36,7 @@ function keys() {
 const encode = (value: Buffer | string) => Buffer.from(value).toString("base64url");
 const decode = (value: string) => Buffer.from(value, "base64url");
 
-function seal(payload: CodePayload | AccessPayload | { redirectUris: string[]; exp: number }) {
+function seal(payload: CodePayload | AccessPayload | GoogleStatePayload | { redirectUris: string[]; exp: number }) {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", keys()[0], iv);
   const encrypted = Buffer.concat([cipher.update(JSON.stringify(payload), "utf8"), cipher.final()]);
@@ -74,6 +84,15 @@ export function getClient(clientId: string) {
 
 export function createAuthorizationCode(payload: Omit<CodePayload, "type" | "exp">) {
   return seal({ ...payload, type: "code", exp: Date.now() + 5 * 60 * 1000 });
+}
+
+export function createGoogleState(payload: Omit<GoogleStatePayload, "type" | "exp">) {
+  return seal({ ...payload, type: "google_state", exp: Date.now() + 10 * 60 * 1000 });
+}
+
+export function getGoogleState(value: string) {
+  const payload = open<GoogleStatePayload>(value);
+  return payload && payload.type === "google_state" && payload.exp > Date.now() ? payload : null;
 }
 
 export function exchangeAuthorizationCode(code: string, clientId: string, redirectUri: string, verifier: string) {

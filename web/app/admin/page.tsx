@@ -2671,12 +2671,12 @@ export default function AdminPanel() {
           if (!/^\d{5}$/.test(playgroundInput.trainNumber)) {
             throw new Error("Train number must be exactly 5 digits");
           }
-          if (!/^\d{2}-\d{2}-\d{4}$/.test(playgroundInput.journeyDate)) {
+          if (playgroundInput.journeyDate && !/^\d{2}-\d{2}-\d{4}$/.test(playgroundInput.journeyDate)) {
             throw new Error("Date must be in DD-MM-YYYY format");
           }
           result = await trackTrain(
             playgroundInput.trainNumber,
-            playgroundInput.journeyDate,
+            playgroundInput.journeyDate || undefined,
           );
           break;
         case "history":

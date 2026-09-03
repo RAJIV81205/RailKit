@@ -170,6 +170,25 @@ const initial: FormState = {
   classCode: "3A",
   quota: "GN",
 };
+
+// Browser date inputs use YYYY-MM-DD; RailKit endpoints use DD-MM-YYYY.
+const toDateInputValue = (value: string) => {
+  const match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : "";
+};
+
+const fromDateInputValue = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}-${match[2]}-${match[1]}` : "";
+};
+
+const dateWithOffset = (offset: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + offset);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+
 const responseStatus = (value: unknown) => {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const record = value as Record<string, unknown>;
@@ -213,7 +232,7 @@ export default function ApiPlayground({
       case "train":
         return `/api/getTrainInfo/${value(form.trainNumber, "trainNumber")}`;
       case "track":
-        return `/api/trackTrain/${value(form.trainNumber, "trainNumber")}/${value(date, "date")}`;
+        return `/api/trackTrain/${value(form.trainNumber, "trainNumber")}/${date ? encodeURIComponent(date) : "today"}`;
       case "history":
         return `/api/trainHistory/${value(form.trainNumber, "trainNumber")}/${value(date, "date")}`;
       case "station":
@@ -259,7 +278,10 @@ export default function ApiPlayground({
           result = await getTrainInfo(form.trainNumber);
           break;
         case "track":
-          result = await trackTrain(form.trainNumber, form.journeyDate);
+          result = await trackTrain(
+            form.trainNumber,
+            form.journeyDate || undefined,
+          );
           break;
         case "history":
           result = await getTrainHistory(form.trainNumber, form.journeyDate);
@@ -367,12 +389,19 @@ export default function ApiPlayground({
       <div>
         <input
           id={`playground-${selected}-${key}`}
-          type={type === "date" ? "text" : type}
-          value={form[key]}
-          onChange={(event) => set(key, event.target.value)}
-          placeholder={
-            type === "date" ? "DD-MM-YYYY" : `Enter ${label.toLowerCase()}`
+          type={type}
+          min={type === "date" && selected === "timetable" ? dateWithOffset(-1) : undefined}
+          max={type === "date" && selected === "timetable" ? dateWithOffset(1) : undefined}
+          value={type === "date" ? toDateInputValue(form[key]) : form[key]}
+          onChange={(event) =>
+            set(
+              key,
+              type === "date"
+                ? fromDateInputValue(event.target.value)
+                : event.target.value,
+            )
           }
+          placeholder={type === "date" ? undefined : `Enter ${label.toLowerCase()}`}
           className={`h-10 w-full rounded-lg border px-3 font-mono text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${input}`}
         />
         {helper && <p className={`mt-1 text-xs ${muted}`}>{helper}</p>}
@@ -504,7 +533,15 @@ export default function ApiPlayground({
                 )}
               {["track", "history", "availability", "fare"].includes(
                 selected,
-              ) && field("journeyDate", "Journey date", "DD-MM-YYYY", "date")}
+              ) &&
+                field(
+                  "journeyDate",
+                  "Journey date",
+                  selected === "track"
+                    ? "Optional · defaults to today · DD-MM-YYYY"
+                    : "DD-MM-YYYY",
+                  "date",
+                )}
               {["station", "stationCode", "timetable"].includes(selected) &&
                 field("stationCode", "Station code", "Example: ASN")}
               {selected === "station" &&

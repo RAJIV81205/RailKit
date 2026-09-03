@@ -966,9 +966,9 @@ export default function DashboardPage() {
         case "track":
           if (!/^\d{5}$/.test(trackTrainInput))
             throw new Error("Train number must be exactly 5 digits");
-          if (!/^\d{2}-\d{2}-\d{4}$/.test(trackDateInput))
+          if (trackDateInput && !/^\d{2}-\d{2}-\d{4}$/.test(trackDateInput))
             throw new Error("Date must be in DD-MM-YYYY format");
-          result = await trackTrain(trackTrainInput, trackDateInput);
+          result = await trackTrain(trackTrainInput, trackDateInput || undefined);
           break;
         case "history":
           if (!/^\d{5}$/.test(historyTrainInput))

@@ -2,7 +2,7 @@
   "product": {
     "name": "RailKit",
     "eyebrow": "Indian Railways API",
-    "description": "Production-ready railway data through a typed Node.js SDK or direct REST endpoints.",
+    "description": "Production-ready railway data through a typed Node.js SDK or direct REST endpoints. Canonical REST paths use /api/v1; legacy unversioned paths remain supported.",
     "baseUrl": "https://api.railkit.in",
     "npmUrl": "https://www.npmjs.com/package/railkit",
     "githubUrl": "https://github.com/RAJIV81205/railkit"
@@ -31,7 +31,7 @@
       "title": "Check PNR status",
       "summary": "Get journey, coach, berth, and current confirmation details for every passenger on a booking.",
       "method": "GET",
-      "path": "/api/checkPNRStatus/:pnr",
+      "path": "/api/v1/pnr/:pnr",
       "sdkSignature": "checkPNRStatus(pnr: string)",
       "availability": "SDK and REST API",
       "parameters": [
@@ -50,8 +50,8 @@
       ],
       "examples": {
         "sdk": "import { configure, checkPNRStatus } from \"railkit\";\n\nconfigure(process.env.RAILKIT_API_KEY);\nconst result = await checkPNRStatus(\"1234567890\");\nconsole.log(result.data.passengers);",
-        "javascript": "const response = await fetch(\n  \"https://api.railkit.in/api/checkPNRStatus/1234567890\",\n  { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } }\n);\nconst result = await response.json();",
-        "curl": "curl \"https://api.railkit.in/api/checkPNRStatus/1234567890\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
+        "javascript": "const response = await fetch(\n  \"https://api.railkit.in/api/v1/pnr/1234567890\",\n  { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } }\n);\nconst result = await response.json();",
+        "curl": "curl \"https://api.railkit.in/api/v1/pnr/1234567890\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
       },
       "response": "{\n  \"success\": true,\n  \"data\": {\n    \"pnr\": \"1234567890\",\n    \"train\": { \"number\": \"12301\", \"name\": \"Rajdhani Express\" },\n    \"passengers\": [{ \"number\": 1, \"bookingStatus\": \"RAC 12\", \"currentStatus\": \"CNF\" }]\n  }\n}"
     },
@@ -61,7 +61,7 @@
       "title": "Check seat availability",
       "summary": "Check inventory for one train, route, date, travel class, and quota.",
       "method": "GET",
-      "path": "/api/getAvailability/:trainNo/:fromStnCode/:toStnCode/:date/:coach/:quota",
+      "path": "/api/v1/seats/:trainNo/:fromStnCode/:toStnCode/:date/:coach/:quota",
       "sdkSignature": "getAvailability(trainNo, fromStnCode, toStnCode, date, coach, quota)",
       "availability": "SDK and REST API",
       "parameters": [
@@ -120,8 +120,8 @@
       ],
       "examples": {
         "sdk": "import { configure, getAvailability } from \"railkit\";\nconfigure(process.env.RAILKIT_API_KEY);\n\nconst result = await getAvailability(\n  \"12496\", \"ASN\", \"DDU\", \"27-12-2026\", \"2A\", \"GN\"\n);",
-        "javascript": "const url = \"https://api.railkit.in/api/getAvailability/12496/ASN/DDU/27-12-2026/2A/GN\";\nconst response = await fetch(url, {\n  headers: { \"x-api-key\": process.env.RAILKIT_API_KEY }\n});\nconst result = await response.json();",
-        "curl": "curl \"https://api.railkit.in/api/getAvailability/12496/ASN/DDU/27-12-2026/2A/GN\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
+        "javascript": "const url = \"https://api.railkit.in/api/v1/seats/12496/ASN/DDU/27-12-2026/2A/GN\";\nconst response = await fetch(url, {\n  headers: { \"x-api-key\": process.env.RAILKIT_API_KEY }\n});\nconst result = await response.json();",
+        "curl": "curl \"https://api.railkit.in/api/v1/seats/12496/ASN/DDU/27-12-2026/2A/GN\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
       },
       "response": "{\n  \"success\": true,\n  \"data\": {\n    \"trainNo\": \"12496\", \"class\": \"2A\", \"quota\": \"GN\",\n    \"availability\": [{ \"date\": \"27-12-2026\", \"status\": \"AVAILABLE 18\" }]\n  }\n}"
     },
@@ -131,7 +131,7 @@
       "title": "Look up fare",
       "summary": "Return base fare, reservation, superfast, catering, tax, dynamic fare, and final collectible amount.",
       "method": "GET",
-      "path": "/api/fareLookup/:trainNo/:date/:fromStation/:toStation/:class/:quota",
+      "path": "/api/v1/fare/:trainNo/:date/:fromStation/:toStation/:class/:quota",
       "sdkSignature": "fareLookup(trainNo, fromStnCode, toStnCode, date, travelClass, quota)",
       "availability": "SDK and REST API",
       "parameters": [
@@ -190,8 +190,8 @@
       ],
       "examples": {
         "sdk": "import { configure, fareLookup } from \"railkit\";\nconfigure(process.env.RAILKIT_API_KEY);\n\nconst result = await fareLookup(\n  \"12313\", \"ASN\", \"NDLS\", \"06-06-2026\", \"3A\", \"GN\"\n);",
-        "javascript": "const url = \"https://api.railkit.in/api/fareLookup/12313/06-06-2026/ASN/NDLS/3A/GN\";\nconst response = await fetch(url, { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } });\nconst result = await response.json();",
-        "curl": "curl \"https://api.railkit.in/api/fareLookup/12313/06-06-2026/ASN/NDLS/3A/GN\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
+        "javascript": "const url = \"https://api.railkit.in/api/v1/fare/12313/06-06-2026/ASN/NDLS/3A/GN\";\nconst response = await fetch(url, { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } });\nconst result = await response.json();",
+        "curl": "curl \"https://api.railkit.in/api/v1/fare/12313/06-06-2026/ASN/NDLS/3A/GN\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
       },
       "response": "{\n  \"success\": true,\n  \"data\": { \"trainNo\": \"12313\", \"distance\": 1234, \"baseFare\": 1875, \"gst\": 94, \"totalFare\": 2165 }\n}"
     },
@@ -201,7 +201,7 @@
       "title": "Get train information",
       "summary": "Retrieve identity, running days, route, schedule, and station-level details for a train.",
       "method": "GET",
-      "path": "/api/getTrainInfo/:trainNumber",
+      "path": "/api/v1/trains/:trainNumber/info",
       "sdkSignature": "getTrainInfo(trainNumber: string)",
       "availability": "SDK and REST API",
       "parameters": [
@@ -220,8 +220,8 @@
       ],
       "examples": {
         "sdk": "import { configure, getTrainInfo } from \"railkit\";\nconfigure(process.env.RAILKIT_API_KEY);\n\nconst result = await getTrainInfo(\"12301\");\nconsole.log(result.data.route);",
-        "javascript": "const response = await fetch(\n  \"https://api.railkit.in/api/getTrainInfo/12301\",\n  { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } }\n);\nconst result = await response.json();",
-        "curl": "curl \"https://api.railkit.in/api/getTrainInfo/12301\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
+        "javascript": "const response = await fetch(\n  \"https://api.railkit.in/api/v1/trains/12301/info\",\n  { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } }\n);\nconst result = await response.json();",
+        "curl": "curl \"https://api.railkit.in/api/v1/trains/12301/info\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
       },
       "response": "{\n  \"success\": true,\n  \"data\": {\n    \"trainInfo\": { \"train_no\": \"12301\", \"train_name\": \"Howrah Rajdhani\" },\n    \"route\": [{ \"station_code\": \"HWH\", \"day\": 1, \"departure\": \"16:50\" }]\n  }\n}"
     },
@@ -231,7 +231,7 @@
       "title": "Track live train",
       "summary": "Track current movement with station-by-station timing, delay, platform, and position context.",
       "method": "GET",
-      "path": "/api/trackTrain/:trainNumber/:date",
+      "path": "/api/v1/trains/:trainNumber/live/:date",
       "sdkSignature": "trackTrain(trainNumber: string, date?: string)",
       "availability": "SDK and REST API",
       "parameters": [
@@ -258,8 +258,8 @@
       ],
       "examples": {
         "sdk": "import { configure, trackTrain } from \"railkit\";\nconfigure(process.env.RAILKIT_API_KEY);\n\nconst result = await trackTrain(\"12342\", \"today\");\nconsole.log(result.data.statusNote);",
-        "javascript": "const response = await fetch(\n  \"https://api.railkit.in/api/trackTrain/12342/today\",\n  { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } }\n);\nconst result = await response.json();",
-        "curl": "curl \"https://api.railkit.in/api/trackTrain/12342/today\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
+        "javascript": "const response = await fetch(\n  \"https://api.railkit.in/api/v1/trains/12342/live/today\",\n  { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } }\n);\nconst result = await response.json();",
+        "curl": "curl \"https://api.railkit.in/api/v1/trains/12342/live/today\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
       },
       "response": "{\n  \"success\": true,\n  \"data\": { \"trainNo\": \"12342\", \"currentStation\": \"CNB\", \"delayMinutes\": 12, \"statusNote\": \"Departed Kanpur Central\" }\n}"
     },
@@ -269,7 +269,7 @@
       "title": "Get train history",
       "summary": "Read completed journey history with actual timings, per-stop delays, and final coach position.",
       "method": "GET",
-      "path": "/api/trainHistory/:trainNo/:journeyDate",
+      "path": "/api/v1/trains/:trainNo/history/:journeyDate",
       "sdkSignature": "getTrainHistory(trainNumber: string, journeyDate: string)",
       "availability": "SDK and REST API",
       "parameters": [
@@ -296,8 +296,8 @@
       ],
       "examples": {
         "sdk": "import { configure, getTrainHistory } from \"railkit\";\nconfigure(process.env.RAILKIT_API_KEY);\n\nconst result = await getTrainHistory(\"12301\", \"15-04-2026\");",
-        "javascript": "const response = await fetch(\n  \"https://api.railkit.in/api/trainHistory/12301/15-04-2026\",\n  { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } }\n);\nconst result = await response.json();",
-        "curl": "curl \"https://api.railkit.in/api/trainHistory/12301/15-04-2026\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
+        "javascript": "const response = await fetch(\n  \"https://api.railkit.in/api/v1/trains/12301/history/15-04-2026\",\n  { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } }\n);\nconst result = await response.json();",
+        "curl": "curl \"https://api.railkit.in/api/v1/trains/12301/history/15-04-2026\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
       },
       "response": "{\n  \"success\": true,\n  \"data\": { \"trainNo\": \"12301\", \"journeyDate\": \"15-04-2026\", \"stations\": [{ \"stationCode\": \"NDLS\", \"arrivalDelay\": 8 }] }\n}"
     },
@@ -307,7 +307,7 @@
       "title": "List cancelled trains",
       "summary": "List fully and partially cancelled services, including affected route segments.",
       "method": "GET",
-      "path": "/api/cancelled",
+      "path": "/api/v1/trains/cancelled",
       "sdkSignature": "cancelList()",
       "availability": "SDK and REST API",
       "parameters": [],
@@ -317,8 +317,8 @@
       ],
       "examples": {
         "sdk": "import { configure, cancelList } from \"railkit\";\nconfigure(process.env.RAILKIT_API_KEY);\n\nconst result = await cancelList();\nconsole.log(result.data.fullyCancelledTrains);",
-        "javascript": "const response = await fetch(\n  \"https://api.railkit.in/api/cancelled\",\n  { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } }\n);\nconst result = await response.json();",
-        "curl": "curl \"https://api.railkit.in/api/cancelled\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
+        "javascript": "const response = await fetch(\n  \"https://api.railkit.in/api/v1/trains/cancelled\",\n  { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } }\n);\nconst result = await response.json();",
+        "curl": "curl \"https://api.railkit.in/api/v1/trains/cancelled\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
       },
       "response": "{\n  \"success\": true,\n  \"summary\": { \"total\": 24, \"fullyCancelled\": 19, \"partiallyCancelled\": 5 },\n  \"data\": { \"fullyCancelledTrains\": [], \"partiallyCancelledTrains\": [] }\n}"
     },
@@ -328,7 +328,7 @@
       "title": "Find trains between stations",
       "summary": "Find direct trains between two stations with timetable, classes, and running-day data.",
       "method": "GET",
-      "path": "/api/searchTrainBetweenStations/:fromStnCode/:toStnCode?date=DD-MM-YYYY",
+      "path": "/api/v1/trains/between/:fromStnCode/:toStnCode?date=DD-MM-YYYY",
       "sdkSignature": "searchTrainBetweenStations(fromStnCode, toStnCode, date?)",
       "availability": "SDK and REST API",
       "parameters": [
@@ -363,8 +363,8 @@
       ],
       "examples": {
         "sdk": "import { configure, searchTrainBetweenStations } from \"railkit\";\nconfigure(process.env.RAILKIT_API_KEY);\n\nconst result = await searchTrainBetweenStations(\n  \"NDLS\", \"BCT\", \"28-03-2026\"\n);",
-        "javascript": "const url = \"https://api.railkit.in/api/searchTrainBetweenStations/NDLS/BCT?date=28-03-2026\";\nconst response = await fetch(url, { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } });\nconst result = await response.json();",
-        "curl": "curl \"https://api.railkit.in/api/searchTrainBetweenStations/NDLS/BCT?date=28-03-2026\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
+        "javascript": "const url = \"https://api.railkit.in/api/v1/trains/between/NDLS/BCT?date=28-03-2026\";\nconst response = await fetch(url, { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } });\nconst result = await response.json();",
+        "curl": "curl \"https://api.railkit.in/api/v1/trains/between/NDLS/BCT?date=28-03-2026\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
       },
       "response": "{\n  \"success\": true,\n  \"data\": [{ \"train_no\": \"12952\", \"train_name\": \"Mumbai Rajdhani\", \"departure\": \"16:55\", \"arrival\": \"08:35\" }]\n}"
     },
@@ -374,7 +374,7 @@
       "title": "Get live station board",
       "summary": "Get upcoming and passing trains at a station with expected times, delays, and platform details.",
       "method": "GET",
-      "path": "/api/liveAtStation/:stnCode?hrs=2|4|8",
+      "path": "/api/v1/stations/:stnCode/live?hrs=2|4|8",
       "sdkSignature": "liveAtStation(stationCode: string, hours?: 2 | 4 | 8)",
       "availability": "SDK and REST API",
       "parameters": [
@@ -401,8 +401,8 @@
       ],
       "examples": {
         "sdk": "import { configure, liveAtStation } from \"railkit\";\nconfigure(process.env.RAILKIT_API_KEY);\n\nconst result = await liveAtStation(\"NDLS\", 4);\nconsole.log(result.data.trains);",
-        "javascript": "const response = await fetch(\n  \"https://api.railkit.in/api/liveAtStation/NDLS?hrs=4\",\n  { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } }\n);\nconst result = await response.json();",
-        "curl": "curl \"https://api.railkit.in/api/liveAtStation/NDLS?hrs=4\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
+        "javascript": "const response = await fetch(\n  \"https://api.railkit.in/api/v1/stations/NDLS/live?hrs=4\",\n  { headers: { \"x-api-key\": process.env.RAILKIT_API_KEY } }\n);\nconst result = await response.json();",
+        "curl": "curl \"https://api.railkit.in/api/v1/stations/NDLS/live?hrs=4\" \\\n  -H \"x-api-key: YOUR_API_KEY\""
       },
       "response": "{\n  \"success\": true,\n  \"data\": { \"stationCode\": \"NDLS\", \"totalTrains\": 14, \"trains\": [{ \"trainNo\": \"12301\", \"platform\": \"3\", \"delayMinutes\": 8 }] }\n}"
     }

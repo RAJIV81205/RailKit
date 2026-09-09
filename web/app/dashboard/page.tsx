@@ -1849,7 +1849,7 @@ export default function DashboardPage() {
                       className="!m-0 !bg-transparent !p-0 !text-xs !leading-[1.7]"
                     >
                       {buildApiSnippet(
-                        "/api/checkPNRStatus/1234567890",
+                        "/api/v1/pnr/1234567890",
                         apiCodeLanguage,
                       )}
                     </SyntaxHighlighter>

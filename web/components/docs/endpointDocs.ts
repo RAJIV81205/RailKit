@@ -363,7 +363,7 @@ if (result.success) {
       { name: "date", type: "string", desc: "Optional DD-MM-YYYY date; only today, yesterday, or tomorrow is accepted" },
     ],
     example: `const result = await fetch(
-  "/api/station/ASN/timetable?date=28-08-2026"
+  "/api/v1/stations/ASN/timetable?date=28-08-2026"
 ).then((res) => res.json());
 
 if (result.success) {
@@ -395,7 +395,7 @@ if (result.success) {
     description: "Resolve a station code to its name and coordinates.",
     signature: "stationByCode(stationCode: string)",
     params: [{ name: "stationCode", type: "string", desc: "Station code such as NDLS or HWH" }],
-    example: `const result = await fetch("/api/station/NDLS").then((res) => res.json());
+    example: `const result = await fetch("/api/v1/stations/NDLS").then((res) => res.json());
 
 if (result.success) {
   console.log(result.data.code, result.data.name);
@@ -413,7 +413,7 @@ if (result.success) {
     signature: "stationsByName(name: string)",
     params: [{ name: "name", type: "string", desc: "At least 2 characters; partial matching supported" }],
     example: `const result = await fetch(
-  "/api/stations/search?name=delhi"
+  "/api/v1/stations/search?name=delhi"
 ).then((res) => res.json());
 
 result.data.stations.forEach((station) => {
@@ -438,7 +438,7 @@ result.data.stations.forEach((station) => {
     description: "Resolve a train number to its stored train name.",
     signature: "trainByNumber(trainNumber: string)",
     params: [{ name: "trainNumber", type: "string", desc: "Exactly 5 numeric digits" }],
-    example: `const result = await fetch("/api/train/12345").then((res) => res.json());
+    example: `const result = await fetch("/api/v1/trains/12345").then((res) => res.json());
 
 if (result.success) {
   console.log(result.data.trainNo, result.data.trainName);
@@ -456,7 +456,7 @@ if (result.success) {
     signature: "trainsByName(name: string)",
     params: [{ name: "name", type: "string", desc: "At least 2 characters; partial matching supported" }],
     example: `const result = await fetch(
-  "/api/trains/search?name=rajdhani"
+  "/api/v1/trains/search?name=rajdhani"
 ).then((res) => res.json());
 
 result.data.trains.forEach((train) => {
@@ -492,32 +492,32 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     id: "pnr-status",
     name: "Check PNR Status",
     method: "GET",
-    path: "/api/checkPNRStatus/:pnr",
-    examplePath: "/api/checkPNRStatus/6948325823",
+    path: "/api/v1/pnr/:pnr",
+    examplePath: "/api/v1/pnr/6948325823",
     notes: "PNR must be 10 digits.",
   },
   {
     id: "train-info",
     name: "Get Train Info",
     method: "GET",
-    path: "/api/getTrainInfo/:trainNumber",
-    examplePath: "/api/getTrainInfo/12345",
+    path: "/api/v1/trains/:trainNumber/info",
+    examplePath: "/api/v1/trains/12345/info",
     notes: "Train number must be 5 digits.",
   },
   {
     id: "live-tracking",
     name: "Track Train",
     method: "GET",
-    path: "/api/trackTrain/:trainNumber/:date",
-    examplePath: "/api/trackTrain/12345/28-08-2026",
+    path: "/api/v1/trains/:trainNumber/live/:date",
+    examplePath: "/api/v1/trains/12345/live/28-08-2026",
     notes: "Date format: DD-MM-YYYY. You can also pass `today` as date.",
   },
   {
     id: "station-live",
     name: "Live At Station",
     method: "GET",
-    path: "/api/liveAtStation/:stnCode?hrs=2|4|8",
-    examplePath: "/api/liveAtStation/NDLS?hrs=4",
+    path: "/api/v1/stations/:stnCode/live?hrs=2|4|8",
+    examplePath: "/api/v1/stations/NDLS/live?hrs=4",
     notes:
       "Use an uppercase station code. Optional `hrs` accepts 2, 4, or 8; default is 2.",
   },
@@ -525,8 +525,8 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     id: "train-history",
     name: "Get Train History",
     method: "GET",
-    path: "/api/trainHistory/:trainNo/:journeyDate",
-    examplePath: "/api/trainHistory/12301/11-06-2026",
+    path: "/api/v1/trains/:trainNo/history/:journeyDate",
+    examplePath: "/api/v1/trains/12301/history/11-06-2026",
     notes:
       "Date format: DD-MM-YYYY. Returns 404 when the train has not completed that journey.",
   },
@@ -534,32 +534,32 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     id: "train-search",
     name: "Search Trains Between Stations",
     method: "GET",
-    path: "/api/searchTrainBetweenStations/:fromStnCode/:toStnCode?date=DD-MM-YYYY",
-    examplePath: "/api/searchTrainBetweenStations/NDLS/BCT?date=28-08-2026",
+    path: "/api/v1/trains/between/:fromStnCode/:toStnCode?date=DD-MM-YYYY",
+    examplePath: "/api/v1/trains/between/NDLS/BCT?date=28-08-2026",
     notes: "The `date` query parameter is optional.",
   },
   {
     id: "seat-availability",
     name: "Get Seat Availability",
     method: "GET",
-    path: "/api/getAvailability/:trainNo/:fromStnCode/:toStnCode/:date/:coach/:quota",
-    examplePath: "/api/getAvailability/12904/NZM/BDTS/01-09-2026/3A/GN",
+    path: "/api/v1/seats/:trainNo/:fromStnCode/:toStnCode/:date/:coach/:quota",
+    examplePath: "/api/v1/seats/12904/NZM/BDTS/01-09-2026/3A/GN",
     notes: "Date format: DD-MM-YYYY.",
   },
   {
     id: "fare-lookup",
     name: "Fare Lookup",
     method: "GET",
-    path: "/api/fareLookup/:trainNo/:date/:fromStation/:toStation/:class/:quota",
-    examplePath: "/api/fareLookup/12904/01-09-2026/NZM/BDTS/3A/GN",
+    path: "/api/v1/fare/:trainNo/:date/:fromStation/:toStation/:class/:quota",
+    examplePath: "/api/v1/fare/12904/01-09-2026/NZM/BDTS/3A/GN",
     notes: "Returns full fare breakdown. Date format: DD-MM-YYYY.",
   },
   {
     id: "cancelled-trains",
     name: "Cancelled Trains",
     method: "GET",
-    path: "/api/cancelled",
-    examplePath: "/api/cancelled",
+    path: "/api/v1/trains/cancelled",
+    examplePath: "/api/v1/trains/cancelled",
     notes:
       "Returns fully and partially cancelled trains. No parameters required.",
   },
@@ -567,40 +567,40 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     id: "station-timetable",
     name: "Get Station Train Timetable",
     method: "GET",
-    path: "/api/station/:stationCode/timetable?date=DD-MM-YYYY",
-    examplePath: "/api/station/ASN/timetable?date=28-08-2026",
+    path: "/api/v1/stations/:stationCode/timetable?date=DD-MM-YYYY",
+    examplePath: "/api/v1/stations/ASN/timetable?date=28-08-2026",
     notes: "Date is optional, must use DD-MM-YYYY format, and can only be today, yesterday, or tomorrow. Defaults to today.",
   },
   {
     id: "station-by-code",
     name: "Get Station by Code",
     method: "GET",
-    path: "/api/station/:stationCode",
-    examplePath: "/api/station/NDLS",
+    path: "/api/v1/stations/:stationCode",
+    examplePath: "/api/v1/stations/NDLS",
     notes: "Station code must be 1-5 letters or digits.",
   },
   {
     id: "station-search",
     name: "Search Stations by Name",
     method: "GET",
-    path: "/api/stations/search?name=...",
-    examplePath: "/api/stations/search?name=delhi",
+    path: "/api/v1/stations/search?name=...",
+    examplePath: "/api/v1/stations/search?name=delhi",
     notes: "Name must contain at least 2 characters. Returns at most 10 matches.",
   },
   {
     id: "train-by-number",
     name: "Get Train by Number",
     method: "GET",
-    path: "/api/train/:trainNumber",
-    examplePath: "/api/train/12345",
+    path: "/api/v1/trains/:trainNumber",
+    examplePath: "/api/v1/trains/12345",
     notes: "Train number must be exactly 5 numeric digits.",
   },
   {
     id: "train-name-search",
     name: "Search Trains by Name",
     method: "GET",
-    path: "/api/trains/search?name=...",
-    examplePath: "/api/trains/search?name=rajdhani",
+    path: "/api/v1/trains/search?name=...",
+    examplePath: "/api/v1/trains/search?name=rajdhani",
     notes: "Name must contain at least 2 characters. Returns at most 10 matches.",
   },
 ] as const;

@@ -359,6 +359,7 @@ This document is self-contained context for an AI model or developer integrating
 - Authentication header on every request: \`x-api-key: YOUR_API_KEY\`
 - Optional request header: \`accept: application/json\`
 - All documented endpoints use HTTP GET.
+- The canonical REST contract uses \`/api/v1\`; legacy unversioned routes remain supported for compatibility.
 - Direct REST access requires the Advance plan.
 - Check both HTTP status and parsed JSON body.
 - URL-encode dynamic path and query values when constructing URLs from user input.
@@ -1191,6 +1192,7 @@ ${sectionLinks}
                   "Send x-api-key with every request",
                   "Keep API keys on your server",
                   "Direct REST access requires the Advance plan",
+                  "Legacy unversioned routes remain supported",
                 ]}
               />
             </div>

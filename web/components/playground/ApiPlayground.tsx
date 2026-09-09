@@ -66,62 +66,62 @@ const groups: { label: string; items: Endpoint[] }[] = [
       {
         id: "pnr",
         label: "PNR Status",
-        path: "/api/checkPNRStatus/:pnr",
+        path: "/api/v1/pnr/:pnr",
         description: "Check passenger booking and current PNR status.",
       },
       {
         id: "train",
         label: "Train Info",
-        path: "/api/getTrainInfo/:trainNumber",
+        path: "/api/v1/trains/:trainNumber/info",
         description: "Get train details and its complete route.",
       },
       {
         id: "track",
         label: "Track Train",
-        path: "/api/trackTrain/:trainNumber/:date",
+        path: "/api/v1/trains/:trainNumber/live/:date",
         description: "Get the live running status of a train.",
       },
       {
         id: "history",
         label: "Train History",
-        path: "/api/trainHistory/:trainNumber/:date",
+        path: "/api/v1/trains/:trainNumber/history/:date",
         description: "Retrieve the completed journey timeline.",
       },
       {
         id: "station",
         label: "Live at Station",
-        path: "/api/liveAtStation/:stationCode",
+        path: "/api/v1/stations/:stationCode/live",
         description: "See upcoming trains at a station.",
       },
       {
         id: "timetable",
         label: "Station Timetable",
-        path: "/api/station/:stationCode/timetable",
+        path: "/api/v1/stations/:stationCode/timetable",
         description:
           "List trains crossing a station, with optional date filtering.",
       },
       {
         id: "search",
         label: "Search Trains",
-        path: "/api/searchTrainBetweenStations/:from/:to",
+        path: "/api/v1/trains/between/:from/:to",
         description: "Find direct trains between two stations.",
       },
       {
         id: "availability",
         label: "Seat Availability",
-        path: "/api/getAvailability",
+        path: "/api/v1/seats",
         description: "Check seats for a train, class, quota, and journey date.",
       },
       {
         id: "fare",
         label: "Fare Lookup",
-        path: "/api/fareLookup",
+        path: "/api/v1/fare",
         description: "Get a complete fare breakdown for a journey.",
       },
       {
         id: "cancelled",
         label: "Cancelled Trains",
-        path: "/api/cancelList",
+        path: "/api/v1/trains/cancelled",
         description: "Get fully and partially cancelled trains.",
       },
     ],
@@ -132,25 +132,25 @@ const groups: { label: string; items: Endpoint[] }[] = [
       {
         id: "stationCode",
         label: "Station by Code",
-        path: "/api/station/code/:stationCode",
+        path: "/api/v1/stations/:stationCode",
         description: "Resolve a station code to its details.",
       },
       {
         id: "stationSearch",
         label: "Stations by Name",
-        path: "/api/station/search/:name",
+        path: "/api/v1/stations/search?name=:name",
         description: "Find up to 10 matching station names and codes.",
       },
       {
         id: "trainLookup",
         label: "Train by Number",
-        path: "/api/train/number/:trainNumber",
+        path: "/api/v1/trains/:trainNumber",
         description: "Resolve an exact five-digit train number.",
       },
       {
         id: "trainNameSearch",
         label: "Trains by Name",
-        path: "/api/train/search/:name",
+        path: "/api/v1/trains/search?name=:name",
         description: "Find up to 10 matching train names and numbers.",
       },
     ],
@@ -228,33 +228,33 @@ export default function ApiPlayground({
     const date = form.journeyDate;
     switch (selected) {
       case "pnr":
-        return `/api/checkPNRStatus/${value(form.pnr, "pnr")}`;
+        return `/api/v1/pnr/${value(form.pnr, "pnr")}`;
       case "train":
-        return `/api/getTrainInfo/${value(form.trainNumber, "trainNumber")}`;
+        return `/api/v1/trains/${value(form.trainNumber, "trainNumber")}/info`;
       case "track":
-        return `/api/trackTrain/${value(form.trainNumber, "trainNumber")}/${date ? encodeURIComponent(date) : "today"}`;
+        return `/api/v1/trains/${value(form.trainNumber, "trainNumber")}/live/${date ? encodeURIComponent(date) : "today"}`;
       case "history":
-        return `/api/trainHistory/${value(form.trainNumber, "trainNumber")}/${value(date, "date")}`;
+        return `/api/v1/trains/${value(form.trainNumber, "trainNumber")}/history/${value(date, "date")}`;
       case "station":
-        return `/api/liveAtStation/${value(form.stationCode, "stationCode")}?hrs=${form.stationHours}`;
+        return `/api/v1/stations/${value(form.stationCode, "stationCode")}/live?hrs=${form.stationHours}`;
       case "timetable":
-        return `/api/station/${value(form.stationCode, "stationCode")}/timetable${form.timetableDate ? `?date=${encodeURIComponent(form.timetableDate)}` : ""}`;
+        return `/api/v1/stations/${value(form.stationCode, "stationCode")}/timetable${form.timetableDate ? `?date=${encodeURIComponent(form.timetableDate)}` : ""}`;
       case "search":
-        return `/api/searchTrainBetweenStations/${value(form.fromStation, "from")}/${value(form.toStation, "to")}${form.journeyDate ? `?date=${encodeURIComponent(form.journeyDate)}` : ""}`;
+        return `/api/v1/trains/between/${value(form.fromStation, "from")}/${value(form.toStation, "to")}${form.journeyDate ? `?date=${encodeURIComponent(form.journeyDate)}` : ""}`;
       case "availability":
-        return `/api/getAvailability/${value(form.trainNumber, "trainNumber")}/${value(form.fromStation, "from")}/${value(form.toStation, "to")}/${value(date, "date")}/${form.classCode}/${form.quota}`;
+        return `/api/v1/seats/${value(form.trainNumber, "trainNumber")}/${value(form.fromStation, "from")}/${value(form.toStation, "to")}/${value(date, "date")}/${form.classCode}/${form.quota}`;
       case "fare":
-        return `/api/fareLookup/${value(form.trainNumber, "trainNumber")}/${value(date, "date")}/${value(form.fromStation, "from")}/${value(form.toStation, "to")}/${form.classCode}/${form.quota}`;
+        return `/api/v1/fare/${value(form.trainNumber, "trainNumber")}/${value(date, "date")}/${value(form.fromStation, "from")}/${value(form.toStation, "to")}/${form.classCode}/${form.quota}`;
       case "cancelled":
-        return "/api/cancelled";
+        return "/api/v1/trains/cancelled";
       case "stationCode":
-        return `/api/station/${value(form.stationCode, "stationCode")}`;
+        return `/api/v1/stations/${value(form.stationCode, "stationCode")}`;
       case "stationSearch":
-        return `/api/stations/search?name=${value(form.name, "name")}`;
+        return `/api/v1/stations/search?name=${value(form.name, "name")}`;
       case "trainLookup":
-        return `/api/train/${value(form.trainNumber, "trainNumber")}`;
+        return `/api/v1/trains/${value(form.trainNumber, "trainNumber")}`;
       case "trainNameSearch":
-        return `/api/trains/search?name=${value(form.name, "name")}`;
+        return `/api/v1/trains/search?name=${value(form.name, "name")}`;
     }
   }, [form, selected]);
   const set = (key: keyof FormState, value: string) =>

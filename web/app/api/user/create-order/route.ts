@@ -141,47 +141,17 @@ export async function POST(request: Request) {
           { status: 409 },
         );
       }
-      if (code === "CHECKOUT_IN_PROGRESS") {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "another checkout is already in progress",
-          },
-          { status: 409 },
-        );
-      }
       if (code === "RATE_LIMITED") {
         return NextResponse.json(
           {
             success: false,
-            message: "too many checkout attempts; try again later",
+            message: "maximum 10 checkout orders are allowed every 10 minutes",
           },
-          { status: 429 },
+          { status: 429, headers: { "Retry-After": "600" } },
         );
       }
       if (code === "USER_NOT_ACTIVE") return unauthorizedResponse();
       throw error;
-    }
-
-    if (reservation.reused) {
-      const reusableOrder = await Order.findOne({
-        orderId: reservation.orderId,
-      }).lean();
-      if (reusableOrder?.paymentSessionId) {
-        return NextResponse.json({
-          success: true,
-          message: "existing checkout returned",
-          order: {
-            orderId: reusableOrder.orderId,
-            paymentSessionId: reusableOrder.paymentSessionId,
-            planType: reusableOrder.planType,
-            amount: reusableOrder.amount,
-            currency: reusableOrder.currency,
-            status: reusableOrder.status,
-          },
-          cashfreeMode: getCashfreeCheckoutMode(),
-        });
-      }
     }
 
     const effectiveOrderId = reservation.orderId;

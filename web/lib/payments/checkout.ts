@@ -5,12 +5,11 @@ import { getEffectiveExpirationDate } from "@/lib/billing/entitlements";
 import type { PaidPlanType } from "@/lib/constants";
 
 const CHECKOUT_TTL_MS = 30 * 60 * 1000;
-const MAX_ORDERS_PER_TEN_MINUTES = 5;
+const MAX_ORDERS_PER_TEN_MINUTES = 10;
 
 export type CheckoutReservationErrorCode =
   | "USER_NOT_ACTIVE"
   | "ACTIVE_PLAN"
-  | "CHECKOUT_IN_PROGRESS"
   | "RATE_LIMITED";
 
 export class CheckoutReservationError extends Error {
@@ -36,7 +35,6 @@ export async function reservePlanCheckout(
 ) {
   const session = await mongoose.startSession();
   let reservedOrderId: string | null = null;
-  let reused = false;
 
   try {
     await session.withTransaction(async () => {
@@ -71,24 +69,6 @@ export async function reservePlanCheckout(
         { session },
       );
 
-      const openOrder = await Order.findOne({
-        userId: user._id,
-        credited: false,
-        status: { $in: ["created", "active"] },
-        createdAt: { $gt: staleBefore },
-      }).session(session);
-      if (openOrder) {
-        if (
-          openOrder.planType === input.planType &&
-          openOrder.billingInterval === input.billingInterval
-        ) {
-          reservedOrderId = openOrder.orderId;
-          reused = true;
-          return;
-        }
-        throw new CheckoutReservationError("CHECKOUT_IN_PROGRESS");
-      }
-
       const recentOrderCount = await Order.countDocuments({
         userId: user._id,
         createdAt: { $gte: new Date(now.getTime() - 10 * 60 * 1000) },
@@ -122,5 +102,5 @@ export async function reservePlanCheckout(
   }
 
   if (!reservedOrderId) throw new Error("Checkout reservation did not produce an order");
-  return { orderId: reservedOrderId, reused };
+  return { orderId: reservedOrderId };
 }

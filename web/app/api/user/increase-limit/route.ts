@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import User from "@/lib/db/models/User";
 import LimitTopup from "@/lib/db/models/LimitTopup";
 import {
@@ -7,12 +8,21 @@ import {
   verifyAuthToken,
 } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db/db";
-import { cashfree, getCashfreeCheckoutMode } from "@/lib/payments/cashfree";
+import {
+  cashfree,
+  getCashfreeCheckoutMode,
+  getWebhookUrl,
+} from "@/lib/payments/cashfree";
 import { TOPUP_OPTIONS } from "@/lib/constants";
 import {
   getEffectiveExpirationDate,
   syncV2Entitlement,
 } from "@/lib/billing/entitlements";
+import {
+  getCashfreeIdempotencyKey,
+  normalizeNonSuccessfulOrderStatus,
+} from "@/lib/payments/validation";
+import { fulfillLimitTopup } from "@/lib/payments/topup";
 
 // use a general numeric key type so calling code can pass `number` safely
 const TOPUP_REQUESTS: Map<number, number> = new Map(TOPUP_OPTIONS.map((option) => [option.requests, option.price]));
@@ -20,12 +30,13 @@ const TOPUP_REQUESTS: Map<number, number> = new Map(TOPUP_OPTIONS.map((option) =
 type PaymentEntityLike = {
   payment_status?: string;
   cf_payment_id?: string | number;
+  payment_amount?: number;
+  payment_currency?: string;
 };
 
 
 function makeOrderId(userId: string) {
-  const suffix = Math.random().toString(36).slice(2, 8);
-  return `topup_${userId.slice(-8)}_${Date.now()}_${suffix}`;
+  return `topup_${userId.slice(-8)}_${randomUUID().replace(/-/g, "")}`;
 }
 
 function sanitizeCustomerName(name?: string) {
@@ -121,6 +132,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: "active plan is required" }, { status: 403 });
     }
 
+    const contentLength = Number(request.headers.get("content-length") || 0);
+    if (contentLength > 4_096) {
+      return NextResponse.json({ success: false, message: "request is too large" }, { status: 413 });
+    }
     const body = (await request.json()) as { extraLimit?: number };
     const quote = getAddonQuote(Number(body.extraLimit));
     if (!quote) {
@@ -133,7 +148,30 @@ export async function POST(request: Request) {
       );
     }
 
+    const recentOrderCount = await LimitTopup.countDocuments({
+      userId: user._id,
+      createdAt: { $gte: new Date(Date.now() - 10 * 60 * 1000) },
+    });
+    if (recentOrderCount >= 10) {
+      return NextResponse.json(
+        { success: false, message: "too many checkout attempts; try again later" },
+        { status: 429 },
+      );
+    }
+
     const orderId = makeOrderId(user._id.toString());
+    const checkoutExpiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    const topup = await LimitTopup.create({
+      userId: user._id,
+      orderId,
+      extraLimit: quote.extraLimit,
+      expiresAt: effectiveExpirationDate,
+      amount: quote.amount,
+      currency: "INR",
+      status: "created",
+      paymentStatus: "PENDING",
+      credited: false,
+    });
     const cashfreeRequest = {
       order_id: orderId,
       order_amount: quote.amount,
@@ -146,7 +184,9 @@ export async function POST(request: Request) {
       },
       order_meta: {
         return_url: getDashboardReturnUrl(),
+        notify_url: getWebhookUrl(),
       },
+      order_expiry_time: checkoutExpiresAt.toISOString(),
       order_note: `${quote.extraLimit} extra API requests for railkit`,
       order_tags: {
         order_type: "limit_topup",
@@ -154,15 +194,36 @@ export async function POST(request: Request) {
       },
     };
 
-    const cashfreeResponse = await cashfree.PGCreateOrder(cashfreeRequest);
-    const cfOrder = cashfreeResponse.data;
+    let cfOrder;
+    try {
+      const cashfreeResponse = await cashfree.PGCreateOrder(
+        cashfreeRequest,
+        orderId,
+        getCashfreeIdempotencyKey(orderId),
+      );
+      cfOrder = cashfreeResponse.data;
+    } catch (error) {
+      await topup.updateOne({
+        $set: { status: "failed", paymentStatus: "FAILED", cashfreeOrderStatus: "FAILED" },
+      }).catch(() => {});
+      throw error;
+    }
 
     if (!cfOrder.payment_session_id) {
+      await topup.updateOne({
+        $set: { status: "failed", paymentStatus: "FAILED", cashfreeOrderStatus: "FAILED" },
+      }).catch(() => {});
       return NextResponse.json(
         { success: false, message: "payment session was not created" },
         { status: 502 }
       );
     }
+
+    topup.cfOrderId = typeof cfOrder.cf_order_id === "number" ? cfOrder.cf_order_id : null;
+    topup.paymentSessionId = cfOrder.payment_session_id;
+    topup.status = cfOrder.order_status?.toUpperCase() === "ACTIVE" ? "active" : "created";
+    topup.cashfreeOrderStatus = cfOrder.order_status || "ACTIVE";
+    await topup.save();
 
     return NextResponse.json(
       {
@@ -180,18 +241,8 @@ export async function POST(request: Request) {
       { status: 201 }
     );
   } catch (error: unknown) {
-    const message =
-      typeof error === "object" &&
-      error !== null &&
-      "response" in error &&
-      typeof (error as { response?: { data?: { message?: string } } }).response
-        ?.data?.message === "string"
-        ? (error as { response?: { data?: { message?: string } } }).response!.data!
-            .message!
-        : "failed to create limit add-on order";
-
     console.error("Increase limit create error:", error);
-    return NextResponse.json({ success: false, message }, { status: 500 });
+    return NextResponse.json({ success: false, message: "failed to create limit add-on order" }, { status: 500 });
   }
 }
 
@@ -222,6 +273,23 @@ export async function PUT(request: Request) {
       );
     }
 
+    const existingTopup = await LimitTopup.findOne({ orderId, userId: user._id });
+    if (!existingTopup) {
+      return NextResponse.json(
+        { success: false, message: "limit add-on order not found" },
+        { status: 404 },
+      );
+    }
+    if (existingTopup.credited) {
+      return NextResponse.json({
+        success: true,
+        message: "limit add-on verified",
+        credited: true,
+        paid: true,
+        extraLimit: existingTopup.extraLimit,
+      });
+    }
+
     const [orderResponse, paymentsResponse] = await Promise.all([
       cashfree.PGFetchOrder(orderId),
       cashfree.PGOrderFetchPayments(orderId),
@@ -239,7 +307,7 @@ export async function PUT(request: Request) {
     };
     const customerId =
       orderData.customer_details?.customer_id || orderData.customer_id;
-    if (customerId && customerId !== user._id.toString()) {
+    if (customerId !== user._id.toString()) {
       return NextResponse.json(
         { success: false, message: "order does not belong to this user" },
         { status: 403 }
@@ -254,8 +322,8 @@ export async function PUT(request: Request) {
       );
     }
 
-    const extraLimit = Number(orderData.order_tags?.extra_limit ?? NaN);
-    if (!Number.isFinite(extraLimit) || extraLimit <= 0) {
+    const taggedExtraLimit = Number(orderData.order_tags?.extra_limit ?? NaN);
+    if (taggedExtraLimit !== existingTopup.extraLimit) {
       return NextResponse.json(
         { success: false, message: "limit add-on metadata is invalid" },
         { status: 400 }
@@ -268,11 +336,23 @@ export async function PUT(request: Request) {
       (payment) => payment?.payment_status === "SUCCESS"
     );
     const latestPayment = successPayment || payments[0];
-    const paid =
-      cfOrderStatus?.toUpperCase() === "PAID" ||
-      latestPayment?.payment_status?.toUpperCase() === "SUCCESS";
     const paymentStatus = latestPayment?.payment_status || "PENDING";
-    if (!paid) {
+    if (paymentStatus.toUpperCase() !== "SUCCESS") {
+      await LimitTopup.updateOne(
+        {
+          _id: existingTopup._id,
+          credited: false,
+          paymentStatus: { $ne: "SUCCESS" },
+          status: { $ne: "paid" },
+        },
+        {
+          $set: {
+            status: normalizeNonSuccessfulOrderStatus(cfOrderStatus || paymentStatus),
+            paymentStatus: paymentStatus.toUpperCase(),
+            cashfreeOrderStatus: cfOrderStatus || null,
+          },
+        },
+      );
       return NextResponse.json(
         {
           success: true,
@@ -284,98 +364,46 @@ export async function PUT(request: Request) {
       );
     }
 
-    const existingTopup = await LimitTopup.findOne({ orderId, userId: user._id });
-    if (existingTopup?.credited) {
-      return NextResponse.json(
-        {
-          success: true,
-          message: "limit add-on verified",
-          credited: true,
-          paid: true,
-          extraLimit: existingTopup.extraLimit,
-        },
-        { status: 200 }
-      );
-    }
-
-    const now = new Date();
-    const amount = Number(orderData.order_amount ?? NaN);
-    const currency = orderData.order_currency || "INR";
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return NextResponse.json(
-        { success: false, message: "order amount is invalid" },
-        { status: 400 }
-      );
-    }
-
-    const topupPayload = {
-      userId: user._id,
+    const transactionReference = latestPayment?.cf_payment_id
+      ? String(latestPayment.cf_payment_id)
+      : null;
+    const fulfillment = await fulfillLimitTopup({
       orderId,
+      userId: user._id.toString(),
+      paymentStatus,
+      transactionReference,
+      orderStatus: cfOrderStatus,
+      orderAmount: orderData.order_amount,
+      orderCurrency: orderData.order_currency,
+      paymentAmount: latestPayment?.payment_amount,
+      paymentCurrency: latestPayment?.payment_currency,
+      customerId,
       cfOrderId:
         typeof orderData.cf_order_id === "number" ? orderData.cf_order_id : null,
-      paymentSessionId: orderData.payment_session_id || null,
-      extraLimit,
-        expiresAt: effectiveExpirationDate,
-      amount,
-      currency,
-      status: "paid" as const,
-      paymentStatus: "SUCCESS" as const,
-      cashfreeOrderStatus: cfOrderStatus || "PAID",
-      transactionReference: latestPayment?.cf_payment_id
-        ? String(latestPayment.cf_payment_id)
-        : null,
-    };
-
-    const creditedTopup = existingTopup
-      ? await LimitTopup.findOneAndUpdate(
-          { _id: existingTopup._id, credited: false },
-          {
-            $set: {
-              ...topupPayload,
-              credited: true,
-              updatedAt: now,
-            },
-          },
-          { new: true }
-        )
-      : await LimitTopup.create({
-          ...topupPayload,
-          credited: true,
-          createdAt: now,
-          updatedAt: now,
-        });
-
-    if (creditedTopup) {
-      const amount = Math.max(0, Math.floor(extraLimit));
-      await User.findByIdAndUpdate(user._id, {
-        $inc: user.entitlementVersion === 2
-          ? { limit: amount, addonLimit: amount }
-          : { limit: amount },
-      });
+      paymentSessionId: orderData.payment_session_id,
+    });
+    if (!fulfillment.found) {
+      return NextResponse.json(
+        { success: false, message: "limit add-on order not found" },
+        { status: 404 },
+      );
     }
 
     return NextResponse.json(
       {
         success: true,
-        message: "limit add-on verified",
-        credited: true,
+        message: fulfillment.requiresSupport
+          ? "payment received but the plan is no longer active"
+          : "limit add-on verified",
+        credited: fulfillment.credited,
         paid: true,
-        extraLimit,
+        requiresSupport: fulfillment.requiresSupport,
+        extraLimit: fulfillment.extraLimit,
       },
       { status: 200 }
     );
   } catch (error: unknown) {
-    const message =
-      typeof error === "object" &&
-      error !== null &&
-      "response" in error &&
-      typeof (error as { response?: { data?: { message?: string } } }).response
-        ?.data?.message === "string"
-        ? (error as { response?: { data?: { message?: string } } }).response!.data!
-            .message!
-        : "failed to verify limit add-on order";
-
     console.error("Increase limit verify error:", error);
-    return NextResponse.json({ success: false, message }, { status: 500 });
+    return NextResponse.json({ success: false, message: "failed to verify limit add-on order" }, { status: 500 });
   }
 }

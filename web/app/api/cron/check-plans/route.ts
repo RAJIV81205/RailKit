@@ -107,7 +107,9 @@ export async function POST(req: Request) {
         if (!result.changed) return user;
         const savedUser = await user.save();
         if (result.expired) {
-          await sendBillingExpiredEmail({ name: savedUser.name, email: savedUser.email });
+          await sendBillingExpiredEmail({ name: savedUser.name, email: savedUser.email }).catch(
+            (error) => console.error(`[cron] Expiry email failed for user ${savedUser._id}:`, error),
+          );
         }
         return savedUser;
       }
@@ -155,7 +157,9 @@ export async function POST(req: Request) {
         await sendBillingExpiredEmail({
           name: savedUser.name,
           email: savedUser.email,
-        });
+        }).catch((error) =>
+          console.error(`[cron] Expiry email failed for user ${savedUser._id}:`, error),
+        );
       }
 
       return savedUser;

@@ -1,6 +1,9 @@
 import { Cashfree, CFEnvironment } from "cashfree-pg";
 
 const envName = process.env.CASHFREE_ENVIRONMENT?.toLowerCase();
+if (envName !== "sandbox" && envName !== "production") {
+  throw new Error("CASHFREE_ENVIRONMENT must be explicitly set to sandbox or production");
+}
 const isSandbox = envName === "sandbox";
 
 const clientId = isSandbox

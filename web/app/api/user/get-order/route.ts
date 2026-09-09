@@ -67,6 +67,8 @@ export async function GET(request: Request) {
       type PaymentEntityLike = {
         payment_status?: string;
         cf_payment_id?: string | number;
+        payment_amount?: number;
+        payment_currency?: string;
       };
 
       const [orderResponse, paymentsResponse] = await Promise.all([
@@ -75,6 +77,10 @@ export async function GET(request: Request) {
       ]);
 
       const cfOrderStatus = orderResponse.data.order_status;
+      const orderData = orderResponse.data as typeof orderResponse.data & {
+        customer_details?: { customer_id?: string | null } | null;
+        customer_id?: string | null;
+      };
       const payments = (paymentsResponse.data || []) as PaymentEntityLike[];
       const successPayment = payments.find(
         (payment) => payment?.payment_status === "SUCCESS"
@@ -87,7 +93,17 @@ export async function GET(request: Request) {
         latestPayment?.payment_status || undefined,
         latestPayment?.cf_payment_id
           ? String(latestPayment.cf_payment_id)
-          : null
+          : null,
+        {
+          orderAmount: orderData.order_amount,
+          orderCurrency: orderData.order_currency,
+          paymentAmount: latestPayment?.payment_amount,
+          paymentCurrency: latestPayment?.payment_currency,
+          customerId:
+            orderData.customer_details?.customer_id ||
+            orderData.customer_id ||
+            null,
+        },
       );
     }
 
@@ -108,26 +124,19 @@ export async function GET(request: Request) {
           status: latestOrder?.status,
           paymentStatus: latestOrder?.paymentStatus,
           credited: latestOrder?.credited,
+          requiresSupport: Boolean(
+            latestOrder?.note?.includes("manual review required"),
+          ),
         },
       },
       { status: 200 }
     );
   } catch (error: unknown) {
-    const message =
-      typeof error === "object" &&
-      error !== null &&
-      "response" in error &&
-      typeof (error as { response?: { data?: { message?: string } } }).response
-        ?.data?.message === "string"
-        ? (error as { response?: { data?: { message?: string } } }).response!.data!
-            .message!
-        : "failed to fetch order";
-
     console.error("Get order route error:", error);
     return NextResponse.json(
       {
         success: false,
-        message,
+        message: "failed to fetch order",
       },
       { status: 500 }
     );

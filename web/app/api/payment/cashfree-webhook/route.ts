@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/db";
 import { cashfree } from "@/lib/payments/cashfree";
 import { applyOrderPaymentState } from "@/lib/payments/order";
+import {
+  isSuccessfulPaymentStatus,
+  normalizeNonSuccessfulOrderStatus,
+  validateWebhookTimestamp,
+} from "@/lib/payments/validation";
+import { fulfillLimitTopup } from "@/lib/payments/topup";
+import LimitTopup from "@/lib/db/models/LimitTopup";
 
 type CashfreeWebhookPayload = {
   type?: string;
@@ -67,11 +74,36 @@ export async function POST(request: Request) {
 
     const signature = request.headers.get("x-webhook-signature");
     const timestamp = request.headers.get("x-webhook-timestamp");
+    const webhookVersion = request.headers.get("x-webhook-version");
+    const idempotencyKey =
+      request.headers.get("x-idempotency-key") ||
+      request.headers.get("x-idempotency-header");
 
-    if (!signature || !timestamp) {
+    if (!signature || !timestamp || !webhookVersion) {
       return NextResponse.json(
-        { success: false, message: "missing webhook signature headers" },
+        { success: false, message: "missing required webhook headers" },
         { status: 400 }
+      );
+    }
+
+    if (webhookVersion !== "2023-08-01" && webhookVersion !== "2025-01-01") {
+      return NextResponse.json(
+        { success: false, message: "unsupported webhook version" },
+        { status: 400 },
+      );
+    }
+
+    if (webhookVersion === "2025-01-01" && !idempotencyKey) {
+      return NextResponse.json(
+        { success: false, message: "missing webhook idempotency key" },
+        { status: 400 },
+      );
+    }
+
+    if (!validateWebhookTimestamp(timestamp)) {
+      return NextResponse.json(
+        { success: false, message: "stale or invalid webhook timestamp" },
+        { status: 401 },
       );
     }
 
@@ -83,21 +115,14 @@ export async function POST(request: Request) {
     );
 
     const eventPayload = getVerifiedWebhookPayload(verified, rawBody);
-    const eventType = eventPayload?.type?.toUpperCase() || null;
     const orderId = eventPayload?.data?.order?.order_id?.trim();
     const paymentStatus = eventPayload?.data?.payment?.payment_status || null;
     const orderStatus =
       eventPayload?.data?.order?.order_status ||
       getOrderStatusForPaymentStatus(paymentStatus);
     const transactionReference =
-      eventPayload?.data?.payment?.cf_payment_id ||
-      eventPayload?.data?.payment?.bank_reference ||
-      eventPayload?.data?.payment?.auth_id ||
-      null;
-    const isSuccessfulPayment =
-      paymentStatus?.toUpperCase() === "SUCCESS" ||
-      eventType === "PAYMENT_SUCCESS_WEBHOOK";
-
+      eventPayload?.data?.payment?.cf_payment_id || null;
+    const orderType = eventPayload?.data?.order?.order_tags?.order_type;
     if (!orderId) {
       return NextResponse.json(
         { success: true, message: "webhook accepted without order id" },
@@ -105,7 +130,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!orderStatus && !paymentStatus && !isSuccessfulPayment) {
+    if (!orderStatus && !paymentStatus) {
       return NextResponse.json(
         {
           success: true,
@@ -115,13 +140,76 @@ export async function POST(request: Request) {
       );
     }
 
-    await applyOrderPaymentState({
+    if (orderType === "limit_topup") {
+      const customerId = eventPayload.data?.customer_details?.customer_id;
+      if (!customerId) throw new Error("Top-up webhook customer is missing");
+
+      if (!isSuccessfulPaymentStatus(paymentStatus)) {
+        await LimitTopup.updateOne(
+          {
+            orderId,
+            userId: customerId,
+            credited: false,
+            paymentStatus: { $ne: "SUCCESS" },
+            status: { $ne: "paid" },
+          },
+          {
+            $set: {
+              status: normalizeNonSuccessfulOrderStatus(orderStatus || paymentStatus),
+              paymentStatus: paymentStatus?.toUpperCase() || "PENDING",
+              cashfreeOrderStatus: orderStatus || null,
+            },
+          },
+        );
+        return NextResponse.json(
+          { success: true, message: "top-up webhook processed" },
+          { status: 200 },
+        );
+      }
+
+      const topupResult = await fulfillLimitTopup({
+        orderId,
+        userId: customerId,
+        orderStatus,
+        paymentStatus,
+        transactionReference: transactionReference ? String(transactionReference) : null,
+        orderAmount: eventPayload.data?.order?.order_amount,
+        orderCurrency: eventPayload.data?.order?.order_currency,
+        paymentAmount: eventPayload.data?.payment?.payment_amount,
+        paymentCurrency: eventPayload.data?.payment?.payment_currency,
+        customerId,
+      });
+      if (!topupResult.found) {
+        console.error(`[billing] Cashfree webhook referenced unknown top-up ${orderId}`);
+      }
+      if (topupResult.requiresSupport) {
+        console.error(`[billing] Paid top-up ${orderId} requires manual entitlement review`);
+      }
+      return NextResponse.json(
+        { success: true, message: "top-up webhook processed" },
+        { status: 200 },
+      );
+    }
+
+    const result = await applyOrderPaymentState({
       orderId,
       orderStatus,
       paymentStatus,
       transactionReference: transactionReference ? String(transactionReference) : null,
+      orderAmount: eventPayload.data?.order?.order_amount,
+      orderCurrency: eventPayload.data?.order?.order_currency,
+      paymentAmount: eventPayload.data?.payment?.payment_amount,
+      paymentCurrency: eventPayload.data?.payment?.payment_currency,
+      customerId: eventPayload.data?.customer_details?.customer_id,
       source: "webhook",
     });
+
+    if (!result.found) {
+      console.error(`[billing] Cashfree webhook referenced unknown order ${orderId}`);
+    }
+    if (result.fulfillmentBlocked) {
+      console.error(`[billing] Paid order ${orderId} requires manual entitlement review`);
+    }
 
     return NextResponse.json(
       { success: true, message: "webhook processed" },

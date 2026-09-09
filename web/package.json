@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "tsx --test \"**/*.test.ts\"",
     "lint": "eslint",
     "cleanup-audit-logs": "npx tsx scripts/cleanupAuditLogs.ts",
     "cleanup-audit-logs:dry-run": "npx tsx scripts/cleanupAuditLogs.ts --dry-run"
@@ -16,14 +17,14 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@vercel/analytics": "^2.0.1",
-    "cashfree-pg": "^5.1.0",
+    "cashfree-pg": "^6.0.5",
     "firebase": "^12.11.0",
-    "google-auth-library": "^9.15.1",
+    "google-auth-library": "^11.0.2",
     "irctc-connect": "^3.3.2",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^0.556.0",
-    "mongoose": "^9.3.3",
-    "next": "^16.2.9",
+    "mongoose": "^9.7.2",
+    "next": "^16.2.11",
     "railkit": "^5.0.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
@@ -41,7 +42,9 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.2",
     "eslint-config-next": "16.0.7",
+    "mongodb-memory-server": "^10.4.3",
     "tailwindcss": "^4.1.18",
+    "tsx": "^4.23.13",
     "typescript": "^5.9.3"
   }
 }

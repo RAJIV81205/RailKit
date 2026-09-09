@@ -808,6 +808,12 @@ export default function DashboardPage() {
           );
           return data;
         }
+        if (data?.requiresSupport) {
+          setLimitPurchaseMessage(
+            "Payment was received, but the plan expired before activation. Please contact support with your order ID.",
+          );
+          return data;
+        }
         setLimitPurchaseMessage(
           `Limit increased by ${Number(data.extraLimit || 0).toLocaleString("en-IN")} requests.`,
         );

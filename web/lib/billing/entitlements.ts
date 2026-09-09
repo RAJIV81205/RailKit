@@ -83,13 +83,18 @@ export function syncV2Entitlement(user: User, now = new Date()) {
     user.baseLimit = null;
     user.addonLimit = null;
     user.billingDate = null;
-      user.expirationDate = null;
+    user.expirationDate = null;
     user.quotaPeriodStart = null;
     user.quotaPeriodEnd = null;
     user.entitlementVersion = null;
     user.billingInterval = null;
     return { changed: true, expired: true };
   }
+
+  // Monthly plans expire at the end of their single quota period. Only
+  // annual plans roll into another monthly quota period while still active.
+  if (user.billingInterval !== "year")
+    return { changed: false, expired: false };
 
   if (!user.quotaPeriodEnd || !user.quotaPeriodStart)
     return { changed: false, expired: false };

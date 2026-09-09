@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+# Local billing tests (run manually with npm test)
+**/*.test.ts
 
 # next.js
 /.next/

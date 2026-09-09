@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import User from "@/lib/db/models/User";
 import Order from "@/lib/db/models/Order";
 import {
@@ -14,10 +15,14 @@ import {
   getWebhookUrl,
 } from "@/lib/payments/cashfree";
 import { getPaidPlanRuntime, isPaidPlanType } from "@/lib/constants";
+import { getCashfreeIdempotencyKey } from "@/lib/payments/validation";
+import {
+  CheckoutReservationError,
+  reservePlanCheckout,
+} from "@/lib/payments/checkout";
 
 function makeOrderId(userId: string) {
-  const suffix = Math.random().toString(36).slice(2, 8);
-  return `order_${userId.slice(-8)}_${Date.now()}_${suffix}`;
+  return `order_${userId.slice(-8)}_${randomUUID().replace(/-/g, "")}`;
 }
 
 function sanitizeCustomerName(name?: string) {
@@ -28,7 +33,7 @@ function sanitizeCustomerName(name?: string) {
 function unauthorizedResponse() {
   const response = NextResponse.json(
     { success: false, message: "unauthorized" },
-    { status: 401 }
+    { status: 401 },
   );
   response.cookies.set(getAuthCookieName(), "", {
     httpOnly: true,
@@ -45,7 +50,13 @@ export async function POST(request: Request) {
     await connectToDatabase();
 
     if (process.env.BILLING_V2_ENABLED !== "true") {
-      return NextResponse.json({ success: false, message: "new billing plans are temporarily unavailable" }, { status: 503 });
+      return NextResponse.json(
+        {
+          success: false,
+          message: "new billing plans are temporarily unavailable",
+        },
+        { status: 503 },
+      );
     }
 
     const token = await getAuthTokenFromCookies();
@@ -58,59 +69,127 @@ export async function POST(request: Request) {
     if (!payload || !payload.userId) {
       return unauthorizedResponse();
     }
-    
+
     const user = await User.findById(payload.userId).lean();
     if (!user || !user.active) {
       return unauthorizedResponse();
     }
 
-    const body = (await request.json()) as { planType?: string; billingInterval?: string };
-    if (!isPaidPlanType(body.planType)) {
+    const contentLength = Number(request.headers.get("content-length") || 0);
+    if (contentLength > 4_096) {
       return NextResponse.json(
-        { success: false, message: "invalid plan type" },
-        { status: 400 }
+        { success: false, message: "request is too large" },
+        { status: 413 },
       );
     }
 
-    const billingInterval = body.billingInterval === "year" ? "year" : body.billingInterval === "month" ? "month" : null;
-    if (!billingInterval) {
-      return NextResponse.json({ success: false, message: "billingInterval must be month or year" }, { status: 400 });
+    const body = (await request.json()) as {
+      planType?: string;
+      billingInterval?: string;
+    };
+    if (!isPaidPlanType(body.planType)) {
+      return NextResponse.json(
+        { success: false, message: "invalid plan type" },
+        { status: 400 },
+      );
     }
 
-    // Existing users are never rewritten. V2 users cannot double-purchase.
-    if (user.plan !== "free" && user.expirationDate && user.expirationDate.getTime() > Date.now()) {
-      return NextResponse.json({ success: false, message: "active plan cannot be changed before expiry" }, { status: 409 });
+    const billingInterval =
+      body.billingInterval === "year"
+        ? "year"
+        : body.billingInterval === "month"
+          ? "month"
+          : null;
+    if (!billingInterval) {
+      return NextResponse.json(
+        { success: false, message: "billingInterval must be month or year" },
+        { status: 400 },
+      );
     }
 
     const planConfig = getPaidPlanRuntime(body.planType, billingInterval);
     if (!planConfig) {
       return NextResponse.json(
         { success: false, message: "plan config not found" },
-        { status: 400 }
+        { status: 400 },
       );
     }
+    const now = new Date();
     const orderId = makeOrderId(user._id.toString());
+    const checkoutExpiresAt = new Date(now.getTime() + 30 * 60 * 1000);
+    let reservation: Awaited<ReturnType<typeof reservePlanCheckout>>;
 
-    const createdOrderDoc = await Order.create({
-      userId: user._id,
-      orderId,
-      cfOrderId: null,
-      paymentSessionId: null,
-      planType: body.planType,
-      entitlementVersion: 2,
-      billingInterval,
-      termMonths: planConfig.termMonths,
-      monthlyLimit: planConfig.limit,
-      amount: planConfig.amount,
-      currency: "INR",
-      status: "created",
-      paymentStatus: "PENDING",
-      credited: false,
-      cashfreeOrderStatus: null,
-    });
+    try {
+      reservation = await reservePlanCheckout({
+        userId: user._id.toString(),
+        orderId,
+        planType: body.planType,
+        billingInterval,
+        termMonths: planConfig.termMonths,
+        monthlyLimit: planConfig.limit,
+        amount: planConfig.amount,
+        currency: "INR",
+      });
+    } catch (error) {
+      const code = error instanceof CheckoutReservationError ? error.code : "";
+      if (code === "ACTIVE_PLAN") {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "active plan cannot be changed before expiry",
+          },
+          { status: 409 },
+        );
+      }
+      if (code === "CHECKOUT_IN_PROGRESS") {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "another checkout is already in progress",
+          },
+          { status: 409 },
+        );
+      }
+      if (code === "RATE_LIMITED") {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "too many checkout attempts; try again later",
+          },
+          { status: 429 },
+        );
+      }
+      if (code === "USER_NOT_ACTIVE") return unauthorizedResponse();
+      throw error;
+    }
+
+    if (reservation.reused) {
+      const reusableOrder = await Order.findOne({
+        orderId: reservation.orderId,
+      }).lean();
+      if (reusableOrder?.paymentSessionId) {
+        return NextResponse.json({
+          success: true,
+          message: "existing checkout returned",
+          order: {
+            orderId: reusableOrder.orderId,
+            paymentSessionId: reusableOrder.paymentSessionId,
+            planType: reusableOrder.planType,
+            amount: reusableOrder.amount,
+            currency: reusableOrder.currency,
+            status: reusableOrder.status,
+          },
+          cashfreeMode: getCashfreeCheckoutMode(),
+        });
+      }
+    }
+
+    const effectiveOrderId = reservation.orderId;
+    const createdOrderDoc = await Order.findOne({ orderId: effectiveOrderId });
+    if (!createdOrderDoc) throw new Error("Created order could not be loaded");
 
     const cashfreeRequest = {
-      order_id: orderId,
+      order_id: effectiveOrderId,
       order_amount: planConfig.amount,
       order_currency: "INR",
       customer_details: {
@@ -123,6 +202,7 @@ export async function POST(request: Request) {
         return_url: getAppReturnUrl(),
         notify_url: getWebhookUrl(),
       },
+      order_expiry_time: checkoutExpiresAt.toISOString(),
       order_note: `${body.planType} ${billingInterval} plan for railkit`,
       order_tags: {
         plan_type: body.planType,
@@ -131,7 +211,11 @@ export async function POST(request: Request) {
     };
 
     try {
-      const cashfreeResponse = await cashfree.PGCreateOrder(cashfreeRequest);
+      const cashfreeResponse = await cashfree.PGCreateOrder(
+        cashfreeRequest,
+        effectiveOrderId,
+        getCashfreeIdempotencyKey(effectiveOrderId),
+      );
       const cfOrder = cashfreeResponse.data;
 
       if (!cfOrder.payment_session_id) {
@@ -147,13 +231,13 @@ export async function POST(request: Request) {
 
         return NextResponse.json(
           { success: false, message: "payment session was not created" },
-          { status: 502 }
+          { status: 502 },
         );
       }
 
       createdOrderDoc.cfOrderId =
         typeof cfOrder.cf_order_id === "number" ? cfOrder.cf_order_id : null;
-      createdOrderDoc.orderId = cfOrder.order_id || orderId;
+      createdOrderDoc.orderId = cfOrder.order_id || effectiveOrderId;
       createdOrderDoc.paymentSessionId = cfOrder.payment_session_id || null;
       createdOrderDoc.status =
         cfOrder.order_status?.toLowerCase() === "active" ? "active" : "created";
@@ -186,26 +270,16 @@ export async function POST(request: Request) {
         },
         cashfreeMode: getCashfreeCheckoutMode(),
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: unknown) {
-    const message =
-      typeof error === "object" &&
-      error !== null &&
-      "response" in error &&
-      typeof (error as { response?: { data?: { message?: string } } }).response
-        ?.data?.message === "string"
-        ? (error as { response?: { data?: { message?: string } } }).response!.data!
-            .message!
-        : "failed to create order";
-
     console.error("Create order route error:", error);
     return NextResponse.json(
       {
         success: false,
-        message,
+        message: "failed to create order",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

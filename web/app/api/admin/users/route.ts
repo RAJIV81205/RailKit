@@ -140,7 +140,7 @@ export async function PUT(req: Request) {
         updates.bannedAt = now;
         updates.bannedBy = moderator;
         if (!("bannedUntil" in rawUpdates) && !("bannedUntil" in updates)) {
-          updates.bannedUntil = new Date(now.getTime() + 12 * 60 * 60 * 1000);
+          updates.bannedUntil = null;
         }
       } else if (nextStatus === "flagged") {
         updates.status = "flagged";
@@ -173,6 +173,19 @@ export async function PUT(req: Request) {
       updates.statusReasons = nextReasons;
     }
 
+    // A moderation ban always disables the account, including legacy records
+    // that were already marked banned before this invariant was enforced.
+    if (nextStatus === "banned") {
+      updates.active = false;
+      if (
+        !("bannedUntil" in rawUpdates) ||
+        rawUpdates.bannedUntil === null ||
+        rawUpdates.bannedUntil === ""
+      ) {
+        updates.bannedUntil = null;
+      }
+    }
+
     const normalizeNullableDate = (value: unknown) => {
       if (value === null || value === "") return null;
       if (typeof value !== "string") return undefined;
@@ -193,14 +206,45 @@ export async function PUT(req: Request) {
       );
     }
 
-    for (const field of [
-      "usage",
-      "limit",
-      "baseLimit",
-      "addonLimit",
-    ] as const) {
+    if (
+      "plan" in updates &&
+      updates.plan !== "free" &&
+      updates.plan !== "pro" &&
+      updates.plan !== "enterprise"
+    ) {
+      return NextResponse.json(
+        { success: false, message: "Invalid plan" },
+        { status: 400 },
+      );
+    }
+
+    for (const field of ["active", "whitelisted"] as const) {
+      if (field in updates && typeof updates[field] !== "boolean") {
+        return NextResponse.json(
+          { success: false, message: `Invalid ${field}` },
+          { status: 400 },
+        );
+      }
+    }
+
+    for (const field of ["usage", "limit"] as const) {
       if (
         field in updates &&
+        (typeof updates[field] !== "number" ||
+          !Number.isInteger(updates[field]) ||
+          updates[field] < 0)
+      ) {
+        return NextResponse.json(
+          { success: false, message: `Invalid ${field}` },
+          { status: 400 },
+        );
+      }
+    }
+
+    for (const field of ["baseLimit", "addonLimit"] as const) {
+      if (
+        field in updates &&
+        updates[field] !== null &&
         (typeof updates[field] !== "number" ||
           !Number.isInteger(updates[field]) ||
           updates[field] < 0)

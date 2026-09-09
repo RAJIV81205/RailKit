@@ -4,6 +4,7 @@ import { OAuth2Client } from "google-auth-library";
 import { connectToDatabase } from "@/lib/db/db";
 import User from "@/lib/db/models/User";
 import { signAuthToken, getAuthCookieName } from "@/lib/auth";
+import { isBlockedEmail } from "@/lib/auth/emailPolicy";
 
 export type GoogleAuthSuccess = {
   ok: true;
@@ -122,6 +123,14 @@ export async function authenticateWithGoogleCode(
       ok: false,
       status: 401,
       message: "Google account does not contain an email",
+    };
+  }
+
+  if (isBlockedEmail(email)) {
+    return {
+      ok: false,
+      status: 403,
+      message: "This email domain is not allowed",
     };
   }
 

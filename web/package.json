@@ -18,6 +18,7 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "@vercel/analytics": "^2.0.1",
     "cashfree-pg": "^6.0.5",
+    "disposable-email-domains-js": "^1.25.0",
     "firebase": "^12.11.0",
     "google-auth-library": "^11.0.2",
     "irctc-connect": "^3.3.2",

@@ -1236,7 +1236,7 @@ function EditUserModal({
                   fontFamily: "'JetBrains Mono', monospace",
                 }}
               >
-                Edit this to extend or shorten ban window.
+                Leave blank for a permanent ban. Set a date only for a temporary ban.
               </span>
             </label>
             <input
@@ -1598,21 +1598,31 @@ function EditUserModal({
           <button
             type="button"
             onClick={() => {
+              const changed: Partial<User> = {};
+              const editableFields = [
+                "plan",
+                "active",
+                "usage",
+                "limit",
+                "billingDate",
+                "expirationDate",
+                "billingInterval",
+                "baseLimit",
+                "addonLimit",
+                "quotaPeriodStart",
+                "quotaPeriodEnd",
+                "bannedUntil",
+                "status",
+                "whitelisted",
+              ] as const;
+              for (const field of editableFields) {
+                if (draft[field] !== user[field]) {
+                  Object.assign(changed, { [field]: draft[field] ?? null });
+                }
+              }
+
               onSave(user._id, {
-                plan: draft.plan,
-                active: draft.active,
-                usage: draft.usage,
-                limit: draft.limit,
-                billingDate: draft.billingDate || null,
-                expirationDate: draft.expirationDate || null,
-                billingInterval: draft.billingInterval || "month",
-                baseLimit: draft.baseLimit ?? null,
-                addonLimit: draft.addonLimit ?? null,
-                quotaPeriodStart: draft.quotaPeriodStart || null,
-                quotaPeriodEnd: draft.quotaPeriodEnd || null,
-                bannedUntil: draft.bannedUntil || null,
-                status: draft.status,
-                whitelisted: !!draft.whitelisted,
+                ...changed,
                 statusReason: statusReason.trim() || undefined,
                 statusNote: statusNote.trim() || undefined,
               });

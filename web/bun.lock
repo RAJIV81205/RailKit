@@ -11,6 +11,7 @@
         "@types/react-syntax-highlighter": "^15.5.13",
         "@vercel/analytics": "^2.0.1",
         "cashfree-pg": "^6.0.5",
+        "disposable-email-domains-js": "^1.25.0",
         "firebase": "^12.11.0",
         "google-auth-library": "^11.0.2",
         "irctc-connect": "^3.3.2",
@@ -800,6 +801,8 @@
     "detect-libc": ["detect-libc@2.1.2", "", {}, "sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ=="],
 
     "dfa": ["dfa@1.2.0", "", {}, "sha512-ED3jP8saaweFTjeGX8HQPjeC1YYyZs98jGNZx6IiBvxW7JG5v492kamAQB3m2wop07CvU/RQmzcKr6bgcC5D/Q=="],
+
+    "disposable-email-domains-js": ["disposable-email-domains-js@1.25.0", "", {}, "sha512-G16ih6YqeZV9CozhVW8IASgSAhGaJ2Tr58RRtZ8Ff5glhTCEav2VX74ciETHZ01n9D57aQasEvDzaBmzATYdYw=="],
 
     "doctrine": ["doctrine@2.1.0", "", { "dependencies": { "esutils": "^2.0.2" } }, "sha512-35mSku4ZXK0vfCuHEDAwt55dg2jNajHZ1odvF+8SSr82EsZY4QmXfuWso8oEd8zRhVObSN18aM0CjSdoBX7zIw=="],
 

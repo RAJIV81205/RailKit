@@ -362,9 +362,7 @@ if (result.success) {
       { name: "stationCode", type: "string", desc: "Station code such as ASN or NDLS" },
       { name: "date", type: "string", desc: "Optional DD-MM-YYYY date; only today, yesterday, or tomorrow is accepted" },
     ],
-    example: `const result = await fetch(
-  "/api/v1/stations/ASN/timetable?date=28-08-2026"
-).then((res) => res.json());
+    example: `const result = await trainTimetableAtStation( "ASN","28-08-2026" );
 
 if (result.success) {
   console.log(result.data.totalTrains);
@@ -395,7 +393,7 @@ if (result.success) {
     description: "Resolve a station code to its name and coordinates.",
     signature: "stationByCode(stationCode: string)",
     params: [{ name: "stationCode", type: "string", desc: "Station code such as NDLS or HWH" }],
-    example: `const result = await fetch("/api/v1/stations/NDLS").then((res) => res.json());
+    example: `const result = await stationByCode("NDLS");
 
 if (result.success) {
   console.log(result.data.code, result.data.name);
@@ -412,13 +410,13 @@ if (result.success) {
     description: "Find up to 10 matching stations by partial name.",
     signature: "stationsByName(name: string)",
     params: [{ name: "name", type: "string", desc: "At least 2 characters; partial matching supported" }],
-    example: `const result = await fetch(
-  "/api/v1/stations/search?name=delhi"
-).then((res) => res.json());
+    example: `const result = await stationsByName("delhi");
 
-result.data.stations.forEach((station) => {
-  console.log(station.name, station.code);
-});`,
+if (result.success) {
+  result.data.stations.forEach((station) => {
+    console.log(station.name, station.code);
+  });
+}`,
     response: `{
   "success": true,
   "data": {
@@ -438,7 +436,7 @@ result.data.stations.forEach((station) => {
     description: "Resolve a train number to its stored train name.",
     signature: "trainByNumber(trainNumber: string)",
     params: [{ name: "trainNumber", type: "string", desc: "Exactly 5 numeric digits" }],
-    example: `const result = await fetch("/api/v1/trains/12345").then((res) => res.json());
+    example: `const result = await trainByNumber("12345");
 
 if (result.success) {
   console.log(result.data.trainNo, result.data.trainName);
@@ -455,13 +453,13 @@ if (result.success) {
     description: "Find up to 10 trains matching a partial train name.",
     signature: "trainsByName(name: string)",
     params: [{ name: "name", type: "string", desc: "At least 2 characters; partial matching supported" }],
-    example: `const result = await fetch(
-  "/api/v1/trains/search?name=rajdhani"
-).then((res) => res.json());
+    example: `const result = await trainsByName("rajdhani");
 
-result.data.trains.forEach((train) => {
-  console.log(train.trainName, train.trainNo);
-});`,
+if (result.success) {
+  result.data.trains.forEach((train) => {
+    console.log(train.trainName, train.trainNo);
+  });
+}`,
     response: `{
   "success": true,
   "data": {

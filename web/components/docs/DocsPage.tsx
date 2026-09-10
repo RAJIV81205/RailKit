@@ -122,46 +122,18 @@ const cancelled = await cancelList();`;
 
 const docsBaseUrl = "https://railkit.in/docs";
 
-const sdkExampleOverrides: Partial<Record<EndpointDoc["id"], string>> = {
-  "station-timetable": `const result = await trainTimetableAtStation(
-  "ASN",
-  "28-08-2026",
-);`,
-  "station-by-code": `const result = await stationByCode("NDLS");
-
-if (result.success) {
-  console.log(result.data.code, result.data.name);
-}`,
-  "station-search": `const result = await stationsByName("delhi");
-
-if (result.success) {
-  console.log(result.data.stations);
-}`,
-  "train-by-number": `const result = await trainByNumber("12345");
-
-if (result.success) {
-  console.log(result.data.trainNo, result.data.trainName);
-}`,
-  "train-name-search": `const result = await trainsByName("rajdhani");
-
-if (result.success) {
-  console.log(result.data.trains);
-}`,
-};
-
 function getSdkFunctionName(endpoint: EndpointDoc) {
   return endpoint.signature.slice(0, endpoint.signature.indexOf("("));
 }
 
 function buildSdkEndpointSnippet(endpoint: EndpointDoc) {
   const functionName = getSdkFunctionName(endpoint);
-  const usage = sdkExampleOverrides[endpoint.id] || endpoint.example;
 
   return `import { configure, ${functionName} } from "railkit";
 
 configure(process.env.RAILKIT_API_KEY);
 
-${usage}`;
+${endpoint.example}`;
 }
 
 function getEndpointParamLocation(endpointId: string, name: string) {
@@ -1621,7 +1593,10 @@ function EndpointDocsCard({
           <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 7 }}>Parameters</p>
           <EndpointParams endpointId={endpoint.id} params={endpoint.params} />
           <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 7 }}>Code Example</p>
-          <DocsCodePanel language="javascript" code={endpoint.example} />
+          <DocsCodePanel
+            language="javascript"
+            code={buildSdkEndpointSnippet(endpoint)}
+          />
         </div>
       ) : rest ? (
         <div key="rest" className="docs-code-swap">
@@ -1663,18 +1638,6 @@ function RestEndpointPanel({
 }) {
   return (
     <>
-      <p
-        style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 11,
-          color: "#6b7280",
-          overflowWrap: "anywhere",
-          marginBottom: 6,
-        }}
-      >
-        {baseUrl}
-        {endpoint.examplePath}
-      </p>
       <p
         style={{
           fontSize: 12,

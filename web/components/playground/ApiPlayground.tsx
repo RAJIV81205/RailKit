@@ -16,6 +16,7 @@ import {
   stationByCode,
   stationsByName,
   trackTrain,
+  trackTrainV2,
   trainByNumber,
   trainTimetableAtStation,
   trainsByName,
@@ -26,6 +27,7 @@ type Action =
   | "pnr"
   | "train"
   | "track"
+  | "trackV2"
   | "history"
   | "station"
   | "search"
@@ -77,9 +79,15 @@ const groups: { label: string; items: Endpoint[] }[] = [
       },
       {
         id: "track",
-        label: "Track Train",
+        label: "Track Train V1 · NTES",
         path: "/api/v1/trains/:trainNumber/live/:date",
-        description: "Get the live running status of a train.",
+        description: "Get NTES-backed live running status.",
+      },
+      {
+        id: "trackV2",
+        label: "Track Train V2 · WIMT",
+        path: "/api/v2/trains/:trainNumber/live/:date",
+        description: "Get WIMT-backed live status and expanded route data.",
       },
       {
         id: "history",
@@ -233,6 +241,8 @@ export default function ApiPlayground({
         return `/api/v1/trains/${value(form.trainNumber, "trainNumber")}/info`;
       case "track":
         return `/api/v1/trains/${value(form.trainNumber, "trainNumber")}/live/${value(date, "date")}`;
+      case "trackV2":
+        return `/api/v2/trains/${value(form.trainNumber, "trainNumber")}/live/${value(date, "date")}`;
       case "history":
         return `/api/v1/trains/${value(form.trainNumber, "trainNumber")}/history/${value(date, "date")}`;
       case "station":
@@ -281,6 +291,11 @@ export default function ApiPlayground({
           if (!form.journeyDate)
             throw new Error("Journey date is required.");
           result = await trackTrain(form.trainNumber, form.journeyDate);
+          break;
+        case "trackV2":
+          if (!form.journeyDate)
+            throw new Error("Journey date is required.");
+          result = await trackTrainV2(form.trainNumber, form.journeyDate);
           break;
         case "history":
           result = await getTrainHistory(form.trainNumber, form.journeyDate);
@@ -389,8 +404,20 @@ export default function ApiPlayground({
         <input
           id={`playground-${selected}-${key}`}
           type={type}
-          min={type === "date" && selected === "timetable" ? dateWithOffset(-1) : undefined}
-          max={type === "date" && selected === "timetable" ? dateWithOffset(1) : undefined}
+          min={
+            type === "date" && selected === "timetable"
+              ? dateWithOffset(-1)
+              : type === "date" && selected === "trackV2"
+                ? dateWithOffset(-5)
+                : undefined
+          }
+          max={
+            type === "date" && selected === "timetable"
+              ? dateWithOffset(1)
+              : type === "date" && selected === "trackV2"
+                ? dateWithOffset(0)
+                : undefined
+          }
           value={type === "date" ? toDateInputValue(form[key]) : form[key]}
           onChange={(event) =>
             set(
@@ -520,6 +547,7 @@ export default function ApiPlayground({
               {[
                 "train",
                 "track",
+                "trackV2",
                 "history",
                 "availability",
                 "fare",
@@ -530,13 +558,15 @@ export default function ApiPlayground({
                   "Train number",
                   "Exactly 5 numeric digits",
                 )}
-              {["track", "history", "availability", "fare"].includes(
+              {["track", "trackV2", "history", "availability", "fare"].includes(
                 selected,
               ) &&
                 field(
                   "journeyDate",
                   "Journey date",
-                  "Required · DD-MM-YYYY",
+                  selected === "trackV2"
+                    ? "Required · today through five days ago"
+                    : "Required · DD-MM-YYYY",
                   "date",
                 )}
               {["station", "stationCode", "timetable"].includes(selected) &&

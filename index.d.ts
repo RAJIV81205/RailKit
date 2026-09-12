@@ -31,13 +31,13 @@ export function getTrainInfo(trainNumber: string): Promise<any>;
 /**
  * Get the live running status of a train.
  * @param trainNumber - 5-digit train number
- * @param date - Journey date in DD-MM-YYYY format (optional, defaults to today)
+ * @param date - Required journey date in DD-MM-YYYY format or "today"
  *
  * @example
  * const result = await trackTrain('12301', '15-04-2025');
  *
  */
-export function trackTrain(trainNumber: string, date?: string): Promise<any>;
+export function trackTrain(trainNumber: string, date: string): Promise<any>;
 
 /**
  * Get live running status using the v2 WIMT-backed tracker.

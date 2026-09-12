@@ -102,17 +102,17 @@ if (result.success) {
   },
   {
     id: "live-tracking",
-    title: "Live Tracking",
+    title: "Track Train — V1 NTES",
     icon: MapPin,
     description:
-      "Track live train movement with station-by-station arrival and delay context.",
-    signature: "trackTrain(trainNumber: string, date?: string)",
+      "Track live movement using the NTES-backed v1 endpoint, with station-by-station arrival, departure, platform, and delay context.",
+    signature: "trackTrain(trainNumber: string, date: string)",
     params: [
       { name: "trainNumber", type: "string", desc: "5-digit train number" },
       {
         name: "date",
         type: "string",
-        desc: "Optional SDK journey date in DD-MM-YYYY; defaults to today. REST requires DD-MM-YYYY or today.",
+        desc: "Required journey date in DD-MM-YYYY format or today",
       },
     ],
     example: `const result = await trackTrain("12345", "28-08-2026");
@@ -129,6 +129,70 @@ if (result.success) {
     "coachPosition": [],
     "timeline": [{ "type": "stoppage", "status": "current", "stationCode": "HWH", "stationName": "HOWRAH JN", "platform": "15", "distanceKm": "", "arrival": { "scheduled": "SRC", "actual": "SRC", "delay": "" }, "departure": { "scheduled": "16:05 28-Aug", "actual": "16:05 28-Aug*", "delay": "On Time" } }],
     "currentStationCode": "HWH"
+  }
+}`,
+  },
+  {
+    id: "live-tracking-v2",
+    title: "Track Train — V2 WIMT",
+    icon: MapPin,
+    description:
+      "Track live movement using the WIMT-backed v2 endpoint, with expanded route points, current location, halt summaries, delay, speed, and coach-position data.",
+    signature: "trackTrainV2(trainNumber: string, date: string)",
+    params: [
+      { name: "trainNumber", type: "string", desc: "Exactly 5 numeric digits" },
+      {
+        name: "date",
+        type: "string",
+        desc: "Required date in DD-MM-YYYY or YYYY-MM-DD; today through five days ago",
+      },
+    ],
+    example: `const result = await trackTrainV2("20888", "2026-09-12");
+
+if (result.success) {
+  console.log(result.data.statusText);
+  console.log(result.data.currentLocation);
+  console.log(result.data.route);
+}`,
+    response: `{
+  "success": true,
+  "data": {
+    "startDate": "12-09-2026",
+    "lastUpdatedAt": "Sep 12, 2026, 16:22",
+    "status": "running",
+    "isLive": true,
+    "statusText": "Arriving Kashi (KEI)",
+    "trainInfo": [{
+      "number": "20888",
+      "name": "VANDE BHARAT EXP",
+      "source": { "code": "BSB", "name": "Varanasi Junction" },
+      "destination": { "code": "RNC", "name": "Ranchi Junction" },
+      "totalHalts": 10,
+      "coachPosition": "C7,C6,C5,C4,C3,E1,C2,C1"
+    }],
+    "currentLocation": {
+      "stnCode": "BSB",
+      "stnName": "Varanasi Junction",
+      "status": "departed",
+      "distanceToNextStationKm": 16.85,
+      "delayMinutes": 13
+    },
+    "nextHalt": {
+      "stnCode": "DDU",
+      "stnName": "Pt. DD Upadhyaya Junction (Mughalsarai)",
+      "distance": 18.1
+    },
+    "delayMinutes": 13,
+    "route": [
+      {
+        "sequence": 1,
+        "stnCode": "BSB",
+        "stnName": "Varanasi Junction",
+        "isHalt": true,
+        "status": "departed"
+      }
+    ],
+    "_provider": "wimt"
   }
 }`,
   },
@@ -504,11 +568,20 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
   },
   {
     id: "live-tracking",
-    name: "Track Train",
+    name: "Track Train — V1 NTES",
     method: "GET",
     path: "/api/v1/trains/:trainNumber/live/:date",
     examplePath: "/api/v1/trains/12345/live/28-08-2026",
     notes: "Date format: DD-MM-YYYY. You can also pass `today` as date.",
+  },
+  {
+    id: "live-tracking-v2",
+    name: "Track Train — V2 WIMT",
+    method: "GET",
+    path: "/api/v2/trains/:trainNumber/live/:date",
+    examplePath: "/api/v2/trains/20888/live/2026-09-12",
+    notes:
+      "Date is required in DD-MM-YYYY or YYYY-MM-DD format and must be from today through five days ago. The response shown is a real-time snapshot for train 20888.",
   },
   {
     id: "station-live",

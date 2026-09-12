@@ -159,7 +159,7 @@ export function createRailkitMcpServer(apiKey: string) {
       title: "Track train",
       description:
         "Get live running status, current station, delays, and station timeline. Date is DD-MM-YYYY or today.",
-      inputSchema: { trainNumber, date: trackDate.optional() },
+      inputSchema: { trainNumber, date: trackDate },
       outputSchema,
       annotations: readOnly,
     },

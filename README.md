@@ -92,7 +92,7 @@ const pnrResult = await checkPNRStatus('1234567890');
 // Get train information
 const trainResult = await getTrainInfo('12301');
 
-// Track live train status (date optional, defaults to today)
+// Track live train status (date required)
 const trackResult = await trackTrain('12301', '31-03-2026');
 
 // Get live trains at a station
@@ -295,7 +295,7 @@ if (result.success) {
 
 ---
 
-### 3. `trackTrain(trainNumber, date?)`
+### 3. `trackTrain(trainNumber, date)`
 
 Get real-time live status of a train with a unified station timeline (stoppages + intermediate stations in route order).
 
@@ -304,7 +304,7 @@ Get real-time live status of a train with a unified station timeline (stoppages 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `trainNumber` | string | 5-digit train number |
-| `date` | string *(optional)* | Date in `DD-MM-YYYY` format. Defaults to today if omitted. |
+| `date` | string | Required date in `DD-MM-YYYY` format or `today`. |
 
 **Example:**
 ```javascript

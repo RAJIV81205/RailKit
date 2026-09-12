@@ -32,8 +32,16 @@ export default function DocsLayoutShell({ children }: { children: React.ReactNod
         .docs-sidebar-group-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #9ca3af; padding: 0 10px; margin-bottom: 4px; margin-top: 4px; }
         .docs-sidebar-btn { position: relative; display: flex; width: 100%; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; border: none; background: transparent; font-family: 'Inter', system-ui, sans-serif; font-size: 13px; font-weight: 400; color: #6F6F6F; cursor: pointer; text-align: left; transition: background 0.15s, color 0.15s; text-decoration: none; }
         .docs-sidebar-btn:hover { background: rgba(0,0,0,0.04); color: #000; }
+        .docs-sidebar-btn:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.28); outline-offset: 2px; }
         .docs-sidebar-btn-active { background: #000; color: #fff; font-weight: 500; }
         .docs-sidebar-btn-active:hover { background: #111; color: #fff; }
+        .docs-sidebar-parent { display: flex; align-items: center; gap: 8px; padding: 8px 10px 5px; color: #374151; font-size: 13px; font-weight: 500; }
+        .docs-sidebar-parent-active { color: #000; }
+        .docs-sidebar-branch { position: relative; display: flex; flex-direction: column; gap: 2px; margin: 0 0 4px 17px; padding-left: 14px; }
+        .docs-sidebar-branch::before { content: ''; position: absolute; top: 0; bottom: 16px; left: 0; border-left: 1px solid #d1d5db; }
+        .docs-sidebar-child { padding: 5px 10px; font-size: 12px; }
+        .docs-sidebar-child::before { content: ''; position: absolute; top: 50%; left: -14px; width: 12px; border-top: 1px solid #d1d5db; }
+        .docs-sidebar-child.docs-sidebar-btn-active::before { border-color: #6b7280; }
         .docs-method-badge { margin-left: auto; border: 1px solid #bbf7d0; border-radius: 5px; background: #f0fdf4; color: #15803d; padding: 1px 5px; font-family: 'JetBrains Mono', monospace; font-size: 8px; font-weight: 600; letter-spacing: 0.04em; line-height: 1.5; }
         .docs-sidebar-btn-active .docs-method-badge { border-color: rgba(255,255,255,0.28); background: rgba(255,255,255,0.12); color: #bbf7d0; }
         .docs-sidebar-new-badge { position: absolute; top: 4px; left: 4px; z-index: 2; width: 7px; height: 7px; transform: rotate(45deg); border: 1px solid #93c5fd; border-radius: 2px; background: #3b82f6; pointer-events: none; }
@@ -64,6 +72,39 @@ export default function DocsLayoutShell({ children }: { children: React.ReactNod
                   {group.items.map((section) => {
                     const Icon = section.icon;
                     const isActive = activeSlug === section.id;
+                    const hasActiveChild = section.children?.some((child) => child.id === activeSlug);
+
+                    if (section.children?.length) {
+                      return (
+                        <div key={section.id}>
+                          <div className={`docs-sidebar-parent ${hasActiveChild ? "docs-sidebar-parent-active" : ""}`}>
+                            <Icon size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
+                            <span>{section.label}</span>
+                          </div>
+                          <div className="docs-sidebar-branch" role="group" aria-label={`${section.label} versions`}>
+                            {section.children.map((child) => {
+                              const ChildIcon = child.icon;
+                              const isChildActive = activeSlug === child.id;
+                              return (
+                                <Link
+                                  key={child.id}
+                                  href={`/docs/${child.id}`}
+                                  onClick={() => setSidebarOpen(false)}
+                                  className={`docs-sidebar-btn docs-sidebar-child ${isChildActive ? "docs-sidebar-btn-active" : ""}`}
+                                  aria-current={isChildActive ? "page" : undefined}
+                                >
+                                  {child.badge && <span aria-hidden="true" className="docs-sidebar-new-badge" />}
+                                  <ChildIcon size={13} aria-hidden="true" style={{ flexShrink: 0 }} />
+                                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{child.label}</span>
+                                  {apiEndpointIds.has(child.id) && <span className="docs-method-badge">GET</span>}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <Link
                         key={section.id}
@@ -73,7 +114,7 @@ export default function DocsLayoutShell({ children }: { children: React.ReactNod
                         aria-current={isActive ? "page" : undefined}
                       >
                         {section.badge && <span aria-hidden="true" className="docs-sidebar-new-badge" />}
-                        <Icon size={14} style={{ flexShrink: 0 }} />
+                        <Icon size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
                         <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{section.label}</span>
                         {apiEndpointIds.has(section.id) && <span className="docs-method-badge">GET</span>}
                       </Link>

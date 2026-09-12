@@ -40,6 +40,7 @@ export type SidebarItem = {
   label: string;
   icon: LucideIcon;
   badge?: string;
+  children?: SidebarItem[];
 };
 
 export type SidebarGroup = {
@@ -61,7 +62,15 @@ export const sidebarGroups: SidebarGroup[] = [
     items: [
       { id: "pnr-status", label: "PNR Status", icon: Ticket },
       { id: "train-info", label: "Train Information", icon: Train },
-      { id: "live-tracking", label: "Live Tracking", icon: MapPin },
+      {
+        id: "track-train",
+        label: "Track Train",
+        icon: MapPin,
+        children: [
+          { id: "live-tracking", label: "V1 · NTES", icon: MapPin },
+          { id: "live-tracking-v2", label: "V2 · WIMT", icon: MapPin, badge: "NEW" },
+        ],
+      },
       { id: "train-history", label: "Train History", icon: History },
       { id: "station-live", label: "Live at Station", icon: Building2 },
       { id: "station-timetable", label: "Station Timetable", icon: Building2, badge: "NEW" },
@@ -104,7 +113,8 @@ export const sections: Array<{ id: string; label: string; icon: LucideIcon }> = 
   { id: "quickstart", label: "Quick Start", icon: Rocket },
   { id: "pnr-status", label: "PNR Status", icon: Ticket },
   { id: "train-info", label: "Train Information", icon: Train },
-  { id: "live-tracking", label: "Live Tracking", icon: MapPin },
+  { id: "live-tracking", label: "Track Train — V1 NTES", icon: MapPin },
+  { id: "live-tracking-v2", label: "Track Train — V2 WIMT", icon: MapPin },
   { id: "train-history", label: "Train History", icon: History },
   { id: "station-live", label: "Live at Station", icon: Building2 },
   { id: "train-search", label: "Train Search", icon: Search },

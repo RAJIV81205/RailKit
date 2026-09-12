@@ -100,6 +100,7 @@ const quickStartSnippet = `import {
   checkPNRStatus,
   getTrainInfo,
   trackTrain,
+  trackTrainV2,
   getTrainHistory,
   liveAtStation,
   searchTrainBetweenStations,
@@ -112,7 +113,8 @@ configure(process.env.RAILKIT_API_KEY);
 
 const pnr    = await checkPNRStatus("1234567890");
 const train  = await getTrainInfo("12345");
-const live   = await trackTrain("12345", "06-12-2025");
+const liveV1 = await trackTrain("12345", "12-09-2026");
+const liveV2 = await trackTrainV2("12345", "2026-09-12");
 const hist   = await getTrainHistory("12345", "06-12-2025");
 const stn    = await liveAtStation("NDLS");
 const search = await searchTrainBetweenStations("NDLS", "BCT");
@@ -150,7 +152,6 @@ function getEndpointParamLocation(endpointId: string, name: string) {
 
 function isSdkParamOptional(endpointId: string, name: string) {
   return (
-    (endpointId === "live-tracking" && name === "date") ||
     (endpointId === "station-live" && name === "hours") ||
     (endpointId === "train-search" && name === "date") ||
     (endpointId === "station-timetable" && name === "date")
@@ -172,6 +173,7 @@ const introductionEndpointGroups = [
     endpointIds: [
       "train-info",
       "live-tracking",
+      "live-tracking-v2",
       "train-history",
       "train-search",
       "seat-availability",
@@ -213,7 +215,13 @@ export default function DocsPage({
     process.env.NEXT_PUBLIC_DIRECT_API_BASE_URL ||
     "https://api.railkit.in";
 
-  const flatSections = useMemo(() => sidebarGroups.flatMap((g) => g.items), []);
+  const flatSections = useMemo(
+    () =>
+      sidebarGroups.flatMap((group) =>
+        group.items.flatMap((item) => item.children ?? [item]),
+      ),
+    [],
+  );
 
   const aiDocsMarkdown = useMemo(() => {
     const endpointDetails = endpointDocs
@@ -277,6 +285,7 @@ ${ep.response}
       "pnr-status",
       "train-info",
       "live-tracking",
+      "live-tracking-v2",
       "train-history",
       "station-live",
       "train-search",
@@ -331,7 +340,7 @@ This document is self-contained context for an AI model or developer integrating
 - Authentication header on every request: \`x-api-key: YOUR_API_KEY\`
 - Optional request header: \`accept: application/json\`
 - All documented endpoints use HTTP GET.
-- The canonical REST contract uses \`/api/v1\`; legacy unversioned routes remain supported for compatibility.
+- Most REST contracts use \`/api/v1\`; WIMT live tracking uses \`/api/v2\`. Legacy unversioned routes remain supported where documented.
 - Direct REST access requires the Advance plan.
 - Check both HTTP status and parsed JSON body.
 - URL-encode dynamic path and query values when constructing URLs from user input.
@@ -359,7 +368,8 @@ ${quickStartSnippet}
 configure(apiKey: string): void
 checkPNRStatus(pnr: string): Promise<any>
 getTrainInfo(trainNumber: string): Promise<any>
-trackTrain(trainNumber: string, date?: string): Promise<any>
+trackTrain(trainNumber: string, date: string): Promise<any>
+trackTrainV2(trainNumber: string, date: string): Promise<any>
 getTrainHistory(trainNumber: string, journeyDate: string): Promise<any>
 liveAtStation(stationCode: string, hours?: 2 | 4 | 8): Promise<any>
 searchTrainBetweenStations(fromStnCode: string, toStnCode: string, date?: string): Promise<any>
@@ -378,7 +388,8 @@ trainTimetableAtStation(stationCode: string, date?: string): Promise<any>
 - PNR: exactly 10 numeric digits; treat as a string.
 - Train number: exactly 5 numeric digits; treat as a string to preserve leading zeros.
 - Date: \`DD-MM-YYYY\`; validate that it is a real calendar date.
-- Live tracking SDK date: optional and defaults to today; REST date path segment is required and accepts \`today\`.
+- V1 NTES tracking date: required in \`DD-MM-YYYY\` format or as \`today\` for both SDK and REST.
+- V2 WIMT tracking date: required in \`DD-MM-YYYY\` or \`YYYY-MM-DD\`; limited to today through five days ago.
 - Station code: uppercase, 1–5 letters or digits; examples: \`NDLS\`, \`BCT\`, \`HWH\`.
 - Station or train name search: at least 2 characters; returns at most 10 matches.
 - Live station hours: \`2\`, \`4\`, or \`8\`; default is \`2\`.

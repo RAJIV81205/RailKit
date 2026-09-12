@@ -232,7 +232,7 @@
       "summary": "Track current movement with station-by-station timing, delay, platform, and position context.",
       "method": "GET",
       "path": "/api/v1/trains/:trainNumber/live/:date",
-      "sdkSignature": "trackTrain(trainNumber: string, date?: string)",
+      "sdkSignature": "trackTrain(trainNumber: string, date: string)",
       "availability": "SDK and REST API",
       "parameters": [
         {
@@ -254,7 +254,7 @@
       ],
       "notes": [
         "Live status depends on upstream railway updates.",
-        "SDK date is optional and defaults to today."
+        "Date is required for both SDK and REST calls."
       ],
       "examples": {
         "sdk": "import { configure, trackTrain } from \"railkit\";\nconfigure(process.env.RAILKIT_API_KEY);\n\nconst result = await trackTrain(\"12342\", \"today\");\nconsole.log(result.data.statusNote);",

@@ -232,7 +232,7 @@ export default function ApiPlayground({
       case "train":
         return `/api/v1/trains/${value(form.trainNumber, "trainNumber")}/info`;
       case "track":
-        return `/api/v1/trains/${value(form.trainNumber, "trainNumber")}/live/${date ? encodeURIComponent(date) : "today"}`;
+        return `/api/v1/trains/${value(form.trainNumber, "trainNumber")}/live/${value(date, "date")}`;
       case "history":
         return `/api/v1/trains/${value(form.trainNumber, "trainNumber")}/history/${value(date, "date")}`;
       case "station":
@@ -278,10 +278,9 @@ export default function ApiPlayground({
           result = await getTrainInfo(form.trainNumber);
           break;
         case "track":
-          result = await trackTrain(
-            form.trainNumber,
-            form.journeyDate || undefined,
-          );
+          if (!form.journeyDate)
+            throw new Error("Journey date is required.");
+          result = await trackTrain(form.trainNumber, form.journeyDate);
           break;
         case "history":
           result = await getTrainHistory(form.trainNumber, form.journeyDate);
@@ -537,9 +536,7 @@ export default function ApiPlayground({
                 field(
                   "journeyDate",
                   "Journey date",
-                  selected === "track"
-                    ? "Optional · defaults to today · DD-MM-YYYY"
-                    : "DD-MM-YYYY",
+                  "Required · DD-MM-YYYY",
                   "date",
                 )}
               {["station", "stationCode", "timetable"].includes(selected) &&

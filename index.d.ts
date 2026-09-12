@@ -40,6 +40,18 @@ export function getTrainInfo(trainNumber: string): Promise<any>;
 export function trackTrain(trainNumber: string, date?: string): Promise<any>;
 
 /**
+ * Get live running status using the v2 WIMT-backed tracker.
+ * The date is required and must be from today through five days ago.
+ *
+ * @param trainNumber - Exactly 5 numeric digits
+ * @param date - Journey date in DD-MM-YYYY or YYYY-MM-DD format
+ *
+ * @example
+ * const result = await trackTrainV2('12301', '15-04-2025');
+ */
+export function trackTrainV2(trainNumber: string, date: string): Promise<any>;
+
+/**
  * Get the completed journey history of a train for a specific journey date.
  * Returns the persisted TrainHistory record once the train has reached its
  * destination, including the full station-by-station timeline, per-stop delays,

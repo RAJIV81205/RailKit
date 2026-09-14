@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
 import useSWR from "swr";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/hljs";
@@ -2522,7 +2520,12 @@ export default function AdminPanel() {
 
   const loadAdminSession = async () => {
     try {
-      const res = await fetch("/api/admin/verify");
+      let res = await fetch("/api/admin/verify", { cache: "no-store" });
+      if (!res.ok) {
+        // Exchange an already-authenticated normal session for admin session.
+        await fetch("/api/admin/login", { method: "POST" });
+        res = await fetch("/api/admin/verify", { cache: "no-store" });
+      }
       if (!res.ok) {
         setIsAdmin(false);
         setAdminApiKey(null);
@@ -2622,25 +2625,7 @@ export default function AdminPanel() {
   const onGoogleLogin = async () => {
     setLoginError("");
     setAuthLoading(true);
-    try {
-      const credential = await signInWithPopup(auth, googleProvider);
-      const email = credential.user.email?.trim().toLowerCase();
-      const name = credential.user.displayName?.trim();
-      const response = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name }),
-      });
-      const result = await response.json();
-      if (!response.ok || !result.success)
-        throw new Error(result.message || "Admin login failed");
-      await loadAdminSession();
-      // SWR keys become non-null now — data fetches automatically
-    } catch (err: unknown) {
-      setLoginError(getErrorMessage(err, "Login failed"));
-    } finally {
-      setAuthLoading(false);
-    }
+    window.location.assign("/auth?redirect=/admin");
   };
 
   const resetPlaygroundMeta = () => {

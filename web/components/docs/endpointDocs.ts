@@ -677,7 +677,9 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
 ] as const;
 
 
-export const endpointDocs: readonly EndpointDoc[] = sdkEndpointDocs.map((endpoint) => ({
-  ...endpoint,
-  ...restEndpointDocs.find((rest) => rest.id === endpoint.id),
-} as EndpointDoc));
+export const endpointDocs: readonly EndpointDoc[] = sdkEndpointDocs
+  .filter((endpoint) => endpoint.id !== "live-tracking-v2")
+  .map((endpoint) => ({
+    ...endpoint,
+    ...restEndpointDocs.find((rest) => rest.id === endpoint.id),
+  } as EndpointDoc));

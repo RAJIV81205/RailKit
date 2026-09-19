@@ -209,9 +209,11 @@ const responseStatus = (value: unknown) => {
 export default function ApiPlayground({
   apiKey,
   variant = "light",
+  showWimt = false,
 }: {
   apiKey?: string | null;
   variant?: Variant;
+  showWimt?: boolean;
 }) {
   const dark = variant === "dark";
   const [selected, setSelected] = useState<Action>("pnr");
@@ -477,7 +479,7 @@ export default function ApiPlayground({
                 {group.label}
               </p>
               <div className="space-y-0.5">
-                {group.items.map((item) => (
+                {group.items.filter((item) => showWimt || item.id !== "trackV2").map((item) => (
                   <button
                     key={item.id}
                     type="button"

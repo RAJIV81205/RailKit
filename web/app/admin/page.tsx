@@ -5804,7 +5804,7 @@ export default function AdminPanel() {
           )}
 
           {activeTab === "playground" && (
-            <ApiPlayground apiKey={adminApiKey} variant="dark" />
+            <ApiPlayground apiKey={adminApiKey} variant="dark" showWimt />
           )}
           {false && activeTab === "playground" && (
             <div

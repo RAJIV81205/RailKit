@@ -1890,7 +1890,7 @@ export default function DashboardPage() {
             )}
 
             {/* ── Playground ────────────────────────────────────────────── */}
-            {activeTab === "playground" && <ApiPlayground apiKey={dbUser.apiKey} variant="light" />}
+            {activeTab === "playground" && <ApiPlayground apiKey={dbUser.apiKey} variant="light" showWimt />}
             {false && activeTab === "playground" && (
               <div className="grid grid-cols-[1.05fr_0.95fr] gap-4 max-[1100px]:grid-cols-1">
                 <div className={dashboardCardClass}>

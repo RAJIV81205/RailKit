@@ -114,7 +114,7 @@ export const sections: Array<{ id: string; label: string; icon: LucideIcon }> = 
   { id: "pnr-status", label: "PNR Status", icon: Ticket },
   { id: "train-info", label: "Train Information", icon: Train },
   { id: "live-tracking", label: "Track Train — V1 NTES", icon: MapPin },
-  { id: "live-tracking-v2", label: "Track Train — V2 WIMT", icon: MapPin, badge: "NEW" },
+  { id: "live-tracking-v2", label: "Track Train — V2 WIMT", icon: MapPin},
   { id: "train-history", label: "Train History", icon: History },
   { id: "station-live", label: "Live at Station", icon: Building2 },
   { id: "train-search", label: "Train Search", icon: Search },

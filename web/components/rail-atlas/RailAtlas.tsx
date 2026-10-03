@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Layer, LayerGroup, Map as LeafletMap } from "leaflet";
+import type { CircleMarker, Layer, LayerGroup, Map as LeafletMap } from "leaflet";
 import { Layers3, ListFilter, MapPin, Search, X } from "lucide-react";
 
 type Station = {
@@ -28,6 +28,12 @@ type StationCatalog = {
 const ROW_HEIGHT = 58;
 const OVERSCAN = 8;
 
+function getStationMarkerRadius(zoom: number) {
+  if (zoom >= 13) return 5;
+  if (zoom >= 10) return 3.5;
+  return 2.25;
+}
+
 function isMappedStation(station: StationRecord): station is Station {
   return Number.isFinite(station.lat) && Number.isFinite(station.lon)
     && station.lat! >= 6 && station.lat! <= 38
@@ -40,6 +46,7 @@ export function RailAtlas() {
   const railwayLayerRef = useRef<Layer | null>(null);
   const stationLayerRef = useRef<LayerGroup | null>(null);
   const selectedLayerRef = useRef<LayerGroup | null>(null);
+  const stationMarkersRef = useRef<CircleMarker[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const [mapReady, setMapReady] = useState(false);
   const [stations, setStations] = useState<Station[]>([]);
@@ -85,6 +92,13 @@ export function RailAtlas() {
         preferCanvas: true,
         zoomControl: false,
       });
+      map.createPane("railwayLines").style.zIndex = "410";
+      map.createPane("stationMarkers").style.zIndex = "440";
+      map.createPane("selectedStation").style.zIndex = "470";
+      map.on("zoomend", () => {
+        const radius = getStationMarkerRadius(map.getZoom());
+        stationMarkersRef.current.forEach((marker) => marker.setRadius(radius));
+      });
       L.control.zoom({ position: "bottomright" }).addTo(map);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -121,7 +135,8 @@ export function RailAtlas() {
     ]).then(([data, L]) => {
       if (controller.signal.aborted || !mapRef.current) return;
       railwayLayerRef.current = L.polyline(data.lines, {
-        renderer: L.canvas({ padding: 0.5, tolerance: 2 }),
+        pane: "railwayLines",
+        renderer: L.canvas({ pane: "railwayLines", padding: 0.5, tolerance: 2 }),
         color: "#155f96",
         weight: 1.7,
         opacity: 0.75,
@@ -147,22 +162,24 @@ export function RailAtlas() {
     import("leaflet").then((L) => {
       if (cancelled || !mapRef.current) return;
       stationLayerRef.current?.removeFrom(mapRef.current);
-      const renderer = L.canvas({ padding: 0.4, tolerance: 5 });
+      const renderer = L.canvas({ pane: "stationMarkers", padding: 0.4, tolerance: 9 });
       const layer = L.layerGroup();
-      stations.forEach((station) => {
+      stationMarkersRef.current = stations.map((station) =>
         L.circleMarker([station.lat, station.lon], {
+          pane: "stationMarkers",
           renderer,
-          radius: 2,
-          weight: 0.7,
+          radius: getStationMarkerRadius(mapRef.current?.getZoom() || 5),
+          weight: 1.15,
           color: "#ffffff",
           fillColor: "#d97706",
-          fillOpacity: 0.82,
-          opacity: 0.9,
+          fillOpacity: 0.92,
+          opacity: 1,
+          bubblingMouseEvents: false,
         })
           .bindTooltip(`${station.name} (${station.code})`, { direction: "top" })
           .on("click", () => setSelected(station))
-          .addTo(layer);
-      });
+          .addTo(layer)
+      );
       stationLayerRef.current = layer.addTo(mapRef.current);
     }).catch(() => {
       if (!cancelled) setError("Station markers unavailable");
@@ -181,6 +198,7 @@ export function RailAtlas() {
       if (cancelled || !mapRef.current) return;
       selectedLayerRef.current?.removeFrom(mapRef.current);
       const ring = L.circleMarker([selected.lat, selected.lon], {
+        pane: "selectedStation",
         radius: 13,
         weight: 3,
         color: "#ffffff",

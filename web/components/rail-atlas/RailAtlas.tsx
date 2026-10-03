@@ -87,6 +87,8 @@ export function RailAtlas() {
       }).addTo(map);
       mapRef.current = map;
       setMapReady(true);
+    }).catch(() => {
+      if (!disposed) setError("Map library unavailable");
     });
     return () => {
       disposed = true;
@@ -99,7 +101,9 @@ export function RailAtlas() {
     if (!mapReady || !mapRef.current) return;
     const controller = new AbortController();
     Promise.all([
-      fetch("/data/india-railways.json", { signal: controller.signal }).then((response) => response.json()) as Promise<{ lines: [number, number][][] }>,
+      fetch("/data/india-railways.json", { signal: controller.signal }).then((response) =>
+        response.ok ? response.json() : Promise.reject(new Error("Railway network data unavailable"))
+      ) as Promise<{ lines: [number, number][][] }>,
       import("leaflet"),
     ]).then(([data, L]) => {
       if (controller.signal.aborted || !mapRef.current) return;
@@ -110,7 +114,9 @@ export function RailAtlas() {
         opacity: 0.75,
         interactive: false,
       }).addTo(mapRef.current);
-    }).catch(() => undefined);
+    }).catch((reason) => {
+      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Railway network data unavailable");
+    });
     return () => controller.abort();
   }, [mapReady]);
 
@@ -137,6 +143,8 @@ export function RailAtlas() {
           .addTo(layer);
       });
       stationLayerRef.current = layer.addTo(mapRef.current);
+    }).catch(() => {
+      if (!cancelled) setError("Station markers unavailable");
     });
     return () => { cancelled = true; };
   }, [mapReady, stations]);
@@ -158,6 +166,8 @@ export function RailAtlas() {
       ring.bindTooltip(selected.code, { permanent: true, direction: "top", offset: [0, -12] });
       selectedLayerRef.current = L.layerGroup([ring]).addTo(mapRef.current);
       mapRef.current.flyTo([selected.lat, selected.lon], 8, { duration: 0.55 });
+    }).catch(() => {
+      if (!cancelled) setError("Selected station marker unavailable");
     });
     return () => { cancelled = true; };
   }, [mapReady, selected]);

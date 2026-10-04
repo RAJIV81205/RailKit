@@ -36,8 +36,14 @@ export function grantV2Plan(
   user.addonLimit = 0;
   user.billingDate = now;
   user.quotaPeriodStart = now;
-  user.quotaPeriodEnd = addMonths(now, 1);
-  user.expirationDate = addMonths(now, runtime.termMonths);
+  user.quotaPeriodEnd =
+    interval === "month"
+      ? new Date(now.getTime() + BILLING_CYCLE_MS)
+      : addMonths(now, 1);
+  user.expirationDate =
+    interval === "month"
+      ? new Date(now.getTime() + BILLING_CYCLE_MS)
+      : addMonths(now, runtime.termMonths);
 
   return { startsAt: now, endsAt: user.expirationDate };
 }

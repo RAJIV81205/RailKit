@@ -3,7 +3,7 @@
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef, useState } from "react";
 import type { CircleMarker, Layer, LayerGroup, Map as LeafletMap } from "leaflet";
-import { Clock3, Layers3, RefreshCw, Search, TrainFront, X } from "lucide-react";
+import { Clock3, Layers3, Navigation, RefreshCw, Search, TrainFront, X } from "lucide-react";
 
 type Station = {
   code: string;
@@ -63,6 +63,23 @@ type GlobalSearchResponse = {
   data?: GlobalSearchResult;
   error?: string;
 };
+
+type TrainSelection = { trainNo: string; trainName: string; date?: string };
+
+type TrainLiveData = {
+  trainNo: string;
+  trainName: string;
+  date: string;
+  statusNote: string;
+  lastUpdate: string | null;
+  progress: { journeyStatus: string; percent: number; remainingStations: number; distanceRemainingKm: number | null } | null;
+  start: { stationCode: string; stationName?: string; lat: number; lon: number } | null;
+  end: { stationCode: string; stationName?: string; lat: number; lon: number } | null;
+  currentPosition: { lat: number; lon: number; stationCode: string; stationName: string; bearing: number } | null;
+  route: [number, number][];
+};
+
+type TrainLiveResponse = { success: boolean; data?: TrainLiveData; error?: string };
 
 const INDIA_MAP_BOUNDS: [[number, number], [number, number]] = [
   [6, 68],
@@ -185,6 +202,44 @@ function useGlobalSearch(query: string) {
   return { results, loading, error };
 }
 
+function useTrainLive(selection: TrainSelection | null) {
+  const [data, setData] = useState<TrainLiveData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [refresh, setRefresh] = useState(0);
+
+  useEffect(() => {
+    if (!selection) return;
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      if (controller.signal.aborted) return;
+      setData(null);
+      setError("");
+      setLoading(true);
+    });
+    const params = new URLSearchParams({ trainNo: selection.trainNo });
+    if (selection.date) params.set("date", selection.date);
+    fetch(`/api/rail-atlas/train-live?${params}`, { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => {
+        const payload = await response.json() as TrainLiveResponse;
+        if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error || "Live train data is unavailable.");
+        return payload.data;
+      })
+      .then((result) => {
+        if (!controller.signal.aborted) setData(result);
+      })
+      .catch((reason) => {
+        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Live train data is unavailable.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [refresh, selection]);
+
+  return { data, loading, error, retry: () => setRefresh((value) => value + 1) };
+}
+
 function StationDetailsPanel({
   station,
   board,
@@ -193,6 +248,7 @@ function StationDetailsPanel({
   error,
   onClose,
   onRetry,
+  onSelectTrain,
 }: {
   station: Station;
   board: StationBoard | null;
@@ -201,6 +257,7 @@ function StationDetailsPanel({
   error: string;
   onClose: () => void;
   onRetry: () => void;
+  onSelectTrain: (train: StationTrain) => void;
 }) {
   return (
     <aside className="absolute right-3 bottom-3 left-3 z-[950] flex h-[42dvh] min-h-72 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl lg:top-16 lg:left-auto lg:h-auto lg:min-h-0 lg:w-[min(410px,calc(100%-1.5rem))]" aria-label={`${station.name} station details`}>
@@ -252,7 +309,7 @@ function StationDetailsPanel({
               const arrival = train.arrival?.actual || train.arrival?.scheduled || "—";
               const departure = train.departure?.actual || train.departure?.scheduled || "—";
               return (
-                <article key={`${train.trainNo}-${train.runDate}-${train.arrival?.scheduled}-${train.departure?.scheduled}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                <button type="button" onClick={() => onSelectTrain(train)} key={`${train.trainNo}-${train.runDate}-${train.arrival?.scheduled}-${train.departure?.scheduled}`} className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40 focus-visible:outline-2 focus-visible:outline-blue-700">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex min-w-0 items-baseline gap-2">
@@ -269,12 +326,52 @@ function StationDetailsPanel({
                     <div className="min-w-0 pl-2"><span className="block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Platform</span><strong className="block truncate font-site-code text-sm text-slate-900">{train.platform || "—"}</strong></div>
                   </div>
                   {train.classes ? <p className="mt-1.5 truncate text-xs text-slate-500" title={train.classes}>Coaches · {train.classes}</p> : null}
-                </article>
+                </button>
               );
             })}
           </div>
         ) : null}
       </div>
+    </aside>
+  );
+}
+
+function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }: {
+  selection: TrainSelection;
+  data: TrainLiveData | null;
+  loading: boolean;
+  error: string;
+  onClose: () => void;
+  onRetry: () => void;
+}) {
+  const progress = data?.progress;
+  return (
+    <aside className="absolute right-3 bottom-3 left-3 z-[950] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl lg:top-16 lg:left-auto lg:bottom-auto lg:w-[min(410px,calc(100%-1.5rem))]" aria-label={`${selection.trainName} live train details`}>
+      <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2"><span className="rounded-md bg-blue-700 px-2 py-1 font-site-code text-xs font-bold text-white">{selection.trainNo}</span><h2 className="truncate text-lg font-bold text-slate-900">{data?.trainName || selection.trainName}</h2></div>
+          <p className="mt-1 text-xs text-slate-500">Live railway route · {data?.date || selection.date || "today"}</p>
+        </div>
+        <button type="button" onClick={onClose} className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-700" aria-label="Close live train details"><X size={18} /></button>
+      </header>
+
+      {loading ? <div className="grid min-h-40 place-items-center p-6 text-center"><div><RefreshCw className="mx-auto animate-spin text-blue-700" size={22} aria-hidden="true" /><p className="mt-3 text-sm text-slate-600">Matching live position to railway tracks…</p></div></div> : null}
+      {error ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p>{error}</p><button type="button" onClick={onRetry} className="mt-3 rounded-lg bg-red-800 px-3 py-2 font-semibold text-white">Try again</button></div> : null}
+
+      {!loading && !error && data ? <div className="space-y-3 p-4">
+        <div className="rounded-xl bg-slate-50 p-3">
+          <p className="flex items-center gap-2 text-xs font-bold tracking-wide text-blue-700 uppercase"><Navigation size={15} aria-hidden="true" /> Current position</p>
+          <p className="mt-1 text-sm font-semibold text-slate-900">{data.currentPosition ? `${data.currentPosition.stationName} (${data.currentPosition.stationCode})` : "Position unavailable"}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-600">{data.statusNote}</p>
+        </div>
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-sm">
+          <div className="min-w-0"><span className="block text-[10px] font-bold tracking-wide text-emerald-700 uppercase">Start</span><strong className="block truncate">{data.start?.stationCode || "—"}</strong><span className="block truncate text-xs text-slate-500">{data.start?.stationName}</span></div>
+          <span className="h-px w-10 bg-slate-300" aria-hidden="true" />
+          <div className="min-w-0 text-right"><span className="block text-[10px] font-bold tracking-wide text-red-700 uppercase">End</span><strong className="block truncate">{data.end?.stationCode || "—"}</strong><span className="block truncate text-xs text-slate-500">{data.end?.stationName}</span></div>
+        </div>
+        {progress ? <div><div className="mb-1 flex justify-between text-xs text-slate-600"><span className="capitalize">{progress.journeyStatus}</span><strong>{Math.round(progress.percent)}%</strong></div><div className="h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-blue-700" style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }} /></div><p className="mt-1 text-xs text-slate-500">{progress.remainingStations} stations · {progress.distanceRemainingKm ?? "—"} km remaining</p></div> : null}
+        {data.route.length === 0 ? <p className="text-xs text-amber-700">A track-matched route could not be resolved for this run.</p> : null}
+      </div> : null}
     </aside>
   );
 }
@@ -285,16 +382,19 @@ export function RailAtlas() {
   const railwayLayerRef = useRef<Layer | null>(null);
   const stationLayerRef = useRef<LayerGroup | null>(null);
   const selectedLayerRef = useRef<LayerGroup | null>(null);
+  const trainLayerRef = useRef<LayerGroup | null>(null);
   const stationMarkersRef = useRef<CircleMarker[]>([]);
   const [mapReady, setMapReady] = useState(false);
   const [stations, setStations] = useState<Station[]>([]);
   const [selected, setSelected] = useState<Station | null>(null);
+  const [selectedTrain, setSelectedTrain] = useState<TrainSelection | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   const [showStations, setShowStations] = useState(true);
   const [showTracks, setShowTracks] = useState(true);
   const stationBoard = useStationBoard(selected);
   const globalSearch = useGlobalSearch(query);
+  const trainLive = useTrainLive(selectedTrain);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -329,6 +429,9 @@ export function RailAtlas() {
       railwayPane.style.zIndex = "410";
       railwayPane.style.pointerEvents = "none";
       map.createPane("stationMarkers").style.zIndex = "440";
+      const activeTrainPane = map.createPane("activeTrain");
+      activeTrainPane.style.zIndex = "465";
+      activeTrainPane.style.pointerEvents = "none";
       const selectedStationPane = map.createPane("selectedStation");
       selectedStationPane.style.zIndex = "470";
       selectedStationPane.style.pointerEvents = "none";
@@ -414,7 +517,10 @@ export function RailAtlas() {
           bubblingMouseEvents: false,
         })
           .bindTooltip(`${station.name} (${station.code})`, { direction: "top" })
-          .on("click", () => setSelected(station))
+          .on("click", () => {
+            setSelectedTrain(null);
+            setSelected(station);
+          })
           .addTo(layer)
       );
       stationLayerRef.current = layer.addTo(mapRef.current);
@@ -453,11 +559,51 @@ export function RailAtlas() {
     return () => { cancelled = true; };
   }, [mapReady, selected, showStations]);
 
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    trainLayerRef.current?.removeFrom(mapRef.current);
+    trainLayerRef.current = null;
+    if (!selectedTrain || !trainLive.data) return;
+    let cancelled = false;
+    import("leaflet").then((L) => {
+      if (cancelled || !mapRef.current || !trainLive.data) return;
+      const data = trainLive.data;
+      const layers: Layer[] = [];
+      if (data.route.length > 1) {
+        layers.push(L.polyline(data.route, { pane: "activeTrain", color: "#dc2626", weight: 4, opacity: 0.92, interactive: false }));
+      }
+      if (data.start) layers.push(L.circleMarker([data.start.lat, data.start.lon], { pane: "activeTrain", radius: 7, color: "#ffffff", weight: 2, fillColor: "#059669", fillOpacity: 1, interactive: false }).bindTooltip(`Start · ${data.start.stationCode}`, { direction: "top" }));
+      if (data.end) layers.push(L.circleMarker([data.end.lat, data.end.lon], { pane: "activeTrain", radius: 7, color: "#ffffff", weight: 2, fillColor: "#dc2626", fillOpacity: 1, interactive: false }).bindTooltip(`End · ${data.end.stationCode}`, { direction: "top" }));
+      if (data.currentPosition) {
+        const rotation = Number.isFinite(data.currentPosition.bearing) ? data.currentPosition.bearing : 0;
+        const icon = L.divIcon({
+          className: "",
+          iconSize: [38, 38],
+          iconAnchor: [19, 19],
+          html: `<div style="width:38px;height:38px;display:grid;place-items:center;border:3px solid white;border-radius:50%;background:#1d4ed8;box-shadow:0 6px 18px rgba(15,23,42,.35);transform:rotate(${rotation}deg)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2 20 21l-8-4-8 4 8-19Z" fill="white"/></svg></div>`,
+        });
+        layers.push(L.marker([data.currentPosition.lat, data.currentPosition.lon], { pane: "activeTrain", icon, interactive: false, zIndexOffset: 1000 }).bindTooltip(`${data.trainNo} · ${data.currentPosition.stationCode}`, { permanent: true, direction: "top", offset: [0, -20] }));
+      }
+      trainLayerRef.current = L.layerGroup(layers).addTo(mapRef.current);
+      if (data.route.length > 1) mapRef.current.fitBounds(L.latLngBounds(data.route), { padding: [40, 40], maxZoom: 9, animate: true });
+    }).catch(() => {
+      if (!cancelled) setError("Live train route could not be displayed");
+    });
+    return () => { cancelled = true; };
+  }, [mapReady, selectedTrain, trainLive.data]);
+
   const chooseSearchStation = (result: GlobalSearchResult["stations"][number]) => {
     const station = stations.find((item) => item.code === result.code)
       || (isMappedStation(result) ? result : null);
     if (!station) return;
+    setSelectedTrain(null);
     setSelected(station);
+    setQuery("");
+  };
+
+  const chooseTrain = (train: TrainSelection) => {
+    setSelected(null);
+    setSelectedTrain(train);
     setQuery("");
   };
 
@@ -490,7 +636,7 @@ export function RailAtlas() {
             </div> : null}
             {globalSearch.results.trains.length > 0 ? <div className="p-2">
               <p className="px-2 py-1 text-[10px] font-bold tracking-[0.14em] text-slate-500 uppercase">Trains</p>
-              {globalSearch.results.trains.map((train) => <div key={train.trainNo} className="flex min-h-11 items-center gap-3 rounded-lg px-2"><span className="font-site-code text-xs font-bold text-blue-700">{train.trainNo}</span><span className="truncate text-sm font-semibold text-slate-800">{train.trainName}</span></div>)}
+              {globalSearch.results.trains.map((train) => <button type="button" onClick={() => chooseTrain(train)} key={train.trainNo} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-left hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-700"><span className="font-site-code text-xs font-bold text-blue-700">{train.trainNo}</span><span className="truncate text-sm font-semibold text-slate-800">{train.trainName}</span><span className="ml-auto text-[10px] font-semibold text-slate-500">Track</span></button>)}
             </div> : null}
           </div>
         ) : null}
@@ -513,7 +659,8 @@ export function RailAtlas() {
         </div>
       </details>
 
-      {selected ? <StationDetailsPanel station={selected} board={stationBoard.board} hours={stationBoard.hours} loading={stationBoard.loading} error={stationBoard.error} onClose={() => setSelected(null)} onRetry={stationBoard.retry} /> : null}
+      {selected ? <StationDetailsPanel station={selected} board={stationBoard.board} hours={stationBoard.hours} loading={stationBoard.loading} error={stationBoard.error} onClose={() => setSelected(null)} onRetry={stationBoard.retry} onSelectTrain={(train) => chooseTrain({ trainNo: train.trainNo, trainName: train.trainName, date: train.runDate })} /> : null}
+      {selectedTrain ? <TrainDetailsPanel selection={selectedTrain} data={trainLive.data} loading={trainLive.loading} error={trainLive.error} onClose={() => setSelectedTrain(null)} onRetry={trainLive.retry} /> : null}
 
       {error ? <div role="alert" className="absolute right-3 bottom-3 left-3 z-[1000] mx-auto max-w-lg rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg">{error}. Run npm run update:station-data if the station file is missing.</div> : null}
     </main>

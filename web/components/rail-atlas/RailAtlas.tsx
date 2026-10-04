@@ -1,9 +1,9 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CircleMarker, Layer, LayerGroup, Map as LeafletMap } from "leaflet";
-import { Clock3, Layers3, ListFilter, MapPin, RefreshCw, Search, TrainFront, X } from "lucide-react";
+import { Clock3, Layers3, RefreshCw, Search, TrainFront, X } from "lucide-react";
 
 type Station = {
   code: string;
@@ -53,13 +53,21 @@ type StationBoardResponse = {
   error?: string;
 };
 
+type GlobalSearchResult = {
+  stations: Array<{ code: string; name: string; lat: number | null; lon: number | null }>;
+  trains: Array<{ trainNo: string; trainName: string }>;
+};
+
+type GlobalSearchResponse = {
+  success: boolean;
+  data?: GlobalSearchResult;
+  error?: string;
+};
+
 const INDIA_MAP_BOUNDS: [[number, number], [number, number]] = [
   [6, 68],
   [38, 98],
 ];
-
-const ROW_HEIGHT = 58;
-const OVERSCAN = 8;
 
 function getStationMarkerRadius(zoom: number) {
   if (zoom >= 13) return 7;
@@ -126,6 +134,55 @@ function useStationBoard(station: Station | null) {
   }, [refresh, station]);
 
   return { board, hours, loading, error, retry: () => setRefresh((value) => value + 1) };
+}
+
+function useGlobalSearch(query: string) {
+  const [results, setResults] = useState<GlobalSearchResult>({ stations: [], trains: [] });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const value = query.trim();
+    if (value.length < 2) {
+      const clearTimer = window.setTimeout(() => {
+        setResults({ stations: [], trains: [] });
+        setLoading(false);
+        setError("");
+      }, 0);
+      return () => window.clearTimeout(clearTimer);
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setError("");
+      fetch(`/api/rail-atlas/search?q=${encodeURIComponent(value)}`, { signal: controller.signal, cache: "no-store" })
+        .then(async (response) => {
+          const payload = await response.json() as GlobalSearchResponse;
+          if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error || "Search is unavailable.");
+          return payload.data;
+        })
+        .then((data) => {
+          if (!controller.signal.aborted) setResults(data);
+        })
+        .catch((reason) => {
+          if (!controller.signal.aborted) {
+            setResults({ stations: [], trains: [] });
+            setError(reason instanceof Error ? reason.message : "Search is unavailable.");
+          }
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
+
+  return { results, loading, error };
 }
 
 function StationDetailsPanel({
@@ -229,20 +286,15 @@ export function RailAtlas() {
   const stationLayerRef = useRef<LayerGroup | null>(null);
   const selectedLayerRef = useRef<LayerGroup | null>(null);
   const stationMarkersRef = useRef<CircleMarker[]>([]);
-  const listRef = useRef<HTMLDivElement>(null);
   const [mapReady, setMapReady] = useState(false);
   const [stations, setStations] = useState<Station[]>([]);
-  const [totalStations, setTotalStations] = useState(0);
   const [selected, setSelected] = useState<Station | null>(null);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [stationPanelOpen, setStationPanelOpen] = useState(false);
   const [showStations, setShowStations] = useState(true);
   const [showTracks, setShowTracks] = useState(true);
-  const [scrollTop, setScrollTop] = useState(0);
-  const [listHeight, setListHeight] = useState(500);
   const stationBoard = useStationBoard(selected);
+  const globalSearch = useGlobalSearch(query);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -251,13 +303,9 @@ export function RailAtlas() {
       .then((response: StationCatalog) => {
         const nextStations = response.stations.filter(isMappedStation).sort((a, b) => a.name.localeCompare(b.name));
         setStations(nextStations);
-        setTotalStations(response.totalStations || response.stations.length);
       })
       .catch((reason) => {
         if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Station data unavailable");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
   }, []);
@@ -405,40 +453,12 @@ export function RailAtlas() {
     return () => { cancelled = true; };
   }, [mapReady, selected, showStations]);
 
-  useEffect(() => {
-    if (!listRef.current) return;
-    const observer = new ResizeObserver(([entry]) => setListHeight(entry.contentRect.height));
-    observer.observe(listRef.current);
-    return () => observer.disconnect();
-  }, [stationPanelOpen]);
-
-  const filteredStations = useMemo(() => {
-    const needle = query.trim().toUpperCase();
-    return needle ? stations.filter((station) => `${station.code} ${station.name}`.toUpperCase().includes(needle)) : stations;
-  }, [query, stations]);
-
-  useEffect(() => {
-    setScrollTop(0);
-    if (listRef.current) listRef.current.scrollTop = 0;
-  }, [query]);
-
-  const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
-  const visibleCount = Math.ceil(listHeight / ROW_HEIGHT) + OVERSCAN * 2;
-  const visibleStations = filteredStations.slice(startIndex, startIndex + visibleCount);
-
-  const chooseStation = (station: Station) => {
+  const chooseSearchStation = (result: GlobalSearchResult["stations"][number]) => {
+    const station = stations.find((item) => item.code === result.code)
+      || (isMappedStation(result) ? result : null);
+    if (!station) return;
     setSelected(station);
-    setStationPanelOpen(false);
-  };
-
-  const toggleStationBrowser = () => {
-    if (stationPanelOpen) {
-      setStationPanelOpen(false);
-      return;
-    }
-    setSelected(null);
     setQuery("");
-    setStationPanelOpen(true);
   };
 
   return (
@@ -447,22 +467,33 @@ export function RailAtlas() {
         <div ref={mapNodeRef} className="absolute inset-0 bg-slate-200" />
       </section>
 
-      <div className="absolute top-3 left-3 z-[900] flex items-center gap-2">
+      <div className="absolute top-3 left-3 z-[1000] w-[min(440px,calc(100%-1.5rem))]">
         <div className="rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur">
-          <p className="font-site-code text-[10px] font-bold tracking-[0.16em] text-blue-700 uppercase">Rail Atlas</p>
-          <p className="hidden text-xs font-medium text-slate-600 sm:block">India railway network</p>
+          <label className="flex h-11 items-center gap-2">
+            <Search size={18} className="shrink-0 text-slate-500" aria-hidden="true" />
+            <span className="sr-only">Search stations and trains</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-base font-medium text-slate-900 outline-none placeholder:text-slate-500" placeholder="Search station, train number or name" aria-label="Search station, train number or name" autoComplete="off" />
+            {query ? <button type="button" onClick={() => setQuery("")} className="grid size-8 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-100" aria-label="Clear search"><X size={16} /></button> : null}
+          </label>
         </div>
-        <button
-          type="button"
-          aria-controls="station-browser"
-          aria-expanded={stationPanelOpen}
-          onClick={toggleStationBrowser}
-          className="flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-3 text-sm font-semibold text-slate-800 shadow-lg backdrop-blur transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
-        >
-          <ListFilter size={17} aria-hidden="true" />
-          Stations
-          <span className="hidden rounded-full bg-slate-100 px-2 py-0.5 font-site-code text-[10px] text-slate-600 sm:inline">{stations.length.toLocaleString("en-IN")}</span>
-        </button>
+        {query.trim().length >= 2 ? (
+          <div className="mt-2 max-h-[min(60dvh,460px)] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl">
+            {globalSearch.loading ? <p className="px-4 py-3 text-sm text-slate-500">Searching stations and trains…</p> : null}
+            {globalSearch.error ? <p className="px-4 py-3 text-sm text-red-700">{globalSearch.error}</p> : null}
+            {!globalSearch.loading && !globalSearch.error && globalSearch.results.stations.length === 0 && globalSearch.results.trains.length === 0 ? <p className="px-4 py-3 text-sm text-slate-600">No stations or trains found.</p> : null}
+            {globalSearch.results.stations.length > 0 ? <div className="border-b border-slate-200 p-2">
+              <p className="px-2 py-1 text-[10px] font-bold tracking-[0.14em] text-slate-500 uppercase">Stations</p>
+              {globalSearch.results.stations.map((station) => <button key={station.code} type="button" onClick={() => chooseSearchStation(station)} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-2 text-left hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-700">
+                <span className="grid size-8 shrink-0 place-items-center rounded-md bg-slate-800 font-site-code text-[10px] font-bold text-white">{station.code}</span>
+                <span className="min-w-0"><strong className="block truncate text-sm text-slate-900">{station.name}</strong><small className="block text-xs text-slate-500">Open station details</small></span>
+              </button>)}
+            </div> : null}
+            {globalSearch.results.trains.length > 0 ? <div className="p-2">
+              <p className="px-2 py-1 text-[10px] font-bold tracking-[0.14em] text-slate-500 uppercase">Trains</p>
+              {globalSearch.results.trains.map((train) => <div key={train.trainNo} className="flex min-h-11 items-center gap-3 rounded-lg px-2"><span className="font-site-code text-xs font-bold text-blue-700">{train.trainNo}</span><span className="truncate text-sm font-semibold text-slate-800">{train.trainName}</span></div>)}
+            </div> : null}
+          </div>
+        ) : null}
       </div>
 
       <details className="group absolute top-3 right-3 z-[1000] w-12 rounded-xl border border-slate-200 bg-white/95 shadow-lg backdrop-blur open:top-16 open:w-48 sm:w-48 sm:open:top-3">
@@ -481,46 +512,6 @@ export function RailAtlas() {
           </label>
         </div>
       </details>
-
-      {stationPanelOpen ? (
-        <aside id="station-browser" className="absolute top-16 bottom-3 left-3 z-[900] flex w-[min(360px,calc(100%-1.5rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-          <header className="flex items-start justify-between gap-3 border-b border-slate-200 p-4">
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">Find a station</h1>
-              <p className="mt-1 text-xs text-slate-500">{totalStations.toLocaleString("en-IN")} stations in the local catalog</p>
-            </div>
-            <button type="button" onClick={() => setStationPanelOpen(false)} className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-blue-700" aria-label="Close station browser"><X size={18} /></button>
-          </header>
-
-          <label className="m-3 flex h-11 items-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-3 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100">
-            <Search size={17} className="shrink-0 text-slate-500" aria-hidden="true" />
-            <span className="sr-only">Filter stations</span>
-            <input autoFocus className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-slate-500 md:text-sm" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name or station code" />
-            {query && <button className="grid size-8 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-200" onClick={() => setQuery("")} type="button" aria-label="Clear station search"><X size={16} /></button>}
-          </label>
-
-          {loading ? <div className="px-4 py-2 text-sm text-slate-500">Loading stations…</div> : null}
-          {!loading && filteredStations.length === 0 ? <div className="px-4 py-6 text-sm text-slate-600">No station matches “{query}”.</div> : null}
-
-          <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto" onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}>
-            <div className="relative" style={{ height: filteredStations.length * ROW_HEIGHT }}>
-              <div className="absolute inset-x-0" style={{ top: startIndex * ROW_HEIGHT }}>
-                {visibleStations.map((station) => (
-                  <button
-                    key={station.code}
-                    onClick={() => chooseStation(station)}
-                    className={`grid h-[58px] w-full grid-cols-[54px_minmax(0,1fr)_18px] items-center gap-2 border-b border-slate-100 px-3 text-left transition-colors hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600 ${selected?.code === station.code ? "bg-blue-50" : "bg-white"}`}
-                  >
-                    <span className="grid h-8 place-items-center rounded-md bg-slate-800 px-1 font-site-code text-[10px] font-bold text-white">{station.code}</span>
-                    <span className="min-w-0"><strong className="block truncate text-sm">{station.name}</strong><small className="mt-0.5 block font-site-code text-[10px] text-slate-500">{station.lat.toFixed(2)}, {station.lon.toFixed(2)}</small></span>
-                    <MapPin size={15} className="text-slate-400" aria-hidden="true" />
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </aside>
-      ) : null}
 
       {selected ? <StationDetailsPanel station={selected} board={stationBoard.board} hours={stationBoard.hours} loading={stationBoard.loading} error={stationBoard.error} onClose={() => setSelected(null)} onRetry={stationBoard.retry} /> : null}
 

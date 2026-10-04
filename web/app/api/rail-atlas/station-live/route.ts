@@ -11,9 +11,9 @@ export async function GET(request: NextRequest) {
   }
 
   const apiKey = process.env.RAILKIT_API_KEY;
-  const backendUrl = process.env.RAILKIT_LOCAL_BACKEND_URL || "http://127.0.0.1:3001";
+  const backendUrl = process.env.RAILKIT_PRODUCTION_BACKEND_URL || "https://api.railkit.in";
   if (!apiKey) {
-    return NextResponse.json({ success: false, error: "Local RailKit API key is not configured." }, { status: 503 });
+    return NextResponse.json({ success: false, error: "RailKit API key is not configured on the server." }, { status: 503 });
   }
 
   try {
@@ -28,6 +28,6 @@ export async function GET(request: NextRequest) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch {
-    return NextResponse.json({ success: false, error: "Local train service is unavailable." }, { status: 503 });
+    return NextResponse.json({ success: false, error: "Production train service is unavailable." }, { status: 503 });
   }
 }

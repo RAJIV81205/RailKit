@@ -53,6 +53,11 @@ type StationBoardResponse = {
   error?: string;
 };
 
+const INDIA_MAP_BOUNDS: [[number, number], [number, number]] = [
+  [6, 68],
+  [38, 98],
+];
+
 const ROW_HEIGHT = 58;
 const OVERSCAN = 8;
 
@@ -267,6 +272,8 @@ export function RailAtlas() {
         zoom: 5,
         minZoom: 4,
         maxZoom: 18,
+        maxBounds: INDIA_MAP_BOUNDS,
+        maxBoundsViscosity: 1,
         preferCanvas: true,
         zoomControl: false,
       });

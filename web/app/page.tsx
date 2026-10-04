@@ -487,7 +487,7 @@ export default async function LandingPage() {
                   alt="RailKit"
                   width={24}
                   height={24}
-                  style={{ objectFit: "contain" }}
+                  style={{ width: 24, height: 24, objectFit: "contain" }}
                 />
               </div>
               <span className="lp-footer-logo-name">RailKit</span>

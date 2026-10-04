@@ -197,6 +197,7 @@ export function Header() {
                   width={20}
                   height={20}
                   className="object-contain"
+                  style={{ width: 20, height: 20 }}
                 />
               </div>
               <span className="font-site-serif text-[17px] leading-none tracking-[-0.01em]">

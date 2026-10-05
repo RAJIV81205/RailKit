@@ -119,6 +119,13 @@ function groupTrainSchedule(timeline: TrainTimelineItem[]) {
   }));
 }
 
+function formatScheduleTime(value?: string) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "—";
+  if (["SRC", "DSTN"].includes(normalized.toUpperCase())) return "—";
+  return normalized.match(/\b\d{1,2}:\d{2}\b/)?.[0] || normalized;
+}
+
 const INDIA_MAP_BOUNDS: [[number, number], [number, number]] = [
   [6, 68],
   [38, 98],
@@ -414,80 +421,78 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
   };
 
   return (
-    <aside className="absolute right-3 bottom-3 left-3 z-[950] flex h-[76dvh] min-h-80 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl lg:top-16 lg:left-auto lg:h-auto lg:w-[min(460px,calc(100%-1.5rem))]" aria-label={`${selection.trainName} live train details`}>
-      <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2"><span className="rounded-md bg-blue-700 px-2 py-1 font-site-code text-xs font-bold text-white">{selection.trainNo}</span><h2 className="truncate text-lg font-bold text-slate-900">{data?.trainName || selection.trainName}</h2></div>
-          <p className="mt-1 text-xs text-slate-500">{data?.start?.stationCode && data?.end?.stationCode ? `${data.start.stationCode} → ${data.end.stationCode} · ` : ""}{data?.date || selection.date || "today"}</p>
-        </div>
-        <button type="button" onClick={onClose} className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-700" aria-label="Close live train details"><X size={18} /></button>
-      </header>
-
-      {loading ? <div className="grid min-h-40 place-items-center p-6 text-center"><div><RefreshCw className="mx-auto animate-spin text-blue-700" size={22} aria-hidden="true" /><p className="mt-3 text-sm text-slate-600">Matching live position to railway tracks…</p></div></div> : null}
-      {error ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p>{error}</p><button type="button" onClick={onRetry} className="mt-3 rounded-lg bg-red-800 px-3 py-2 font-semibold text-white">Try again</button></div> : null}
-
-      {!loading && !error && data ? <div className="flex min-h-0 flex-1 flex-col">
-        <div className="space-y-3 border-b border-slate-200 p-3">
-          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
-          <p className="flex items-center gap-2 text-xs font-bold tracking-wide text-blue-700 uppercase"><Navigation size={15} aria-hidden="true" /> Current position</p>
-            <p className="mt-1 text-sm font-bold text-slate-900">{data.currentPosition ? `${data.currentPosition.stationName} (${data.currentPosition.stationCode})` : "Position unavailable"}</p>
-            <p className="mt-1 text-xs leading-5 text-slate-700">{data.statusNote}</p>
+    <aside className="absolute right-3 bottom-3 left-3 z-[950] flex h-[78dvh] min-h-80 flex-col overflow-hidden rounded-[22px] border border-slate-200 bg-slate-50 shadow-[0_24px_70px_rgba(15,23,42,0.28)] lg:top-16 lg:left-auto lg:h-auto lg:w-[min(480px,calc(100%-1.5rem))]" aria-label={`${selection.trainName} live train details`}>
+      <header className="border-b border-slate-200 bg-white px-4 pt-4 pb-3 text-slate-900">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2"><span className="rounded-md bg-blue-700 px-2 py-1 font-site-code text-xs font-black text-white">{selection.trainNo}</span><span className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.14em] text-emerald-700 uppercase"><i className="size-1.5 rounded-full bg-emerald-500" /> Live run</span></div>
+            <h2 className="mt-2 truncate text-lg font-bold tracking-tight">{data?.trainName || selection.trainName}</h2>
+            <p className="mt-1 text-xs text-slate-500">{data?.start?.stationCode && data?.end?.stationCode ? `${data.start.stationCode} → ${data.end.stationCode} · ` : ""}{data?.date || selection.date || "today"}</p>
           </div>
-          {progress ? <div>
-            <div className="mb-1.5 flex justify-between text-xs text-slate-600"><span className="font-semibold capitalize">{progress.journeyStatus.replace("_", " ")}</span><strong>{Math.round(progress.percent)}%</strong></div>
-            <div className="h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Journey progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.percent)}><div className="h-full rounded-full bg-blue-700" style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }} /></div>
-            <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
-              <div><strong className="block text-sm text-slate-900">{progress.remainingStations}</strong><span className="text-slate-500">remaining</span></div>
-              <div><strong className="block text-sm text-slate-900">{progress.distanceRemainingKm ?? "—"}</strong><span className="text-slate-500">km left</span></div>
-              <div><strong className="block text-sm text-slate-900">{data.averageSpeedKmph ?? "—"}</strong><span className="text-slate-500">avg km/h</span></div>
+          <div className="flex shrink-0 items-center gap-1">
+            <button type="button" onClick={onRetry} disabled={loading} className="flex h-11 items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-wait disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label="Refresh live train details"><RefreshCw size={16} className={loading ? "animate-spin" : ""} aria-hidden="true" /><span>Refresh</span></button>
+            <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label="Close live train details"><X size={19} /></button>
+          </div>
+        </div>
+
+        {!loading && !error && data ? <>
+          <div className="mt-3 flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3">
+            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-blue-700 text-white"><Navigation size={15} aria-hidden="true" /></span>
+            <div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{data.currentPosition ? `${data.currentPosition.stationName} (${data.currentPosition.stationCode})` : "Position unavailable"}</p><p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-600">{data.statusNote}</p></div>
+          </div>
+          {progress ? <div className="mt-3">
+            <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="font-semibold capitalize text-slate-600">{progress.journeyStatus.replace("_", " ")}</span><strong className="text-blue-700">{Math.round(progress.percent)}%</strong></div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Journey progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.percent)}><div className="h-full rounded-full bg-blue-700" style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }} /></div>
+            <div className="mt-3 grid grid-cols-3 divide-x divide-slate-200 rounded-xl border border-slate-200 bg-slate-50 py-2 text-center">
+              <div><strong className="block font-site-code text-sm text-slate-900">{progress.remainingStations}</strong><span className="text-[10px] text-slate-500">stations left</span></div>
+              <div><strong className="block font-site-code text-sm text-slate-900">{progress.distanceRemainingKm ?? "—"}</strong><span className="text-[10px] text-slate-500">km left</span></div>
+              <div><strong className="block font-site-code text-sm text-slate-900">{data.averageSpeedKmph ?? "—"}</strong><span className="text-[10px] text-slate-500">avg km/h</span></div>
             </div>
           </div> : null}
+        </> : null}
+      </header>
+
+      {loading ? <div className="grid flex-1 place-items-center p-6 text-center"><div><RefreshCw className="mx-auto animate-spin text-blue-700" size={22} aria-hidden="true" /><p className="mt-3 text-sm text-slate-600">Building the live schedule…</p></div></div> : null}
+      {error ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p>{error}</p><button type="button" onClick={onRetry} className="mt-3 min-h-11 rounded-lg bg-red-800 px-3 py-2 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-800">Try again</button></div> : null}
+
+      {!loading && !error && data ? <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2.5">
+          <div><h3 className="text-xs font-black tracking-[0.08em] text-slate-900 uppercase">Route schedule</h3><p className="mt-0.5 text-[11px] font-medium text-slate-500">{scheduleGroups.length} stops · {data.totalDistanceKm ?? "—"} km</p></div>
         </div>
 
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
-          <div><h3 className="text-sm font-bold text-slate-900">Station timeline</h3><p className="text-xs text-slate-500">{data.timeline.length} route points · {data.totalDistanceKm ?? "—"} km</p></div>
-          {data.lastUpdate ? <span className="max-w-36 text-right text-[11px] leading-4 text-slate-500">Updated {data.lastUpdate}</span> : null}
-        </div>
-
-        {scheduleGroups.length > 0 ? <ol ref={scheduleRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3" aria-label="Train station timeline">
+        {scheduleGroups.length > 0 ? <ol ref={scheduleRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 px-4 py-3" aria-label="Train station timeline">
           {scheduleGroups.map((group) => {
             const stop = group.stop;
             const isCurrent = stop.status === "current" || stop.stationCode === data.currentPosition?.stationCode;
             const isPassed = stop.status === "passed";
-            const arrival = stop.arrival?.actual || stop.arrival?.scheduled || "—";
-            const departure = stop.departure?.actual || stop.departure?.scheduled || "—";
+            const scheduledArrival = formatScheduleTime(stop.arrival?.scheduled);
+            const scheduledDeparture = formatScheduleTime(stop.departure?.scheduled);
+            const actualArrival = formatScheduleTime(stop.arrival?.actual);
+            const actualDeparture = formatScheduleTime(stop.departure?.actual);
+            const arrivalDelayed = Boolean(stop.arrival?.delay && !/on time/i.test(stop.arrival.delay));
+            const departureDelayed = Boolean(stop.departure?.delay && !/on time/i.test(stop.departure.delay));
             const expanded = expandedSegments.has(group.key);
-            return <li key={group.key} className="relative ml-3 border-l-2 border-slate-200 pl-5 last:border-transparent">
-              <span className={`absolute -left-[8px] top-5 size-3.5 rounded-full border-[3px] border-white ring-2 ${isCurrent ? "bg-blue-700 ring-blue-700" : isPassed ? "bg-emerald-600 ring-emerald-600" : "bg-white ring-slate-400"}`} aria-hidden="true" />
-              <article aria-current={isCurrent ? "location" : undefined} className={`rounded-xl border p-3 ${isCurrent ? "border-blue-300 bg-blue-50 shadow-sm" : "border-slate-200 bg-white"}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0"><div className="flex items-center gap-2"><strong className="font-site-code text-xs text-blue-700">{stop.stationCode}</strong><span className="rounded-md bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-white uppercase">Stoppage</span>{isCurrent ? <span className="rounded-md bg-blue-700 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-white uppercase">Current</span> : null}</div><h4 className="mt-1 truncate text-sm font-bold text-slate-900" title={stop.stationName}>{stop.stationName || stop.stationCode}</h4></div>
-                  <div className="shrink-0 text-right"><span className="block text-xs font-semibold text-slate-700">{stop.distanceKm === "" || stop.distanceKm == null ? "—" : `${stop.distanceKm} km`}</span><span className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">{isCurrent ? "Current" : isPassed ? "Passed" : "Upcoming"}</span></div>
-                </div>
-                <div className="mt-2 grid grid-cols-3 divide-x divide-slate-200 rounded-lg bg-slate-50 px-2 py-2">
-                  <div className="min-w-0 pr-2"><span className="block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Arrival</span><strong className="mt-0.5 block break-words font-site-code text-xs leading-4 text-slate-900">{arrival}</strong>{stop.arrival?.actual && stop.arrival.scheduled && stop.arrival.actual !== stop.arrival.scheduled ? <span className="mt-0.5 block break-words text-[10px] leading-4 text-slate-500">Sch {stop.arrival.scheduled}</span> : null}{stop.arrival?.delay ? <span className="block text-[10px] text-slate-600">{stop.arrival.delay}</span> : null}</div>
-                  <div className="min-w-0 px-2"><span className="block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Departure</span><strong className="mt-0.5 block break-words font-site-code text-xs leading-4 text-slate-900">{departure}</strong>{stop.departure?.actual && stop.departure.scheduled && stop.departure.actual !== stop.departure.scheduled ? <span className="mt-0.5 block break-words text-[10px] leading-4 text-slate-500">Sch {stop.departure.scheduled}</span> : null}{stop.departure?.delay ? <span className="block text-[10px] text-slate-600">{stop.departure.delay}</span> : null}</div>
-                  <div className="min-w-0 pl-2"><span className="block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Platform</span><strong className="mt-0.5 block truncate font-site-code text-xs leading-4 text-slate-900">{stop.platform || "—"}</strong></div>
-                </div>
+            return <li key={group.key}>
+              <article aria-current={isCurrent ? "location" : undefined} className={`grid min-h-[68px] grid-cols-[68px_24px_minmax(0,1fr)_68px] items-center rounded-xl py-2 transition-colors ${isCurrent ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-white"}`}>
+                <div className="min-w-0 text-left"><strong className="block font-site-code text-xs leading-4 text-slate-800">{scheduledArrival}</strong><strong className={`block font-site-code text-xs leading-4 ${actualArrival === "—" ? "text-slate-400" : arrivalDelayed ? "text-rose-600" : "text-emerald-700"}`}>{actualArrival}</strong></div>
+                <div className="relative h-full" aria-hidden="true"><span className={`absolute -top-2 -bottom-2 left-1/2 w-px -translate-x-1/2 ${isPassed ? "bg-blue-500" : "bg-slate-300"}`} /><span className={`absolute top-1/2 left-1/2 grid size-4 -translate-1/2 place-items-center rounded-full border-[3px] border-slate-50 ${isCurrent ? "bg-blue-600 ring-4 ring-blue-100" : isPassed ? "bg-blue-700" : "bg-amber-400"}`} /></div>
+                <div className="min-w-0 px-3"><h4 className="truncate text-sm font-bold text-slate-950" title={stop.stationName}>{stop.stationName || stop.stationCode}</h4><div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-slate-500"><strong className="font-site-code text-slate-700">{stop.stationCode}</strong><span>·</span><span>{stop.distanceKm === "" || stop.distanceKm == null ? "—" : `${stop.distanceKm} km`}</span><span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">PF {stop.platform || "—"}</span></div></div>
+                <div className="min-w-0 text-right"><strong className="block font-site-code text-xs leading-4 text-slate-800">{scheduledDeparture}</strong><strong className={`block font-site-code text-xs leading-4 ${actualDeparture === "—" ? "text-slate-400" : departureDelayed ? "text-rose-600" : "text-emerald-700"}`}>{actualDeparture}</strong></div>
               </article>
 
-              {group.intermediates.length > 0 ? <div className="py-2">
-                <button type="button" onClick={() => toggleSegment(group.key)} aria-expanded={expanded} aria-controls={`segment-${group.key}`} className={`flex min-h-11 w-full items-center gap-3 rounded-lg border border-dashed px-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-blue-700 ${expanded ? "border-blue-300 bg-blue-50 text-blue-900" : "border-slate-300 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50"}`}>
-                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white font-site-code text-[10px] font-bold shadow-sm">{group.intermediates.length}</span>
-                  <span className="min-w-0 flex-1"><strong className="block text-xs">Intermediate stations</strong><span className="block truncate text-[11px] text-slate-500">{stop.stationCode} → {group.nextStop?.stationCode || "route end"}</span></span>
-                  <ChevronDown size={16} className={`shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+              {group.intermediates.length > 0 ? <div>
+                <button type="button" onClick={() => toggleSegment(group.key)} aria-expanded={expanded} aria-controls={`segment-${group.key}`} className={`grid min-h-10 w-full grid-cols-[68px_24px_minmax(0,1fr)_68px] items-center rounded-lg text-left transition-colors focus-visible:outline-2 focus-visible:outline-blue-700 ${expanded ? "bg-blue-50" : "hover:bg-white"}`}>
+                  <span /><span className="relative h-full" aria-hidden="true"><i className="absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-slate-300" /><i className="absolute top-1/2 -right-2 left-1/2 h-px bg-slate-300" /></span><span className="min-w-0 px-2"><span className="block truncate text-[11px] font-semibold text-slate-600">{group.intermediates.length} passing stations</span></span><ChevronDown size={15} className={`mx-auto text-slate-500 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
                 </button>
-                {expanded ? <ol id={`segment-${group.key}`} className="ml-3 border-l border-dashed border-blue-300 py-1 pl-4">
+                {expanded ? <ol id={`segment-${group.key}`}>
                   {group.intermediates.map((intermediate) => {
                     const intermediateCurrent = intermediate.status === "current" || intermediate.stationCode === data.currentPosition?.stationCode;
-                    return <li key={`${intermediate.stationCode}-${intermediate.index}`} aria-current={intermediateCurrent ? "location" : undefined} className={`relative flex min-h-11 items-center justify-between gap-3 border-b border-slate-100 px-2 py-2 last:border-0 ${intermediateCurrent ? "rounded-lg bg-blue-100" : ""}`}>
-                      <span className={`absolute -left-[19px] size-2 rounded-full ${intermediateCurrent ? "bg-blue-700 ring-2 ring-blue-200" : "bg-slate-400"}`} aria-hidden="true" />
-                      <div className="min-w-0"><div className="flex items-center gap-2"><strong className="font-site-code text-[11px] text-slate-700">{intermediate.stationCode}</strong>{intermediateCurrent ? <span className="rounded bg-blue-700 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase">Current position</span> : null}</div><span className="block truncate text-xs text-slate-600" title={intermediate.stationName}>{intermediate.stationName || intermediate.stationCode}</span></div>
-                      <div className="shrink-0 text-right"><span className="block text-[11px] font-semibold text-slate-600">{intermediate.distanceKm === "" || intermediate.distanceKm == null ? "—" : `${intermediate.distanceKm} km`}</span><span className="text-[9px] font-bold tracking-wide text-slate-400 uppercase">No stop</span></div>
+                    return <li key={`${intermediate.stationCode}-${intermediate.index}`} aria-current={intermediateCurrent ? "location" : undefined} className={`grid min-h-10 grid-cols-[68px_24px_minmax(0,1fr)_68px] items-center rounded-lg py-1.5 ${intermediateCurrent ? "bg-blue-100 ring-1 ring-blue-300" : ""}`}>
+                      <span className="text-right text-[9px] font-bold text-slate-400 uppercase">Passes</span><span className="relative h-full" aria-hidden="true"><i className="absolute -top-1.5 -bottom-1.5 left-1/2 w-px -translate-x-1/2 bg-slate-300" /><i className={`absolute top-1/2 left-1/2 size-2 -translate-1/2 rounded-full ${intermediateCurrent ? "bg-blue-700 ring-4 ring-blue-100" : "bg-slate-400"}`} /></span><div className="min-w-0 px-3"><strong className="block truncate text-xs font-semibold text-slate-700" title={intermediate.stationName}>{intermediate.stationName || intermediate.stationCode}</strong><span className="font-site-code text-[10px] text-slate-500">{intermediate.stationCode}</span></div><span className="pr-1 text-right font-site-code text-[10px] text-slate-500">{intermediate.distanceKm === "" || intermediate.distanceKm == null ? "—" : `${intermediate.distanceKm} km`}</span>
                     </li>;
                   })}
                 </ol> : null}
-              </div> : <div className="h-2" />}
+              </div> : null}
             </li>;
           })}
         </ol> : <div className="grid flex-1 place-items-center p-6 text-center"><p className="text-sm text-slate-600">Station timeline unavailable for this run.</p></div>}

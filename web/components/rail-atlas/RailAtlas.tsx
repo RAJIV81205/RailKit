@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CircleMarker, Layer, LayerGroup, Map as LeafletMap } from "leaflet";
+import type { CircleMarker, Layer, LayerGroup, Map as LeafletMap, LeafletMouseEvent } from "leaflet";
 import { ChevronDown, Clock3, Layers3, Navigation, RefreshCw, Search, TrainFront, X } from "lucide-react";
 
 type Station = {
@@ -404,14 +404,16 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
   const progress = data?.progress;
   const scheduleRef = useRef<HTMLOListElement>(null);
   const scheduleGroups = useMemo(() => groupTrainSchedule(data?.timeline || []), [data]);
+  const isFullyCancelled = Boolean(data?.statusNote && /\bcancel(?:led|lation)?\b/i.test(data.statusNote));
   const cancellationNote = useMemo(() => {
+    if (isFullyCancelled) return "This train is completely cancelled today. No stations will be served.";
     const cancelledStops = scheduleGroups.map((group) => group.stop).filter(isCancelledScheduleStop);
     if (cancelledStops.length === 0) return "";
     const first = cancelledStops[0];
     const last = cancelledStops.at(-1)!;
     if (cancelledStops.length === 1) return `${first.stationName || first.stationCode} is marked cancelled in this schedule.`;
     return `${cancelledStops.length} stops are marked cancelled from ${first.stationName || first.stationCode} to ${last.stationName || last.stationCode}.`;
-  }, [scheduleGroups]);
+  }, [isFullyCancelled, scheduleGroups]);
   const currentSegmentKey = useMemo(() => scheduleGroups.find((group) => group.intermediates.some((stop) => stop.status === "current" || stop.stationCode === data?.currentPosition?.stationCode))?.key, [data?.currentPosition?.stationCode, scheduleGroups]);
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
 
@@ -445,7 +447,7 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
       <header className="border-b border-slate-200 bg-white px-4 pt-4 pb-3 text-slate-900">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2"><span className="rounded-md bg-blue-700 px-2 py-1 font-site-code text-xs font-black text-white">{selection.trainNo}</span><span className="flex items-center gap-1.5 text-[10px] font-bold tracking-[0.14em] text-emerald-700 uppercase"><i className="size-1.5 rounded-full bg-emerald-500" /> Live run</span></div>
+            <div className="flex items-center gap-2"><span className="rounded-md bg-blue-700 px-2 py-1 font-site-code text-xs font-black text-white">{selection.trainNo}</span><span className={`flex items-center gap-1.5 text-[10px] font-bold tracking-[0.14em] uppercase ${isFullyCancelled ? "text-red-700" : "text-emerald-700"}`}><i className={`size-1.5 rounded-full ${isFullyCancelled ? "bg-red-600" : "bg-emerald-500"}`} /> {isFullyCancelled ? "Cancelled" : "Live run"}</span></div>
             <h2 className="mt-2 truncate text-lg font-bold tracking-tight">{data?.trainName || selection.trainName}</h2>
             <p className="mt-1 text-xs text-slate-500">{data?.start?.stationCode && data?.end?.stationCode ? `${data.start.stationCode} → ${data.end.stationCode} · ` : ""}{data?.date || selection.date || "today"}</p>
           </div>
@@ -456,11 +458,11 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
         </div>
 
         {!loading && !error && data ? <>
-          <div className="mt-3 flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3">
-            <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg bg-blue-700 text-white"><Navigation size={15} aria-hidden="true" /></span>
-            <div className="min-w-0"><p className="truncate text-sm font-bold text-slate-900">{data.currentPosition ? `${data.currentPosition.stationName} (${data.currentPosition.stationCode})` : "Position unavailable"}</p><p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-600">{data.statusNote}</p></div>
+          <div className={`mt-3 flex items-start gap-2 rounded-xl border p-3 ${isFullyCancelled ? "border-red-200 bg-red-50" : "border-blue-100 bg-blue-50"}`}>
+            <span className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg text-white ${isFullyCancelled ? "bg-red-600" : "bg-blue-700"}`}><Navigation size={15} aria-hidden="true" /></span>
+            <div className="min-w-0"><p className={`truncate text-sm font-bold ${isFullyCancelled ? "text-red-900" : "text-slate-900"}`}>{isFullyCancelled ? "Service cancelled" : data.currentPosition ? `${data.currentPosition.stationName} (${data.currentPosition.stationCode})` : "Position unavailable"}</p><p className={`mt-0.5 line-clamp-2 text-[11px] leading-4 ${isFullyCancelled ? "text-red-800" : "text-slate-600"}`}>{data.statusNote}</p></div>
           </div>
-          {progress ? <div className="mt-3">
+          {progress && !isFullyCancelled ? <div className="mt-3">
             <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="font-semibold capitalize text-slate-600">{progress.journeyStatus.replace("_", " ")}</span><strong className="text-blue-700">{Math.round(progress.percent)}%</strong></div>
             <div className="h-1.5 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Journey progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.percent)}><div className="h-full rounded-full bg-blue-700" style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }} /></div>
             <div className="mt-3 grid grid-cols-3 divide-x divide-slate-200 rounded-xl border border-slate-200 bg-slate-50 py-2 text-center">
@@ -488,13 +490,15 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
             const isPassed = stop.status === "passed";
             const scheduledArrival = formatScheduleTime(stop.arrival?.scheduled);
             const scheduledDeparture = formatScheduleTime(stop.departure?.scheduled);
-            const actualArrival = formatScheduleTime(stop.arrival?.actual);
-            const actualDeparture = formatScheduleTime(stop.departure?.actual);
+            const actualArrivalValue = formatScheduleTime(stop.arrival?.actual);
+            const actualDepartureValue = formatScheduleTime(stop.departure?.actual);
+            const actualArrival = isFullyCancelled && scheduledArrival !== "--" ? "CANCEL" : actualArrivalValue;
+            const actualDeparture = isFullyCancelled && scheduledDeparture !== "--" ? "CANCEL" : actualDepartureValue;
             const arrivalDelayed = Boolean(stop.arrival?.delay && !/on time/i.test(stop.arrival.delay));
             const departureDelayed = Boolean(stop.departure?.delay && !/on time/i.test(stop.departure.delay));
-            const arrivalCancelled = isCancelledScheduleValue(stop.arrival?.actual);
-            const departureCancelled = isCancelledScheduleValue(stop.departure?.actual);
-            const stopCancelled = isCancelledScheduleStop(stop);
+            const arrivalCancelled = isFullyCancelled || isCancelledScheduleValue(stop.arrival?.actual);
+            const departureCancelled = isFullyCancelled || isCancelledScheduleValue(stop.departure?.actual);
+            const stopCancelled = isFullyCancelled || isCancelledScheduleStop(stop);
             const expanded = expandedSegments.has(group.key);
             return <li key={group.key}>
               <article aria-current={isCurrent ? "location" : undefined} className={`grid min-h-[68px] grid-cols-[68px_24px_minmax(0,1fr)_68px] items-center rounded-xl px-2 py-2 transition-colors ${isCurrent ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-white"}`}>
@@ -638,12 +642,9 @@ export function RailAtlas() {
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || stations.length === 0) return;
+    stationLayerRef.current?.removeFrom(mapRef.current);
+    stationLayerRef.current = null;
     if (!showStations || selectedTrain) {
-      stationLayerRef.current?.removeFrom(mapRef.current);
-      return;
-    }
-    if (stationLayerRef.current) {
-      stationLayerRef.current.addTo(mapRef.current);
       return;
     }
     let cancelled = false;
@@ -662,9 +663,9 @@ export function RailAtlas() {
           fillColor: "#d97706",
           fillOpacity: 0.92,
           opacity: 1,
+          interactive: true,
           bubblingMouseEvents: false,
         })
-          .bindTooltip(`${station.name} (${station.code})`, { direction: "top" })
           .on("click", () => {
             setSelectedTrain(null);
             setSelected(station);
@@ -676,6 +677,71 @@ export function RailAtlas() {
       if (!cancelled) setError("Station markers unavailable");
     });
     return () => { cancelled = true; };
+  }, [mapReady, selectedTrain, showStations, stations]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !showStations || stations.length === 0) return;
+    const map = mapRef.current;
+    let cancelled = false;
+    let cleanupInteraction: (() => void) | undefined;
+    import("leaflet").then((L) => {
+      if (cancelled || mapRef.current !== map) return;
+      let hoverTooltip: ReturnType<typeof L.tooltip> | null = null;
+      const findNearest = (event: LeafletMouseEvent) => {
+        const clickPoint = map.latLngToContainerPoint(event.latlng);
+        let nearest: Station | null = null;
+        let nearestDistance = 12;
+        for (const station of stations) {
+          const stationPoint = map.latLngToContainerPoint([station.lat, station.lon]);
+          const distance = clickPoint.distanceTo(stationPoint);
+          if (distance < nearestDistance) {
+            nearest = station;
+            nearestDistance = distance;
+          }
+        }
+        return nearest;
+      };
+      const handleMapMove = (event: LeafletMouseEvent) => {
+        const nearest = findNearest(event);
+        map.getContainer().style.cursor = nearest ? "pointer" : "";
+        if (!nearest) {
+          if (hoverTooltip) {
+            map.removeLayer(hoverTooltip);
+            hoverTooltip = null;
+          }
+          return;
+        }
+        if (!hoverTooltip) hoverTooltip = L.tooltip({ direction: "top", offset: [0, -10], opacity: 0.96 });
+        hoverTooltip.setContent(nearest.code).setLatLng([nearest.lat, nearest.lon]);
+        if (!map.hasLayer(hoverTooltip)) hoverTooltip.addTo(map);
+      };
+      const handleMapClick = (event: LeafletMouseEvent) => {
+        if (selectedTrain) return;
+        const nearest = findNearest(event);
+        if (nearest) setSelected(nearest);
+      };
+      map.on("mousemove", handleMapMove);
+      map.on("click", handleMapClick);
+      const handleMapOut = () => {
+        map.getContainer().style.cursor = "";
+        if (hoverTooltip) {
+          map.removeLayer(hoverTooltip);
+          hoverTooltip = null;
+        }
+      };
+      map.on("mouseout", handleMapOut);
+      cleanupInteraction = () => {
+        map.off("mousemove", handleMapMove);
+        map.off("click", handleMapClick);
+        map.off("mouseout", handleMapOut);
+        map.getContainer().style.cursor = "";
+        if (hoverTooltip) map.removeLayer(hoverTooltip);
+      };
+    });
+    return () => {
+      cancelled = true;
+      cleanupInteraction?.();
+    };
   }, [mapReady, selectedTrain, showStations, stations]);
 
   useEffect(() => {
@@ -716,28 +782,29 @@ export function RailAtlas() {
     import("leaflet").then((L) => {
       if (cancelled || !mapRef.current || !trainLive.data) return;
       const data = trainLive.data;
+      const isFullyCancelled = Boolean(data.statusNote && /\bcancel(?:led|lation)?\b/i.test(data.statusNote));
       const layers: Layer[] = [];
       if (data.route.length > 1) {
-        layers.push(L.polyline(data.route, { pane: "activeTrain", color: "#dc2626", weight: 4, opacity: 0.92, interactive: false }));
+        layers.push(L.polyline(data.route, { pane: "activeTrain", color: isFullyCancelled ? "#94a3b8" : "#2563eb", weight: 4, opacity: isFullyCancelled ? 0.7 : 0.9, dashArray: isFullyCancelled ? "7 7" : undefined, interactive: false }));
       }
       data.timeline
         .filter((stop) => stop.type !== "intermediate" && Number.isFinite(stop.lat) && Number.isFinite(stop.lon))
         .filter((stop) => stop.stationCode !== data.start?.stationCode && stop.stationCode !== data.end?.stationCode)
         .forEach((stop) => {
-          const stopCancelled = isCancelledScheduleStop(stop);
+          const stopCancelled = isFullyCancelled || isCancelledScheduleStop(stop);
           layers.push(L.circleMarker([stop.lat!, stop.lon!], {
             pane: "activeTrain",
             radius: 4.5,
-            color: stopCancelled ? "#ffffff" : "#b91c1c",
+            color: stopCancelled ? "#ffffff" : "#2563eb",
             weight: 2,
-            fillColor: stopCancelled ? "#dc2626" : "#ffffff",
+            fillColor: stopCancelled ? "#dc2626" : "#eff6ff",
             fillOpacity: 1,
             bubblingMouseEvents: false,
           }).bindTooltip(`${stop.stationName || stop.stationCode} (${stop.stationCode})`, { direction: "top" }));
         });
-      if (data.start) layers.push(L.circleMarker([data.start.lat, data.start.lon], { pane: "activeTrain", radius: 7, color: "#ffffff", weight: 2, fillColor: "#059669", fillOpacity: 1, interactive: false }).bindTooltip(`Start · ${data.start.stationCode}`, { direction: "top" }));
-      if (data.end) layers.push(L.circleMarker([data.end.lat, data.end.lon], { pane: "activeTrain", radius: 7, color: "#ffffff", weight: 2, fillColor: "#dc2626", fillOpacity: 1, interactive: false }).bindTooltip(`End · ${data.end.stationCode}`, { direction: "top" }));
-      if (data.currentPosition) {
+      if (data.start) layers.push(L.circleMarker([data.start.lat, data.start.lon], { pane: "activeTrain", radius: 7, color: "#ffffff", weight: 2, fillColor: isFullyCancelled ? "#64748b" : "#059669", fillOpacity: 1, interactive: false }).bindTooltip(`Start · ${data.start.stationCode}`, { direction: "top" }));
+      if (data.end) layers.push(L.circleMarker([data.end.lat, data.end.lon], { pane: "activeTrain", radius: 7, color: "#ffffff", weight: 2, fillColor: isFullyCancelled ? "#64748b" : "#7c3aed", fillOpacity: 1, interactive: false }).bindTooltip(`End · ${data.end.stationCode}`, { direction: "top" }));
+      if (data.currentPosition && !isFullyCancelled) {
         const rotation = Number.isFinite(data.currentPosition.bearing) ? data.currentPosition.bearing : 0;
         const icon = L.divIcon({
           className: "",

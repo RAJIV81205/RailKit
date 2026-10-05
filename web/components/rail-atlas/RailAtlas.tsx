@@ -1,9 +1,9 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CircleMarker, Layer, LayerGroup, Map as LeafletMap } from "leaflet";
-import { Clock3, Layers3, Navigation, RefreshCw, Search, TrainFront, X } from "lucide-react";
+import { ChevronDown, Clock3, Layers3, Navigation, RefreshCw, Search, TrainFront, X } from "lucide-react";
 
 type Station = {
   code: string;
@@ -66,20 +66,58 @@ type GlobalSearchResponse = {
 
 type TrainSelection = { trainNo: string; trainName: string; date?: string };
 
+type TrainTimelineItem = {
+  index: number;
+  type?: string;
+  status?: string;
+  stationCode: string;
+  stationName?: string;
+  platform?: string;
+  distanceKm?: string | number;
+  arrival?: { scheduled?: string; actual?: string; delay?: string };
+  departure?: { scheduled?: string; actual?: string; delay?: string };
+};
+
 type TrainLiveData = {
   trainNo: string;
   trainName: string;
   date: string;
   statusNote: string;
   lastUpdate: string | null;
-  progress: { journeyStatus: string; percent: number; remainingStations: number; distanceRemainingKm: number | null } | null;
+  progress: { journeyStatus: string; percent: number; currentStationIndex?: number | null; totalStations?: number; passedStations?: number; remainingStations: number; currentDistanceKm?: number | null; distanceRemainingKm: number | null } | null;
+  totalDistanceKm: number | null;
+  averageSpeedKmph: number | null;
   start: { stationCode: string; stationName?: string; lat: number; lon: number } | null;
   end: { stationCode: string; stationName?: string; lat: number; lon: number } | null;
   currentPosition: { lat: number; lon: number; stationCode: string; stationName: string; bearing: number } | null;
   route: [number, number][];
+  timeline: TrainTimelineItem[];
 };
 
 type TrainLiveResponse = { success: boolean; data?: TrainLiveData; error?: string };
+
+type TrainScheduleGroup = {
+  key: string;
+  stop: TrainTimelineItem;
+  intermediates: TrainTimelineItem[];
+  nextStop?: TrainTimelineItem;
+};
+
+function groupTrainSchedule(timeline: TrainTimelineItem[]) {
+  const groups: TrainScheduleGroup[] = [];
+  for (const item of timeline) {
+    if (item.type === "intermediate") {
+      groups.at(-1)?.intermediates.push(item);
+      continue;
+    }
+    groups.push({ key: String(item.index), stop: item, intermediates: [] });
+  }
+  return groups.map((group, index) => ({
+    ...group,
+    key: `${group.stop.index}-${groups[index + 1]?.stop.index ?? "end"}`,
+    nextStop: groups[index + 1]?.stop,
+  }));
+}
 
 const INDIA_MAP_BOUNDS: [[number, number], [number, number]] = [
   [6, 68],
@@ -345,12 +383,42 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
   onRetry: () => void;
 }) {
   const progress = data?.progress;
+  const scheduleRef = useRef<HTMLOListElement>(null);
+  const scheduleGroups = useMemo(() => groupTrainSchedule(data?.timeline || []), [data]);
+  const currentSegmentKey = useMemo(() => scheduleGroups.find((group) => group.intermediates.some((stop) => stop.status === "current" || stop.stationCode === data?.currentPosition?.stationCode))?.key, [data?.currentPosition?.stationCode, scheduleGroups]);
+  const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!data?.timeline.length) return;
+    const initialSegments = currentSegmentKey ? new Set([currentSegmentKey]) : new Set<string>();
+    let frame = 0;
+    queueMicrotask(() => {
+      setExpandedSegments(initialSegments);
+      frame = window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        scheduleRef.current?.querySelector<HTMLElement>('[aria-current="location"]')?.scrollIntoView({
+        block: "center",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      });
+      }));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentSegmentKey, data]);
+
+  const toggleSegment = (key: string) => {
+    setExpandedSegments((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   return (
-    <aside className="absolute right-3 bottom-3 left-3 z-[950] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl lg:top-16 lg:left-auto lg:bottom-auto lg:w-[min(410px,calc(100%-1.5rem))]" aria-label={`${selection.trainName} live train details`}>
+    <aside className="absolute right-3 bottom-3 left-3 z-[950] flex h-[76dvh] min-h-80 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl lg:top-16 lg:left-auto lg:h-auto lg:w-[min(460px,calc(100%-1.5rem))]" aria-label={`${selection.trainName} live train details`}>
       <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2"><span className="rounded-md bg-blue-700 px-2 py-1 font-site-code text-xs font-bold text-white">{selection.trainNo}</span><h2 className="truncate text-lg font-bold text-slate-900">{data?.trainName || selection.trainName}</h2></div>
-          <p className="mt-1 text-xs text-slate-500">Live railway route · {data?.date || selection.date || "today"}</p>
+          <p className="mt-1 text-xs text-slate-500">{data?.start?.stationCode && data?.end?.stationCode ? `${data.start.stationCode} → ${data.end.stationCode} · ` : ""}{data?.date || selection.date || "today"}</p>
         </div>
         <button type="button" onClick={onClose} className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-700" aria-label="Close live train details"><X size={18} /></button>
       </header>
@@ -358,19 +426,71 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
       {loading ? <div className="grid min-h-40 place-items-center p-6 text-center"><div><RefreshCw className="mx-auto animate-spin text-blue-700" size={22} aria-hidden="true" /><p className="mt-3 text-sm text-slate-600">Matching live position to railway tracks…</p></div></div> : null}
       {error ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p>{error}</p><button type="button" onClick={onRetry} className="mt-3 rounded-lg bg-red-800 px-3 py-2 font-semibold text-white">Try again</button></div> : null}
 
-      {!loading && !error && data ? <div className="space-y-3 p-4">
-        <div className="rounded-xl bg-slate-50 p-3">
+      {!loading && !error && data ? <div className="flex min-h-0 flex-1 flex-col">
+        <div className="space-y-3 border-b border-slate-200 p-3">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
           <p className="flex items-center gap-2 text-xs font-bold tracking-wide text-blue-700 uppercase"><Navigation size={15} aria-hidden="true" /> Current position</p>
-          <p className="mt-1 text-sm font-semibold text-slate-900">{data.currentPosition ? `${data.currentPosition.stationName} (${data.currentPosition.stationCode})` : "Position unavailable"}</p>
-          <p className="mt-1 text-xs leading-5 text-slate-600">{data.statusNote}</p>
+            <p className="mt-1 text-sm font-bold text-slate-900">{data.currentPosition ? `${data.currentPosition.stationName} (${data.currentPosition.stationCode})` : "Position unavailable"}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-700">{data.statusNote}</p>
+          </div>
+          {progress ? <div>
+            <div className="mb-1.5 flex justify-between text-xs text-slate-600"><span className="font-semibold capitalize">{progress.journeyStatus.replace("_", " ")}</span><strong>{Math.round(progress.percent)}%</strong></div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Journey progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.percent)}><div className="h-full rounded-full bg-blue-700" style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }} /></div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
+              <div><strong className="block text-sm text-slate-900">{progress.remainingStations}</strong><span className="text-slate-500">remaining</span></div>
+              <div><strong className="block text-sm text-slate-900">{progress.distanceRemainingKm ?? "—"}</strong><span className="text-slate-500">km left</span></div>
+              <div><strong className="block text-sm text-slate-900">{data.averageSpeedKmph ?? "—"}</strong><span className="text-slate-500">avg km/h</span></div>
+            </div>
+          </div> : null}
         </div>
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 text-sm">
-          <div className="min-w-0"><span className="block text-[10px] font-bold tracking-wide text-emerald-700 uppercase">Start</span><strong className="block truncate">{data.start?.stationCode || "—"}</strong><span className="block truncate text-xs text-slate-500">{data.start?.stationName}</span></div>
-          <span className="h-px w-10 bg-slate-300" aria-hidden="true" />
-          <div className="min-w-0 text-right"><span className="block text-[10px] font-bold tracking-wide text-red-700 uppercase">End</span><strong className="block truncate">{data.end?.stationCode || "—"}</strong><span className="block truncate text-xs text-slate-500">{data.end?.stationName}</span></div>
+
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
+          <div><h3 className="text-sm font-bold text-slate-900">Station timeline</h3><p className="text-xs text-slate-500">{data.timeline.length} route points · {data.totalDistanceKm ?? "—"} km</p></div>
+          {data.lastUpdate ? <span className="max-w-36 text-right text-[11px] leading-4 text-slate-500">Updated {data.lastUpdate}</span> : null}
         </div>
-        {progress ? <div><div className="mb-1 flex justify-between text-xs text-slate-600"><span className="capitalize">{progress.journeyStatus}</span><strong>{Math.round(progress.percent)}%</strong></div><div className="h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-blue-700" style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }} /></div><p className="mt-1 text-xs text-slate-500">{progress.remainingStations} stations · {progress.distanceRemainingKm ?? "—"} km remaining</p></div> : null}
-        {data.route.length === 0 ? <p className="text-xs text-amber-700">A track-matched route could not be resolved for this run.</p> : null}
+
+        {scheduleGroups.length > 0 ? <ol ref={scheduleRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3" aria-label="Train station timeline">
+          {scheduleGroups.map((group) => {
+            const stop = group.stop;
+            const isCurrent = stop.status === "current" || stop.stationCode === data.currentPosition?.stationCode;
+            const isPassed = stop.status === "passed";
+            const arrival = stop.arrival?.actual || stop.arrival?.scheduled || "—";
+            const departure = stop.departure?.actual || stop.departure?.scheduled || "—";
+            const expanded = expandedSegments.has(group.key);
+            return <li key={group.key} className="relative ml-3 border-l-2 border-slate-200 pl-5 last:border-transparent">
+              <span className={`absolute -left-[8px] top-5 size-3.5 rounded-full border-[3px] border-white ring-2 ${isCurrent ? "bg-blue-700 ring-blue-700" : isPassed ? "bg-emerald-600 ring-emerald-600" : "bg-white ring-slate-400"}`} aria-hidden="true" />
+              <article aria-current={isCurrent ? "location" : undefined} className={`rounded-xl border p-3 ${isCurrent ? "border-blue-300 bg-blue-50 shadow-sm" : "border-slate-200 bg-white"}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><div className="flex items-center gap-2"><strong className="font-site-code text-xs text-blue-700">{stop.stationCode}</strong><span className="rounded-md bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-white uppercase">Stoppage</span>{isCurrent ? <span className="rounded-md bg-blue-700 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-white uppercase">Current</span> : null}</div><h4 className="mt-1 truncate text-sm font-bold text-slate-900" title={stop.stationName}>{stop.stationName || stop.stationCode}</h4></div>
+                  <div className="shrink-0 text-right"><span className="block text-xs font-semibold text-slate-700">{stop.distanceKm === "" || stop.distanceKm == null ? "—" : `${stop.distanceKm} km`}</span><span className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">{isCurrent ? "Current" : isPassed ? "Passed" : "Upcoming"}</span></div>
+                </div>
+                <div className="mt-2 grid grid-cols-3 divide-x divide-slate-200 rounded-lg bg-slate-50 px-2 py-2">
+                  <div className="min-w-0 pr-2"><span className="block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Arrival</span><strong className="mt-0.5 block break-words font-site-code text-xs leading-4 text-slate-900">{arrival}</strong>{stop.arrival?.actual && stop.arrival.scheduled && stop.arrival.actual !== stop.arrival.scheduled ? <span className="mt-0.5 block break-words text-[10px] leading-4 text-slate-500">Sch {stop.arrival.scheduled}</span> : null}{stop.arrival?.delay ? <span className="block text-[10px] text-slate-600">{stop.arrival.delay}</span> : null}</div>
+                  <div className="min-w-0 px-2"><span className="block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Departure</span><strong className="mt-0.5 block break-words font-site-code text-xs leading-4 text-slate-900">{departure}</strong>{stop.departure?.actual && stop.departure.scheduled && stop.departure.actual !== stop.departure.scheduled ? <span className="mt-0.5 block break-words text-[10px] leading-4 text-slate-500">Sch {stop.departure.scheduled}</span> : null}{stop.departure?.delay ? <span className="block text-[10px] text-slate-600">{stop.departure.delay}</span> : null}</div>
+                  <div className="min-w-0 pl-2"><span className="block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Platform</span><strong className="mt-0.5 block truncate font-site-code text-xs leading-4 text-slate-900">{stop.platform || "—"}</strong></div>
+                </div>
+              </article>
+
+              {group.intermediates.length > 0 ? <div className="py-2">
+                <button type="button" onClick={() => toggleSegment(group.key)} aria-expanded={expanded} aria-controls={`segment-${group.key}`} className={`flex min-h-11 w-full items-center gap-3 rounded-lg border border-dashed px-3 text-left transition-colors focus-visible:outline-2 focus-visible:outline-blue-700 ${expanded ? "border-blue-300 bg-blue-50 text-blue-900" : "border-slate-300 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50"}`}>
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white font-site-code text-[10px] font-bold shadow-sm">{group.intermediates.length}</span>
+                  <span className="min-w-0 flex-1"><strong className="block text-xs">Intermediate stations</strong><span className="block truncate text-[11px] text-slate-500">{stop.stationCode} → {group.nextStop?.stationCode || "route end"}</span></span>
+                  <ChevronDown size={16} className={`shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+                </button>
+                {expanded ? <ol id={`segment-${group.key}`} className="ml-3 border-l border-dashed border-blue-300 py-1 pl-4">
+                  {group.intermediates.map((intermediate) => {
+                    const intermediateCurrent = intermediate.status === "current" || intermediate.stationCode === data.currentPosition?.stationCode;
+                    return <li key={`${intermediate.stationCode}-${intermediate.index}`} aria-current={intermediateCurrent ? "location" : undefined} className={`relative flex min-h-11 items-center justify-between gap-3 border-b border-slate-100 px-2 py-2 last:border-0 ${intermediateCurrent ? "rounded-lg bg-blue-100" : ""}`}>
+                      <span className={`absolute -left-[19px] size-2 rounded-full ${intermediateCurrent ? "bg-blue-700 ring-2 ring-blue-200" : "bg-slate-400"}`} aria-hidden="true" />
+                      <div className="min-w-0"><div className="flex items-center gap-2"><strong className="font-site-code text-[11px] text-slate-700">{intermediate.stationCode}</strong>{intermediateCurrent ? <span className="rounded bg-blue-700 px-1.5 py-0.5 text-[9px] font-bold text-white uppercase">Current position</span> : null}</div><span className="block truncate text-xs text-slate-600" title={intermediate.stationName}>{intermediate.stationName || intermediate.stationCode}</span></div>
+                      <div className="shrink-0 text-right"><span className="block text-[11px] font-semibold text-slate-600">{intermediate.distanceKm === "" || intermediate.distanceKm == null ? "—" : `${intermediate.distanceKm} km`}</span><span className="text-[9px] font-bold tracking-wide text-slate-400 uppercase">No stop</span></div>
+                    </li>;
+                  })}
+                </ol> : null}
+              </div> : <div className="h-2" />}
+            </li>;
+          })}
+        </ol> : <div className="grid flex-1 place-items-center p-6 text-center"><p className="text-sm text-slate-600">Station timeline unavailable for this run.</p></div>}
       </div> : null}
     </aside>
   );

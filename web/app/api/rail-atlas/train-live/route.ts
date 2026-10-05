@@ -11,10 +11,12 @@ type TimelineItem = {
   status?: string;
   stationCode?: string;
   stationName?: string;
+  platform?: string;
   distanceKm?: string | number;
   arrival?: { scheduled?: string; actual?: string; delay?: string };
   departure?: { scheduled?: string; actual?: string; delay?: string };
 };
+type NormalizedTimelineItem = TimelineItem & { index: number; stationCode: string; lat?: number; lon?: number };
 
 let stationsPromise: Promise<Map<string, StationRecord>> | null = null;
 
@@ -80,13 +82,14 @@ export async function GET(request: NextRequest) {
 
     const stations = await getStations();
     const timeline = (Array.isArray(payload.data.timeline) ? payload.data.timeline : []) as TimelineItem[];
-    const mappedTimeline = timeline.map((item, index) => {
+    const normalizedTimeline = timeline.map<NormalizedTimelineItem>((item, index) => {
       const code = String(item.stationCode || "").toUpperCase();
       const station = stations.get(code);
       return station && Number.isFinite(station.lat) && Number.isFinite(station.lon)
         ? { ...item, index, stationCode: code, lat: station.lat as number, lon: station.lon as number }
-        : null;
-    }).filter(Boolean) as Array<TimelineItem & { index: number; stationCode: string; lat: number; lon: number }>;
+        : { ...item, index, stationCode: code };
+    });
+    const mappedTimeline = normalizedTimeline.filter((item): item is NormalizedTimelineItem & { lat: number; lon: number } => Number.isFinite(item.lat) && Number.isFinite(item.lon));
 
     const routeWaypoints = mappedTimeline.filter((item, index) => item.type === "stoppage" || index === 0 || index === mappedTimeline.length - 1);
     const route = await routeAlongRailways(routeWaypoints.map((item) => [item.lat, item.lon]));
@@ -122,6 +125,8 @@ export async function GET(request: NextRequest) {
         statusNote: payload.data.statusNote || "Live position unavailable",
         lastUpdate: payload.data.lastUpdate || null,
         progress: payload.data.progress || null,
+        totalDistanceKm: payload.data.totalDistanceKm ?? null,
+        averageSpeedKmph: payload.data.averageSpeedKmph ?? null,
         start: mappedTimeline[0] || null,
         end: mappedTimeline.at(-1) || null,
         currentPosition: current ? {
@@ -132,6 +137,7 @@ export async function GET(request: NextRequest) {
           bearing: routeBearing,
         } : null,
         route,
+        timeline: normalizedTimeline,
       },
     }, { headers: { "Cache-Control": "public, max-age=30, stale-while-revalidate=30" } });
   } catch {

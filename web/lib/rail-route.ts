@@ -29,6 +29,14 @@ function distance(a: Point, b: Point) {
   return Math.hypot((a[0] - b[0]) * 111, (a[1] - b[1]) * 111 * latScale);
 }
 
+function pathDistance(points: Point[]) {
+  let total = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    total += distance(points[index - 1], points[index]);
+  }
+  return total;
+}
+
 async function loadGraph(): Promise<RailGraph> {
   if (graphPromise) return graphPromise;
   graphPromise = (async () => {
@@ -196,8 +204,14 @@ export async function routeAlongRailways(waypoints: Point[]) {
   const graph = await loadGraph();
   const route: Point[] = [];
   for (let index = 1; index < waypoints.length; index += 1) {
-    const pair = connectedPair(graph, waypoints[index - 1], waypoints[index]);
-    if (!pair) continue;
+    const from = waypoints[index - 1];
+    const to = waypoints[index];
+    const directDistance = distance(from, to);
+    const pair = connectedPair(graph, from, to);
+    if (!pair) {
+      route.push(...(route.length ? [to] : [from, to]));
+      continue;
+    }
     const { start, end } = pair;
     const cacheKey = `${start}:${end}`;
     const reverseKey = `${end}:${start}`;
@@ -210,7 +224,16 @@ export async function routeAlongRailways(waypoints: Point[]) {
         segmentCache.set(cacheKey, segment);
       }
     }
-    if (segment.length) route.push(...(route.length ? segment.slice(1) : segment));
+    const snappedSegment = segment.length ? [from, ...segment, to] : [];
+    const snapDistance = distance(from, graph.points[start]) + distance(graph.points[end], to);
+    const railDistance = pathDistance(snappedSegment);
+    const maxSnapDistance = Math.max(8, directDistance * 0.3);
+    const maxRailDistance = Math.max(directDistance + 15, directDistance * 1.75 + 5);
+    const usableRailSegment = snappedSegment.length > 2
+      && snapDistance <= maxSnapDistance
+      && railDistance <= maxRailDistance;
+    const chosenSegment = usableRailSegment ? snappedSegment : [from, to];
+    route.push(...(route.length ? chosenSegment.slice(1) : chosenSegment));
   }
   return route;
 }

@@ -458,7 +458,7 @@ export function RailAtlas() {
 
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
-    if (!showTracks) {
+    if (!showTracks || selectedTrain) {
       railwayLayerRef.current?.removeFrom(mapRef.current);
       return;
     }
@@ -486,11 +486,11 @@ export function RailAtlas() {
       if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Railway network data unavailable");
     });
     return () => controller.abort();
-  }, [mapReady, showTracks]);
+  }, [mapReady, selectedTrain, showTracks]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || stations.length === 0) return;
-    if (!showStations) {
+    if (!showStations || selectedTrain) {
       stationLayerRef.current?.removeFrom(mapRef.current);
       return;
     }
@@ -528,7 +528,7 @@ export function RailAtlas() {
       if (!cancelled) setError("Station markers unavailable");
     });
     return () => { cancelled = true; };
-  }, [mapReady, showStations, stations]);
+  }, [mapReady, selectedTrain, showStations, stations]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;

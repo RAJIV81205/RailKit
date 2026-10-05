@@ -72,6 +72,8 @@ type TrainTimelineItem = {
   status?: string;
   stationCode: string;
   stationName?: string;
+  lat?: number;
+  lon?: number;
   platform?: string;
   distanceKm?: string | number;
   arrival?: { scheduled?: string; actual?: string; delay?: string };
@@ -121,9 +123,19 @@ function groupTrainSchedule(timeline: TrainTimelineItem[]) {
 
 function formatScheduleTime(value?: string) {
   const normalized = String(value || "").trim();
-  if (!normalized) return "—";
-  if (["SRC", "DSTN"].includes(normalized.toUpperCase())) return "—";
+  const status = normalized.replace(/\*/g, "").trim().toUpperCase();
+  if (!normalized || ["SRC", "DSTN", "UA", "NA", "N/A", "UNAVAILABLE"].includes(status)) return "--";
   return normalized.match(/\b\d{1,2}:\d{2}\b/)?.[0] || normalized;
+}
+
+function isCancelledScheduleValue(value?: string) {
+  return /^cancel(?:led)?$/i.test(String(value || "").trim());
+}
+
+function isCancelledScheduleStop(stop: TrainTimelineItem) {
+  return /cancel/i.test(String(stop.status || ""))
+    || isCancelledScheduleValue(stop.arrival?.actual)
+    || isCancelledScheduleValue(stop.departure?.actual);
 }
 
 const INDIA_MAP_BOUNDS: [[number, number], [number, number]] = [
@@ -392,6 +404,14 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
   const progress = data?.progress;
   const scheduleRef = useRef<HTMLOListElement>(null);
   const scheduleGroups = useMemo(() => groupTrainSchedule(data?.timeline || []), [data]);
+  const cancellationNote = useMemo(() => {
+    const cancelledStops = scheduleGroups.map((group) => group.stop).filter(isCancelledScheduleStop);
+    if (cancelledStops.length === 0) return "";
+    const first = cancelledStops[0];
+    const last = cancelledStops.at(-1)!;
+    if (cancelledStops.length === 1) return `${first.stationName || first.stationCode} is marked cancelled in this schedule.`;
+    return `${cancelledStops.length} stops are marked cancelled from ${first.stationName || first.stationCode} to ${last.stationName || last.stationCode}.`;
+  }, [scheduleGroups]);
   const currentSegmentKey = useMemo(() => scheduleGroups.find((group) => group.intermediates.some((stop) => stop.status === "current" || stop.stationCode === data?.currentPosition?.stationCode))?.key, [data?.currentPosition?.stationCode, scheduleGroups]);
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
 
@@ -459,6 +479,7 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2.5">
           <div><h3 className="text-xs font-black tracking-[0.08em] text-slate-900 uppercase">Route schedule</h3><p className="mt-0.5 text-[11px] font-medium text-slate-500">{scheduleGroups.length} stops · {data.totalDistanceKm ?? "—"} km</p></div>
         </div>
+        {cancellationNote ? <div role="note" className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs leading-5 text-red-800"><strong>Schedule notice:</strong> {cancellationNote}</div> : null}
 
         {scheduleGroups.length > 0 ? <ol ref={scheduleRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 px-4 py-3" aria-label="Train station timeline">
           {scheduleGroups.map((group) => {
@@ -471,13 +492,16 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
             const actualDeparture = formatScheduleTime(stop.departure?.actual);
             const arrivalDelayed = Boolean(stop.arrival?.delay && !/on time/i.test(stop.arrival.delay));
             const departureDelayed = Boolean(stop.departure?.delay && !/on time/i.test(stop.departure.delay));
+            const arrivalCancelled = isCancelledScheduleValue(stop.arrival?.actual);
+            const departureCancelled = isCancelledScheduleValue(stop.departure?.actual);
+            const stopCancelled = isCancelledScheduleStop(stop);
             const expanded = expandedSegments.has(group.key);
             return <li key={group.key}>
-              <article aria-current={isCurrent ? "location" : undefined} className={`grid min-h-[68px] grid-cols-[68px_24px_minmax(0,1fr)_68px] items-center rounded-xl py-2 transition-colors ${isCurrent ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-white"}`}>
-                <div className="min-w-0 text-left"><strong className="block font-site-code text-xs leading-4 text-slate-800">{scheduledArrival}</strong><strong className={`block font-site-code text-xs leading-4 ${actualArrival === "—" ? "text-slate-400" : arrivalDelayed ? "text-rose-600" : "text-emerald-700"}`}>{actualArrival}</strong></div>
-                <div className="relative h-full" aria-hidden="true"><span className={`absolute -top-2 -bottom-2 left-1/2 w-px -translate-x-1/2 ${isPassed ? "bg-blue-500" : "bg-slate-300"}`} /><span className={`absolute top-1/2 left-1/2 grid size-4 -translate-1/2 place-items-center rounded-full border-[3px] border-slate-50 ${isCurrent ? "bg-blue-600 ring-4 ring-blue-100" : isPassed ? "bg-blue-700" : "bg-amber-400"}`} /></div>
-                <div className="min-w-0 px-3"><h4 className="truncate text-sm font-bold text-slate-950" title={stop.stationName}>{stop.stationName || stop.stationCode}</h4><div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-slate-500"><strong className="font-site-code text-slate-700">{stop.stationCode}</strong><span>·</span><span>{stop.distanceKm === "" || stop.distanceKm == null ? "—" : `${stop.distanceKm} km`}</span><span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">PF {stop.platform || "—"}</span></div></div>
-                <div className="min-w-0 text-right"><strong className="block font-site-code text-xs leading-4 text-slate-800">{scheduledDeparture}</strong><strong className={`block font-site-code text-xs leading-4 ${actualDeparture === "—" ? "text-slate-400" : departureDelayed ? "text-rose-600" : "text-emerald-700"}`}>{actualDeparture}</strong></div>
+              <article aria-current={isCurrent ? "location" : undefined} className={`grid min-h-[68px] grid-cols-[68px_24px_minmax(0,1fr)_68px] items-center rounded-xl px-2 py-2 transition-colors ${isCurrent ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-white"}`}>
+                <div className="min-w-0 text-left"><strong className="block font-site-code text-xs leading-4 text-slate-800">{scheduledArrival}</strong><strong className={`block font-site-code text-xs leading-4 ${actualArrival === "--" ? "text-slate-400" : arrivalCancelled ? "font-bold text-red-600" : arrivalDelayed ? "text-rose-600" : "text-emerald-700"}`}>{actualArrival}</strong></div>
+                <div className="relative h-full" aria-hidden="true"><span className={`absolute -top-2 -bottom-2 left-1/2 w-px -translate-x-1/2 ${isPassed ? "bg-blue-500" : "bg-slate-300"}`} /><span className={`absolute top-1/2 left-1/2 grid size-4 -translate-1/2 place-items-center rounded-full border-[3px] border-slate-50 ${stopCancelled ? "bg-red-600" : isCurrent ? "bg-blue-600 ring-4 ring-blue-100" : isPassed ? "bg-blue-700" : "bg-amber-400"}`} /></div>
+                <div className="min-w-0 px-3"><h4 className={`truncate text-sm font-bold ${stopCancelled ? "text-slate-500 line-through decoration-red-500 decoration-2" : "text-slate-950"}`} title={stop.stationName}>{stop.stationName || stop.stationCode}</h4><div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-slate-500"><strong className="font-site-code text-slate-700">{stop.stationCode}</strong><span>·</span><span>{stop.distanceKm === "" || stop.distanceKm == null ? "—" : `${stop.distanceKm} km`}</span><span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">PF {stop.platform || "—"}</span></div></div>
+                <div className="min-w-0 text-right"><strong className="block font-site-code text-xs leading-4 text-slate-800">{scheduledDeparture}</strong><strong className={`block font-site-code text-xs leading-4 ${actualDeparture === "--" ? "text-slate-400" : departureCancelled ? "font-bold text-red-600" : departureDelayed ? "text-rose-600" : "text-emerald-700"}`}>{actualDeparture}</strong></div>
               </article>
 
               {group.intermediates.length > 0 ? <div>
@@ -543,7 +567,7 @@ export function RailAtlas() {
       const map = L.map(mapNodeRef.current, {
         center: [22.9, 79.2],
         zoom: 5,
-        minZoom: 4,
+        minZoom: 5,
         maxZoom: 18,
         maxBounds: INDIA_MAP_BOUNDS,
         maxBoundsViscosity: 1,
@@ -556,7 +580,6 @@ export function RailAtlas() {
       map.createPane("stationMarkers").style.zIndex = "440";
       const activeTrainPane = map.createPane("activeTrain");
       activeTrainPane.style.zIndex = "465";
-      activeTrainPane.style.pointerEvents = "none";
       const selectedStationPane = map.createPane("selectedStation");
       selectedStationPane.style.zIndex = "470";
       selectedStationPane.style.pointerEvents = "none";
@@ -697,6 +720,21 @@ export function RailAtlas() {
       if (data.route.length > 1) {
         layers.push(L.polyline(data.route, { pane: "activeTrain", color: "#dc2626", weight: 4, opacity: 0.92, interactive: false }));
       }
+      data.timeline
+        .filter((stop) => stop.type !== "intermediate" && Number.isFinite(stop.lat) && Number.isFinite(stop.lon))
+        .filter((stop) => stop.stationCode !== data.start?.stationCode && stop.stationCode !== data.end?.stationCode)
+        .forEach((stop) => {
+          const stopCancelled = isCancelledScheduleStop(stop);
+          layers.push(L.circleMarker([stop.lat!, stop.lon!], {
+            pane: "activeTrain",
+            radius: 4.5,
+            color: stopCancelled ? "#ffffff" : "#b91c1c",
+            weight: 2,
+            fillColor: stopCancelled ? "#dc2626" : "#ffffff",
+            fillOpacity: 1,
+            bubblingMouseEvents: false,
+          }).bindTooltip(`${stop.stationName || stop.stationCode} (${stop.stationCode})`, { direction: "top" }));
+        });
       if (data.start) layers.push(L.circleMarker([data.start.lat, data.start.lon], { pane: "activeTrain", radius: 7, color: "#ffffff", weight: 2, fillColor: "#059669", fillOpacity: 1, interactive: false }).bindTooltip(`Start · ${data.start.stationCode}`, { direction: "top" }));
       if (data.end) layers.push(L.circleMarker([data.end.lat, data.end.lon], { pane: "activeTrain", radius: 7, color: "#ffffff", weight: 2, fillColor: "#dc2626", fillOpacity: 1, interactive: false }).bindTooltip(`End · ${data.end.stationCode}`, { direction: "top" }));
       if (data.currentPosition) {

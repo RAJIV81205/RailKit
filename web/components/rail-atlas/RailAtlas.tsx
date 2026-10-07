@@ -128,6 +128,19 @@ function formatScheduleTime(value?: string) {
   return normalized.match(/\b\d{1,2}:\d{2}\b/)?.[0] || normalized;
 }
 
+function StationBoardTime({ time, cancelled }: { time: StationTrain["arrival"]; cancelled: boolean }) {
+  const scheduled = formatScheduleTime(time?.scheduled);
+  const actual = formatScheduleTime(time?.actual);
+  if (cancelled) return <strong className="font-site-code text-sm text-slate-500">—</strong>;
+
+  const delayed = time?.delayed === true && scheduled !== "--" && actual !== "--" && scheduled !== actual;
+  return <span className="flex flex-wrap items-baseline gap-x-1.5 font-site-code text-sm leading-5">
+    {delayed ? <span className="sr-only">Scheduled {scheduled}, actual {actual}</span> : null}
+    {delayed ? <span className="text-xs text-slate-500 line-through decoration-slate-500" aria-hidden="true">{scheduled}</span> : null}
+    <strong className={delayed ? "text-red-700" : "text-slate-900"} aria-hidden={delayed || undefined}>{actual !== "--" ? actual : scheduled}</strong>
+  </span>;
+}
+
 function isCancelledScheduleValue(value?: string) {
   return /^cancel(?:led)?$/i.test(String(value || "").trim());
 }
@@ -213,6 +226,7 @@ function useStationBoard(station: Station | null) {
 function useGlobalSearch(query: string) {
   const [results, setResults] = useState<GlobalSearchResult>({ stations: [], trains: [] });
   const [loading, setLoading] = useState(false);
+  const [resolvedQuery, setResolvedQuery] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -221,6 +235,7 @@ function useGlobalSearch(query: string) {
       const clearTimer = window.setTimeout(() => {
         setResults({ stations: [], trains: [] });
         setLoading(false);
+        setResolvedQuery("");
         setError("");
       }, 0);
       return () => window.clearTimeout(clearTimer);
@@ -237,12 +252,16 @@ function useGlobalSearch(query: string) {
           return payload.data;
         })
         .then((data) => {
-          if (!controller.signal.aborted) setResults(data);
+          if (!controller.signal.aborted) {
+            setResults(data);
+            setResolvedQuery(value);
+          }
         })
         .catch((reason) => {
           if (!controller.signal.aborted) {
             setResults({ stations: [], trains: [] });
             setError(reason instanceof Error ? reason.message : "Search is unavailable.");
+            setResolvedQuery(value);
           }
         })
         .finally(() => {
@@ -256,7 +275,7 @@ function useGlobalSearch(query: string) {
     };
   }, [query]);
 
-  return { results, loading, error };
+  return { results, loading: query.trim().length >= 2 && (loading || resolvedQuery !== query.trim()), error };
 }
 
 function useTrainLive(selection: TrainSelection | null) {
@@ -363,8 +382,7 @@ function StationDetailsPanel({
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-slate-50 p-2">
             {board.trains.map((train) => {
               const cancelled = train.cancelled === true || (typeof train.cancelled === "string" && !["", "false", "null"].includes(train.cancelled.toLowerCase()));
-              const arrival = train.arrival?.actual || train.arrival?.scheduled || "—";
-              const departure = train.departure?.actual || train.departure?.scheduled || "—";
+              const delayedTime = [train.departure, train.arrival].find((time) => time?.delayed);
               return (
                 <button type="button" onClick={() => onSelectTrain(train)} key={`${train.trainNo}-${train.runDate}-${train.arrival?.scheduled}-${train.departure?.scheduled}`} className="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left shadow-sm transition-colors hover:border-blue-300 hover:bg-blue-50/40 focus-visible:outline-2 focus-visible:outline-blue-700">
                   <div className="flex items-start justify-between gap-3">
@@ -375,11 +393,11 @@ function StationDetailsPanel({
                       </div>
                       <p className="mt-1 truncate text-xs text-slate-600" title={`${train.sourceName} to ${train.destName}`}>{train.source} · {train.sourceName} → {train.dest} · {train.destName}</p>
                     </div>
-                    {cancelled ? <span className="max-w-24 shrink-0 truncate whitespace-nowrap rounded-md bg-red-100 px-2 py-1 text-xs font-bold text-red-800">Cancelled</span> : train.departure?.delayed || train.arrival?.delayed ? <span className="max-w-24 shrink-0 truncate whitespace-nowrap rounded-md bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">{train.departure?.delay || train.arrival?.delay}</span> : <span className="shrink-0 whitespace-nowrap rounded-md bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800">On time</span>}
+                    {cancelled ? <span className="max-w-24 shrink-0 truncate whitespace-nowrap rounded-md bg-red-100 px-2 py-1 text-xs font-bold text-red-800">Cancelled</span> : delayedTime ? <span className="max-w-24 shrink-0 truncate whitespace-nowrap rounded-md bg-amber-100 px-2 py-1 text-xs font-bold text-amber-900">{delayedTime.delay || "Delayed"}</span> : <span className="shrink-0 whitespace-nowrap rounded-md bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800">On time</span>}
                   </div>
                   <div className="mt-2 grid grid-cols-3 divide-x divide-slate-200 rounded-lg bg-slate-50 px-2 py-1.5">
-                    <div className="min-w-0 pr-2"><span className="block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Arr</span><strong className="block truncate font-site-code text-sm text-slate-900">{cancelled ? "—" : arrival}</strong></div>
-                    <div className="min-w-0 px-2"><span className="block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Dep</span><strong className="block truncate font-site-code text-sm text-slate-900">{cancelled ? "—" : departure}</strong></div>
+                    <div className="min-w-0 pr-2"><span className="block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Arr</span><StationBoardTime time={train.arrival} cancelled={cancelled} /></div>
+                    <div className="min-w-0 px-2"><span className="block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Dep</span><StationBoardTime time={train.departure} cancelled={cancelled} /></div>
                     <div className="min-w-0 pl-2"><span className="block text-[10px] font-semibold tracking-wide text-slate-500 uppercase">Platform</span><strong className="block truncate font-site-code text-sm text-slate-900">{train.platform || "—"}</strong></div>
                   </div>
                   {train.classes ? <p className="mt-1.5 truncate text-xs text-slate-500" title={train.classes}>Coaches · {train.classes}</p> : null}
@@ -402,7 +420,7 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
   onRetry: () => void;
 }) {
   const progress = data?.progress;
-  const scheduleRef = useRef<HTMLOListElement>(null);
+  const scheduleRef = useRef<HTMLDivElement>(null);
   const scheduleGroups = useMemo(() => groupTrainSchedule(data?.timeline || []), [data]);
   const isFullyCancelled = Boolean(data?.statusNote && /\bcancel(?:led|lation)?\b/i.test(data.statusNote));
   const cancellationNote = useMemo(() => {
@@ -483,8 +501,8 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
         </div>
         {cancellationNote ? <div role="note" className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs leading-5 text-red-800"><strong>Schedule notice:</strong> {cancellationNote}</div> : null}
 
-        {scheduleGroups.length > 0 ? <ol ref={scheduleRef} className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 px-4 py-3" aria-label="Train station timeline">
-          <span className="pointer-events-none absolute inset-y-0 left-[104px] z-[999] w-px bg-slate-300" aria-hidden="true" />
+        {scheduleGroups.length > 0 ? <div ref={scheduleRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 px-4 py-3">
+          <ol className="relative before:pointer-events-none before:absolute before:top-8 before:bottom-8 before:left-[88px] before:z-10 before:w-px before:bg-slate-300 before:content-['']" aria-label="Train station timeline">
           {scheduleGroups.map((group) => {
             const stop = group.stop;
             const isCurrent = stop.status === "current" || stop.stationCode === data.currentPosition?.stationCode;
@@ -524,7 +542,8 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
               </div> : null}
             </li>;
           })}
-        </ol> : <div className="grid flex-1 place-items-center p-6 text-center"><p className="text-sm text-slate-600">Station timeline unavailable for this run.</p></div>}
+          </ol>
+        </div> : <div className="grid flex-1 place-items-center p-6 text-center"><p className="text-sm text-slate-600">Station timeline unavailable for this run.</p></div>}
       </div> : null}
     </aside>
   );
@@ -854,18 +873,18 @@ export function RailAtlas() {
           </label>
         </div>
         {query.trim().length >= 2 ? (
-          <div className="mt-2 max-h-[min(60dvh,460px)] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl">
-            {globalSearch.loading ? <p className="px-4 py-3 text-sm text-slate-500">Searching stations and trains…</p> : null}
-            {globalSearch.error ? <p className="px-4 py-3 text-sm text-red-700">{globalSearch.error}</p> : null}
+          <div className="mt-2 max-h-[min(60dvh,460px)] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl" aria-busy={globalSearch.loading}>
+            {globalSearch.loading ? <div role="status" aria-label="Searching stations and trains" className="space-y-2 p-3"><span className="sr-only">Searching stations and trains…</span>{[0, 1, 2].map((index) => <div key={index} className="flex h-12 items-center gap-3 rounded-lg px-2"><span className="size-8 shrink-0 animate-pulse rounded-md bg-slate-200 motion-reduce:animate-none" /><span className="h-3.5 animate-pulse rounded bg-slate-200 motion-reduce:animate-none" style={{ width: `${65 - index * 12}%` }} /></div>)}</div> : null}
+            {!globalSearch.loading && globalSearch.error ? <p className="px-4 py-3 text-sm text-red-700">{globalSearch.error}</p> : null}
             {!globalSearch.loading && !globalSearch.error && globalSearch.results.stations.length === 0 && globalSearch.results.trains.length === 0 ? <p className="px-4 py-3 text-sm text-slate-600">No stations or trains found.</p> : null}
-            {globalSearch.results.stations.length > 0 ? <div className="border-b border-slate-200 p-2">
+            {!globalSearch.loading && !globalSearch.error && globalSearch.results.stations.length > 0 ? <div className="border-b border-slate-200 p-2">
               <p className="px-2 py-1 text-[10px] font-bold tracking-[0.14em] text-slate-500 uppercase">Stations</p>
               {globalSearch.results.stations.map((station) => <button key={station.code} type="button" onClick={() => chooseSearchStation(station)} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-2 text-left hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-700">
                 <span className="grid size-8 shrink-0 place-items-center rounded-md bg-slate-800 font-site-code text-[10px] font-bold text-white">{station.code}</span>
                 <span className="min-w-0"><strong className="block truncate text-sm text-slate-900">{station.name}</strong><small className="block text-xs text-slate-500">Open station details</small></span>
               </button>)}
             </div> : null}
-            {globalSearch.results.trains.length > 0 ? <div className="p-2">
+            {!globalSearch.loading && !globalSearch.error && globalSearch.results.trains.length > 0 ? <div className="p-2">
               <p className="px-2 py-1 text-[10px] font-bold tracking-[0.14em] text-slate-500 uppercase">Trains</p>
               {globalSearch.results.trains.map((train) => <button type="button" onClick={() => chooseTrain(train)} key={train.trainNo} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-left hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-700"><span className="font-site-code text-xs font-bold text-blue-700">{train.trainNo}</span><span className="truncate text-sm font-semibold text-slate-800">{train.trainName}</span><span className="ml-auto text-[10px] font-semibold text-slate-500">Track</span></button>)}
             </div> : null}

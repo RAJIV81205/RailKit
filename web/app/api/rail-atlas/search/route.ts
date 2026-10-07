@@ -35,23 +35,22 @@ export async function GET(request: NextRequest) {
 
   try {
     const encoded = encodeURIComponent(query);
-    const trainNumberResult = /^\d{5}$/.test(query)
-      ? searchApi(`${backendUrl}/api/v1/trains/${encoded}`, apiKey).catch(() => ({ success: false } as SearchPayload))
-      : Promise.resolve({ success: false } as SearchPayload);
-    const [stationResult, trainResult, exactTrainResult] = await Promise.all([
+    const isNumberQuery = /^\d{2,5}$/.test(query);
+    const trainSearch = isNumberQuery
+      ? searchApi(`${backendUrl}/api/v1/trains/${encoded}`, apiKey)
+      : /^[a-zA-Z ]+$/.test(query)
+        ? searchApi(`${backendUrl}/api/v1/trains/search?name=${encoded}`, apiKey)
+        : Promise.resolve({ success: false } as SearchPayload);
+    const [stationResult, trainResult] = await Promise.all([
       searchApi(`${backendUrl}/api/v1/stations/search?name=${encoded}`, apiKey),
-      searchApi(`${backendUrl}/api/v1/trains/search?name=${encoded}`, apiKey),
-      trainNumberResult,
+      trainSearch,
     ]);
     return NextResponse.json({
       success: true,
       data: {
         query,
         stations: (stationResult.data?.stations || []).slice(0, 5),
-        trains: [
-          ...(exactTrainResult.data?.trainNo ? [{ trainNo: exactTrainResult.data.trainNo, trainName: exactTrainResult.data.trainName }] : []),
-          ...(trainResult.data?.trains || []).filter((train) => train.trainNo !== exactTrainResult.data?.trainNo),
-        ],
+        trains: (trainResult.data?.trains || []).slice(0, 10),
       },
     }, { headers: { "Cache-Control": "public, max-age=30, stale-while-revalidate=60" } });
   } catch (error) {

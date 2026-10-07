@@ -1,9 +1,10 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CircleMarker, Layer, LayerGroup, Map as LeafletMap, LeafletMouseEvent } from "leaflet";
-import { ChevronDown, Clock3, Layers3, Navigation, RefreshCw, Search, TrainFront, X } from "lucide-react";
+import { ChevronDown, Clock3, House, Layers3, Minus, Navigation, Plus, RefreshCw, Search, TrainFront, X } from "lucide-react";
 
 type Station = {
   code: string;
@@ -551,7 +552,10 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
 
 export function RailAtlas() {
   const mapNodeRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
+  const layersButtonRef = useRef<HTMLButtonElement>(null);
   const railwayLayerRef = useRef<Layer | null>(null);
   const stationLayerRef = useRef<LayerGroup | null>(null);
   const selectedLayerRef = useRef<LayerGroup | null>(null);
@@ -565,6 +569,8 @@ export function RailAtlas() {
   const [error, setError] = useState("");
   const [showStations, setShowStations] = useState(true);
   const [showTracks, setShowTracks] = useState(true);
+  const [mapZoom, setMapZoom] = useState(5);
+  const [layersOpen, setLayersOpen] = useState(false);
   const stationBoard = useStationBoard(selected);
   const globalSearch = useGlobalSearch(query);
   const trainLive = useTrainLive(selectedTrain);
@@ -608,10 +614,10 @@ export function RailAtlas() {
       selectedStationPane.style.zIndex = "470";
       selectedStationPane.style.pointerEvents = "none";
       map.on("zoomend", () => {
+        setMapZoom(map.getZoom());
         const radius = getStationMarkerRadius(map.getZoom());
         stationMarkersRef.current.forEach((marker) => marker.setRadius(radius));
       });
-      L.control.zoom({ position: "bottomright" }).addTo(map);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 18,
@@ -627,6 +633,24 @@ export function RailAtlas() {
       mapRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!layersOpen) return;
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (!controlsRef.current?.contains(event.target as Node)) setLayersOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setLayersOpen(false);
+      layersButtonRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [layersOpen]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
@@ -859,21 +883,25 @@ export function RailAtlas() {
 
   return (
     <main className="relative h-dvh overflow-hidden bg-slate-200 text-slate-900">
+      <h1 className="sr-only">Rail Atlas: Indian railway map, stations and live trains</h1>
+      <p className="sr-only">Search Indian railway stations and trains, explore the track network, check upcoming trains at a station, and view a train&apos;s latest reported position and route.</p>
       <section className="absolute inset-0" aria-label="Indian railway network map">
         <div ref={mapNodeRef} className="absolute inset-0 bg-slate-200" />
       </section>
 
-      <div className="absolute top-3 left-3 z-[1000] w-[min(440px,calc(100%-1.5rem))]">
-        <div className="rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-lg backdrop-blur">
-          <label className="flex h-11 items-center gap-2">
-            <Search size={18} className="shrink-0 text-slate-500" aria-hidden="true" />
-            <span className="sr-only">Search stations and trains</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-base font-medium text-slate-900 outline-none placeholder:text-slate-500" placeholder="Search station, train number or name" aria-label="Search station, train number or name" autoComplete="off" />
-            {query ? <button type="button" onClick={() => setQuery("")} className="grid size-8 shrink-0 place-items-center rounded-md text-slate-500 hover:bg-slate-100" aria-label="Clear search"><X size={16} /></button> : null}
-          </label>
+      <div className="absolute top-3 left-3 z-[1000] w-[min(380px,calc(100%-1.5rem))]">
+        <div className="rounded-2xl border border-slate-300 bg-white p-1.5 shadow-[0_10px_30px_-12px_rgba(15,23,42,0.45)] transition-colors focus-within:border-blue-700 focus-within:ring-2 focus-within:ring-blue-700/20">
+          <div className="flex h-11 items-center gap-2">
+            <label className="flex min-w-0 flex-1 cursor-text items-center gap-2">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-900 text-white"><Search size={18} strokeWidth={2} aria-hidden="true" /></span>
+              <span className="sr-only">Search station name, train name or number</span>
+              <input ref={searchInputRef} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") setQuery(""); }} className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-500" placeholder="Find a station or train" autoComplete="off" />
+            </label>
+            {query ? <button type="button" onClick={() => { setQuery(""); searchInputRef.current?.focus(); }} className="grid size-10 shrink-0 place-items-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label="Clear search"><X size={17} aria-hidden="true" /></button> : null}
+          </div>
         </div>
         {query.trim().length >= 2 ? (
-          <div className="mt-2 max-h-[min(60dvh,460px)] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl" aria-busy={globalSearch.loading}>
+          <div id="rail-atlas-search-results" className="mt-2 max-h-[min(60dvh,460px)] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-[0_18px_40px_-18px_rgba(15,23,42,0.5)]" aria-busy={globalSearch.loading}>
             {globalSearch.loading ? <div role="status" aria-label="Searching stations and trains" className="space-y-2 p-3"><span className="sr-only">Searching stations and trains…</span>{[0, 1, 2].map((index) => <div key={index} className="flex h-12 items-center gap-3 rounded-lg px-2"><span className="size-8 shrink-0 animate-pulse rounded-md bg-slate-200 motion-reduce:animate-none" /><span className="h-3.5 animate-pulse rounded bg-slate-200 motion-reduce:animate-none" style={{ width: `${65 - index * 12}%` }} /></div>)}</div> : null}
             {!globalSearch.loading && globalSearch.error ? <p className="px-4 py-3 text-sm text-red-700">{globalSearch.error}</p> : null}
             {!globalSearch.loading && !globalSearch.error && globalSearch.results.stations.length === 0 && globalSearch.results.trains.length === 0 ? <p className="px-4 py-3 text-sm text-slate-600">No stations or trains found.</p> : null}
@@ -892,22 +920,27 @@ export function RailAtlas() {
         ) : null}
       </div>
 
-      <details className="group absolute top-3 right-3 z-[1000] w-12 rounded-xl border border-slate-200 bg-white/95 shadow-lg backdrop-blur open:top-16 open:w-48 sm:w-48 sm:open:top-3">
-        <summary className="flex h-11 cursor-pointer list-none items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold text-slate-800 transition-colors hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 group-open:justify-start sm:justify-start [&::-webkit-details-marker]:hidden">
-          <Layers3 size={17} aria-hidden="true" />
-          <span className="hidden group-open:inline sm:inline">Map layers</span>
-        </summary>
-        <div className="border-t border-slate-200 p-2">
-          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-2 text-sm hover:bg-slate-50">
-            <span className="flex items-center gap-2"><i className="size-2 rounded-full border border-white bg-amber-600 ring-1 ring-amber-800" /> Stations</span>
-            <input className="size-4 accent-blue-700" type="checkbox" checked={showStations} onChange={(event) => setShowStations(event.target.checked)} />
-          </label>
-          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-2 text-sm hover:bg-slate-50">
-            <span className="flex items-center gap-2"><i className="h-[3px] w-5 bg-blue-700" /> Railway tracks</span>
-            <input className="size-4 accent-blue-700" type="checkbox" checked={showTracks} onChange={(event) => setShowTracks(event.target.checked)} />
-          </label>
+      <div ref={controlsRef} className="absolute bottom-16 left-3 z-[900]" aria-label="Map controls">
+        <div className="flex w-14 flex-col gap-2 rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur">
+          <button type="button" onClick={() => mapRef.current?.zoomIn()} disabled={!mapReady || mapZoom >= 18} aria-label="Zoom in" title="Zoom in" className="grid size-11 cursor-pointer place-items-center rounded-xl text-slate-800 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><Plus size={20} strokeWidth={2} aria-hidden="true" /></button>
+          <button type="button" onClick={() => mapRef.current?.zoomOut()} disabled={!mapReady || mapZoom <= 5} aria-label="Zoom out" title="Zoom out" className="grid size-11 cursor-pointer place-items-center rounded-xl text-slate-800 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><Minus size={20} strokeWidth={2} aria-hidden="true" /></button>
+          <span className="mx-2 border-t border-slate-200" aria-hidden="true" />
+          <button ref={layersButtonRef} type="button" onClick={() => setLayersOpen((open) => !open)} aria-label="Map layers" aria-expanded={layersOpen} aria-controls={layersOpen ? "rail-atlas-layer-options" : undefined} title="Map layers" className={`grid size-11 cursor-pointer place-items-center rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${layersOpen ? "bg-blue-700 text-white" : "text-slate-800 hover:bg-blue-50 hover:text-blue-700"}`}><Layers3 size={19} strokeWidth={1.8} aria-hidden="true" /></button>
+          <span className="mx-2 border-t border-slate-200" aria-hidden="true" />
+          <Link href="/" aria-label="Back to RailKit site" title="Back to site" className="group relative grid size-11 cursor-pointer place-items-center rounded-xl text-slate-800 no-underline transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><House size={19} strokeWidth={1.8} aria-hidden="true" /><span className="pointer-events-none absolute left-[calc(100%+0.75rem)] whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true">Back to site</span></Link>
         </div>
-      </details>
+        {layersOpen ? <div id="rail-atlas-layer-options" className="absolute bottom-[60px] left-[calc(100%+0.75rem)] w-52 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl" aria-label="Map layers">
+          <p className="px-2 pt-1 pb-1.5 text-xs font-bold tracking-wide text-slate-500 uppercase">Map layers</p>
+          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-2 text-sm font-medium text-slate-800 hover:bg-slate-50">
+            <span className="flex items-center gap-2"><i className="size-2 rounded-full border border-white bg-amber-600 ring-1 ring-amber-800" aria-hidden="true" /> Stations</span>
+            <input className="size-4 accent-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" type="checkbox" checked={showStations} onChange={(event) => setShowStations(event.target.checked)} />
+          </label>
+          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-2 text-sm font-medium text-slate-800 hover:bg-slate-50">
+            <span className="flex items-center gap-2"><i className="h-[3px] w-5 bg-blue-700" aria-hidden="true" /> Railway tracks</span>
+            <input className="size-4 accent-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" type="checkbox" checked={showTracks} onChange={(event) => setShowTracks(event.target.checked)} />
+          </label>
+        </div> : null}
+      </div>
 
       {selected ? <StationDetailsPanel station={selected} board={stationBoard.board} hours={stationBoard.hours} loading={stationBoard.loading} error={stationBoard.error} onClose={() => setSelected(null)} onRetry={stationBoard.retry} onSelectTrain={(train) => chooseTrain({ trainNo: train.trainNo, trainName: train.trainName, date: train.runDate })} /> : null}
       {selectedTrain ? <TrainDetailsPanel selection={selectedTrain} data={trainLive.data} loading={trainLive.loading} error={trainLive.error} onClose={() => setSelectedTrain(null)} onRetry={trainLive.retry} /> : null}

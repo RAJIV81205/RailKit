@@ -98,23 +98,17 @@ export async function GET(request: NextRequest) {
     if (currentIndex < 0) currentIndex = mappedTimeline.findIndex((item) => item.status === "current");
     if (currentIndex < 0 && mappedTimeline.length) currentIndex = payload.data.progress?.journeyStatus === "completed" ? mappedTimeline.length - 1 : 0;
     const current = currentIndex >= 0 ? mappedTimeline[currentIndex] : null;
-    const directionTarget = currentIndex >= 0
-      ? mappedTimeline[currentIndex + 1] || mappedTimeline[currentIndex - 1] || current
+    const nextStation = current && mappedTimeline.slice(currentIndex + 1)
+      .find((item) => item.lat !== current.lat || item.lon !== current.lon);
+    const previousStation = current && !nextStation
+      ? mappedTimeline.slice(0, currentIndex).reverse()
+        .find((item) => item.lat !== current.lat || item.lon !== current.lon)
       : null;
-    let routeBearing = current && directionTarget ? bearing([current.lat, current.lon], [directionTarget.lat, directionTarget.lon]) : 0;
-    if (current && route.length > 1) {
-      let nearestRouteIndex = 0;
-      let nearestRouteDistance = Number.POSITIVE_INFINITY;
-      route.forEach((point, index) => {
-        const pointDistance = Math.hypot(point[0] - current.lat, point[1] - current.lon);
-        if (pointDistance < nearestRouteDistance) {
-          nearestRouteDistance = pointDistance;
-          nearestRouteIndex = index;
-        }
-      });
-      const nextRoutePoint = route[nearestRouteIndex + 1] || route[nearestRouteIndex - 1];
-      if (nextRoutePoint) routeBearing = bearing(route[nearestRouteIndex], nextRoutePoint);
-    }
+    const routeBearing = current && nextStation
+      ? bearing([current.lat, current.lon], [nextStation.lat, nextStation.lon])
+      : current && previousStation
+        ? bearing([previousStation.lat, previousStation.lon], [current.lat, current.lon])
+        : 0;
 
     return NextResponse.json({
       success: true,

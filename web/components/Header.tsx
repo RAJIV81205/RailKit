@@ -111,10 +111,10 @@ export function Header() {
 
             <div className="flex flex-1 flex-col gap-0.5">
               {[
-                { href: "/rail-atlas", label: "Rail Atlas" },
                 { href: "/docs", label: "Docs" },
                 { href: "/pricing", label: "Pricing" },
                 { href: "/contact", label: "Contact" },
+                { href: "/rail-atlas", label: "Rail Atlas" },
               ].map(({ href, label }) => {
                 const active = pathname === href;
                 return (
@@ -215,12 +215,6 @@ export function Header() {
             aria-label="Main navigation"
           >
             <Link
-              href="/rail-atlas"
-              className={`rounded-lg px-3 py-[5px] font-site-sans text-[13.5px] no-underline transition-colors hover:bg-black/4 hover:text-black ${pathname === "/rail-atlas" ? "bg-black/5 font-medium text-black" : "text-[#6F6F6F]"}`}
-            >
-              Rail Atlas
-            </Link>
-            <Link
               href="/docs"
               className={`rounded-lg px-3 py-[5px] font-site-sans text-[13.5px] no-underline transition-colors hover:bg-black/4 hover:text-black ${isDocsPage ? "bg-black/5 font-medium text-black" : "text-[#6F6F6F]"}`}
             >
@@ -237,6 +231,12 @@ export function Header() {
               className={`rounded-lg px-3 py-[5px] font-site-sans text-[13.5px] no-underline transition-colors hover:bg-black/4 hover:text-black ${pathname === "/contact" ? "bg-black/5 font-medium text-black" : "text-[#6F6F6F]"}`}
             >
               Contact
+            </Link>
+            <Link
+              href="/rail-atlas"
+              className={`rounded-lg px-3 py-[5px] font-site-sans text-[13.5px] no-underline transition-colors hover:bg-black/4 hover:text-black ${pathname === "/rail-atlas" ? "bg-black/5 font-medium text-black" : "text-[#6F6F6F]"}`}
+            >
+              Rail Atlas
             </Link>
           </nav>
 

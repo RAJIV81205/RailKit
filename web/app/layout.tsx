@@ -5,6 +5,7 @@ import "./globals.css";
 import { SidebarProvider } from "../components/SidebarProvider";
 import { Header } from "../components/Header";
 import { Analytics } from "@vercel/analytics/next"
+import { DevtoolsGuard } from "../components/DevtoolsGuard";
 import {
   buildMetadata,
   OG_LOCALE,
@@ -147,6 +148,7 @@ export default function RootLayout({
           />
         </noscript>
         <SidebarProvider>
+          <DevtoolsGuard />
           <Header />
           {children}
         </SidebarProvider>

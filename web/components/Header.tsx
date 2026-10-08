@@ -18,6 +18,7 @@ export function Header() {
   const pathname = usePathname();
   const isAdminPage = pathname === "/admin";
   const isStandalonePage = pathname === "/rail-atlas";
+  const isDevtoolsNoticePage = pathname === "/devtools-blocked";
   const isDocsPage = pathname === "/docs" || pathname.startsWith("/docs/");
   const router = useRouter();
   const { sidebarOpen, setSidebarOpen } = useSidebar();
@@ -70,7 +71,7 @@ export function Header() {
     if (!isDocsPage) setSidebarOpen(false);
   }, [isDocsPage, setSidebarOpen]);
 
-  if (isAdminPage || isStandalonePage) return null;
+  if (isAdminPage || isStandalonePage || isDevtoolsNoticePage) return null;
 
   const handleLogout = async () => {
     try {

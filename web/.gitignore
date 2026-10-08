@@ -52,3 +52,7 @@ dist/
 .DS_Store
 *.log
 /scripts
+!/scripts/
+/scripts/*
+!/scripts/buildRailwayGeometry.mjs
+!/scripts/updateStationData.mjs

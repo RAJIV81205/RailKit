@@ -17,6 +17,7 @@ type VerifiedUser = {
 export function Header() {
   const pathname = usePathname();
   const isAdminPage = pathname === "/admin";
+  const isStandalonePage = pathname === "/rail-atlas";
   const isDocsPage = pathname === "/docs" || pathname.startsWith("/docs/");
   const router = useRouter();
   const { sidebarOpen, setSidebarOpen } = useSidebar();
@@ -25,6 +26,11 @@ export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
+    if (isStandalonePage) {
+      setLoading(false);
+      setUser(null);
+      return;
+    }
     let mounted = true;
     const controller = new AbortController();
     const checkAuth = async () => {
@@ -53,7 +59,7 @@ export function Header() {
       mounted = false;
       controller.abort();
     };
-  }, [pathname]);
+  }, [isStandalonePage, pathname]);
 
   useEffect(() => {
     const closeTimer = window.setTimeout(() => setMobileMenuOpen(false), 0);
@@ -64,7 +70,7 @@ export function Header() {
     if (!isDocsPage) setSidebarOpen(false);
   }, [isDocsPage, setSidebarOpen]);
 
-  if (isAdminPage) return null;
+  if (isAdminPage || isStandalonePage) return null;
 
   const handleLogout = async () => {
     try {
@@ -108,6 +114,7 @@ export function Header() {
                 { href: "/docs", label: "Docs" },
                 { href: "/pricing", label: "Pricing" },
                 { href: "/contact", label: "Contact" },
+                { href: "/rail-atlas", label: "Rail Atlas" },
               ].map(({ href, label }) => {
                 const active = pathname === href;
                 return (
@@ -190,6 +197,7 @@ export function Header() {
                   width={20}
                   height={20}
                   className="object-contain"
+                  style={{ width: 20, height: 20 }}
                 />
               </div>
               <span className="font-site-serif text-[17px] leading-none tracking-[-0.01em]">
@@ -223,6 +231,12 @@ export function Header() {
               className={`rounded-lg px-3 py-[5px] font-site-sans text-[13.5px] no-underline transition-colors hover:bg-black/4 hover:text-black ${pathname === "/contact" ? "bg-black/5 font-medium text-black" : "text-[#6F6F6F]"}`}
             >
               Contact
+            </Link>
+            <Link
+              href="/rail-atlas"
+              className={`rounded-lg px-3 py-[5px] font-site-sans text-[13.5px] no-underline transition-colors hover:bg-black/4 hover:text-black ${pathname === "/rail-atlas" ? "bg-black/5 font-medium text-black" : "text-[#6F6F6F]"}`}
+            >
+              Rail Atlas
             </Link>
           </nav>
 

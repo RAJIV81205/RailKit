@@ -2,6 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import Link from "next/link";
+import Script from "next/script";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CircleMarker, Layer, LayerGroup, Map as LeafletMap, LeafletMouseEvent } from "leaflet";
 import { ChevronDown, Clock3, House, Layers3, Minus, Navigation, Plus, RefreshCw, Search, TrainFront, X } from "lucide-react";
@@ -106,6 +107,27 @@ type TrainScheduleGroup = {
   nextStop?: TrainTimelineItem;
 };
 
+type TurnstileWidget = {
+  render: (container: HTMLElement, options: {
+    sitekey: string;
+    action: string;
+    size: "invisible";
+    execution: "execute";
+    callback: (token: string) => void;
+    "error-callback": () => void;
+    "expired-callback": () => void;
+  }) => string;
+  execute: (widgetId: string) => void;
+  reset: (widgetId: string) => void;
+  remove: (widgetId: string) => void;
+};
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileWidget;
+  }
+}
+
 function groupTrainSchedule(timeline: TrainTimelineItem[]) {
   const groups: TrainScheduleGroup[] = [];
   for (const item of timeline) {
@@ -170,7 +192,89 @@ function isMappedStation(station: StationRecord): station is Station {
     && station.lon! >= 68 && station.lon! <= 98;
 }
 
-function useStationBoard(station: Station | null) {
+function useRailAtlasAccess(scriptReady: boolean) {
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+  useEffect(() => {
+    let disposed = false;
+    let requesting = false;
+    let widgetId: string | null = null;
+    let renewalTimer: number | undefined;
+
+    const startChallenge = () => {
+      if (!widgetId || !window.turnstile) return;
+      window.turnstile.reset(widgetId);
+      window.turnstile.execute(widgetId);
+    };
+
+    const requestAccess = async (turnstileToken?: string) => {
+      if (requesting || disposed) return;
+      requesting = true;
+      try {
+        const response = await fetch("/api/rail-atlas/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(turnstileToken ? { turnstileToken } : {}),
+          cache: "no-store",
+        });
+        const payload = await response.json() as { success?: boolean; error?: string };
+        if (!response.ok || !payload.success) throw new Error(payload.error || "Rail Atlas security check failed.");
+        if (disposed) return;
+        setError("");
+        setReady(true);
+        window.clearTimeout(renewalTimer);
+        renewalTimer = window.setTimeout(() => {
+          if (disposed) return;
+          setReady(false);
+          if (siteKey) startChallenge();
+          else void requestAccess();
+        }, 4 * 60 * 1000);
+      } catch (reason) {
+        if (!disposed) {
+          setReady(false);
+          setError(reason instanceof Error ? reason.message : "Rail Atlas security check failed.");
+        }
+      } finally {
+        requesting = false;
+      }
+    };
+
+    const isLocalDevelopment = process.env.NODE_ENV !== "production"
+      && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+    if (!siteKey || isLocalDevelopment) {
+      void requestAccess();
+      return () => {
+        disposed = true;
+        window.clearTimeout(renewalTimer);
+      };
+    }
+
+    if (!scriptReady || !containerRef.current || !window.turnstile) return;
+    widgetId = window.turnstile.render(containerRef.current, {
+      sitekey: siteKey,
+      action: "rail_atlas_access",
+      size: "invisible",
+      execution: "execute",
+      callback: (token) => { void requestAccess(token); },
+      "error-callback": () => setError("Security check failed to load. Please reload the page."),
+      "expired-callback": () => setError("Security check expired. Please reload the page."),
+    });
+    startChallenge();
+
+    return () => {
+      disposed = true;
+      window.clearTimeout(renewalTimer);
+      if (widgetId && window.turnstile) window.turnstile.remove(widgetId);
+    };
+  }, [scriptReady, siteKey]);
+
+  return { ready, error, containerRef };
+}
+
+function useStationBoard(station: Station | null, accessReady: boolean) {
   const [board, setBoard] = useState<StationBoard | null>(null);
   const [hours, setHours] = useState<4 | 8>(4);
   const [loading, setLoading] = useState(false);
@@ -178,7 +282,7 @@ function useStationBoard(station: Station | null) {
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
-    if (!station) return;
+    if (!station || !accessReady) return;
 
     const controller = new AbortController();
     queueMicrotask(() => {
@@ -219,12 +323,12 @@ function useStationBoard(station: Station | null) {
       });
 
     return () => controller.abort();
-  }, [refresh, station]);
+  }, [accessReady, refresh, station]);
 
   return { board, hours, loading, error, retry: () => setRefresh((value) => value + 1) };
 }
 
-function useGlobalSearch(query: string) {
+function useGlobalSearch(query: string, accessReady: boolean) {
   const [results, setResults] = useState<GlobalSearchResult>({ stations: [], trains: [] });
   const [loading, setLoading] = useState(false);
   const [resolvedQuery, setResolvedQuery] = useState("");
@@ -241,6 +345,7 @@ function useGlobalSearch(query: string) {
       }, 0);
       return () => window.clearTimeout(clearTimer);
     }
+    if (!accessReady) return;
 
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
@@ -274,19 +379,19 @@ function useGlobalSearch(query: string) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query]);
+  }, [accessReady, query]);
 
   return { results, loading: query.trim().length >= 2 && (loading || resolvedQuery !== query.trim()), error };
 }
 
-function useTrainLive(selection: TrainSelection | null) {
+function useTrainLive(selection: TrainSelection | null, accessReady: boolean) {
   const [data, setData] = useState<TrainLiveData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
-    if (!selection) return;
+    if (!selection || !accessReady) return;
     const controller = new AbortController();
     queueMicrotask(() => {
       if (controller.signal.aborted) return;
@@ -312,7 +417,7 @@ function useTrainLive(selection: TrainSelection | null) {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [refresh, selection]);
+  }, [accessReady, refresh, selection]);
 
   return { data, loading, error, retry: () => setRefresh((value) => value + 1) };
 }
@@ -571,9 +676,11 @@ export function RailAtlas() {
   const [showTracks, setShowTracks] = useState(true);
   const [mapZoom, setMapZoom] = useState(5);
   const [layersOpen, setLayersOpen] = useState(false);
-  const stationBoard = useStationBoard(selected);
-  const globalSearch = useGlobalSearch(query);
-  const trainLive = useTrainLive(selectedTrain);
+  const [turnstileScriptReady, setTurnstileScriptReady] = useState(false);
+  const atlasAccess = useRailAtlasAccess(turnstileScriptReady);
+  const stationBoard = useStationBoard(selected, atlasAccess.ready);
+  const globalSearch = useGlobalSearch(query, atlasAccess.ready);
+  const trainLive = useTrainLive(selectedTrain, atlasAccess.ready);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -883,6 +990,8 @@ export function RailAtlas() {
 
   return (
     <main className="relative h-dvh overflow-hidden bg-slate-200 text-slate-900">
+      {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" strategy="afterInteractive" onReady={() => setTurnstileScriptReady(true)} /> : null}
+      <div ref={atlasAccess.containerRef} className="hidden" aria-hidden="true" />
       <h1 className="sr-only">Rail Atlas: Indian railway map, stations and live trains</h1>
       <p className="sr-only">Search Indian railway stations and trains, explore the track network, check upcoming trains at a station, and view a train&apos;s latest reported position and route.</p>
       <section className="absolute inset-0" aria-label="Indian railway network map">
@@ -945,6 +1054,7 @@ export function RailAtlas() {
       {selected ? <StationDetailsPanel station={selected} board={stationBoard.board} hours={stationBoard.hours} loading={stationBoard.loading} error={stationBoard.error} onClose={() => setSelected(null)} onRetry={stationBoard.retry} onSelectTrain={(train) => chooseTrain({ trainNo: train.trainNo, trainName: train.trainName, date: train.runDate })} /> : null}
       {selectedTrain ? <TrainDetailsPanel selection={selectedTrain} data={trainLive.data} loading={trainLive.loading} error={trainLive.error} onClose={() => setSelectedTrain(null)} onRetry={trainLive.retry} /> : null}
 
+      {atlasAccess.error ? <div role="alert" className="absolute right-3 bottom-3 left-3 z-[1100] mx-auto max-w-lg rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-800 shadow-lg"><p>{atlasAccess.error}</p><button type="button" onClick={() => window.location.reload()} className="mt-2 min-h-9 cursor-pointer rounded-lg bg-red-800 px-3 py-1.5 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-800">Retry security check</button></div> : null}
       {error ? <div role="alert" className="absolute right-3 bottom-3 left-3 z-[1000] mx-auto max-w-lg rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg">{error}. Run npm run update:station-data if the station file is missing.</div> : null}
     </main>
   );

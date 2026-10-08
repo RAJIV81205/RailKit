@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rejectNonFirstPartyRequest } from "@/lib/rail-atlas-origin";
+import { rejectMissingRailAtlasAccess } from "@/lib/rail-atlas-token";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const originError = rejectNonFirstPartyRequest(request);
+  if (originError) return originError;
+  const accessError = rejectMissingRailAtlasAccess(request);
+  if (accessError) return accessError;
+
   const code = request.nextUrl.searchParams.get("code")?.trim().toUpperCase() || "";
   const hours = Number(request.nextUrl.searchParams.get("hours") || 4);
 

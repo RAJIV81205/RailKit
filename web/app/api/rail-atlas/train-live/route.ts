@@ -2,6 +2,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import { routeAlongRailways } from "../../../../lib/rail-route";
+import { rejectNonFirstPartyRequest } from "@/lib/rail-atlas-origin";
+import { rejectMissingRailAtlasAccess } from "@/lib/rail-atlas-token";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,11 @@ function bearing(from: [number, number], to: [number, number]) {
 }
 
 export async function GET(request: NextRequest) {
+  const originError = rejectNonFirstPartyRequest(request);
+  if (originError) return originError;
+  const accessError = rejectMissingRailAtlasAccess(request);
+  if (accessError) return accessError;
+
   const trainNo = request.nextUrl.searchParams.get("trainNo")?.trim() || "";
   const date = normalizeDate(request.nextUrl.searchParams.get("date")?.trim() || "");
   if (!/^\d{5}$/.test(trainNo)) {
@@ -133,7 +140,7 @@ export async function GET(request: NextRequest) {
         route,
         timeline: normalizedTimeline,
       },
-    }, { headers: { "Cache-Control": "public, max-age=30, stale-while-revalidate=30" } });
+    }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {
     return NextResponse.json({ success: false, error: "Production live-train service is unavailable." }, { status: 503 });
   }

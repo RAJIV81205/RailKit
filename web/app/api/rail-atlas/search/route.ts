@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rejectNonFirstPartyRequest } from "@/lib/rail-atlas-origin";
+import { rejectMissingRailAtlasAccess } from "@/lib/rail-atlas-token";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,11 @@ async function searchApi(url: string, apiKey: string): Promise<SearchPayload> {
 }
 
 export async function GET(request: NextRequest) {
+  const originError = rejectNonFirstPartyRequest(request);
+  if (originError) return originError;
+  const accessError = rejectMissingRailAtlasAccess(request);
+  if (accessError) return accessError;
+
   const query = request.nextUrl.searchParams.get("q")?.trim() || "";
   if (query.length < 2 || query.length > 80) {
     return NextResponse.json({ success: true, data: { query, stations: [], trains: [] } });
@@ -52,7 +59,7 @@ export async function GET(request: NextRequest) {
         stations: (stationResult.data?.stations || []).slice(0, 5),
         trains: (trainResult.data?.trains || []).slice(0, 10),
       },
-    }, { headers: { "Cache-Control": "public, max-age=30, stale-while-revalidate=60" } });
+    }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     return NextResponse.json({ success: false, error: error instanceof Error ? error.message : "Search service unavailable." }, { status: 502 });
   }

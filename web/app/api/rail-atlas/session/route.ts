@@ -8,11 +8,14 @@ type TurnstileVerification = {
   success?: boolean;
   hostname?: string;
   action?: string;
+  "error-codes"?: unknown;
 };
 
 export async function POST(request: NextRequest) {
   const originError = rejectNonFirstPartyRequest(request);
   if (originError) return originError;
+
+  const requestId = crypto.randomUUID();
 
   const isLocalDevelopment = process.env.NODE_ENV !== "production"
     && request.nextUrl.protocol === "http:"
@@ -44,14 +47,37 @@ export async function POST(request: NextRequest) {
         signal: AbortSignal.timeout(5000),
       });
       const verification = await verificationResponse.json() as TurnstileVerification;
-      if (!verificationResponse.ok
-        || !verification.success
-        || verification.hostname !== request.nextUrl.hostname
-        || verification.action !== "rail_atlas_access") {
-        return NextResponse.json({ success: false, error: "Security check failed. Reload the page and try again." }, { status: 403 });
+      const hostnameMatches = verification.hostname === request.nextUrl.hostname;
+      const actionMatches = verification.action === "rail_atlas_access";
+      if (!verificationResponse.ok || !verification.success || !hostnameMatches || !actionMatches) {
+        // Never log the submitted token, secret, or raw Siteverify response.
+        console.warn("[rail-atlas] Turnstile verification rejected", {
+          requestId,
+          httpStatus: verificationResponse.status,
+          success: Boolean(verification.success),
+          errorCodes: Array.isArray(verification["error-codes"])
+            ? verification["error-codes"].filter((code): code is string => typeof code === "string")
+            : [],
+          hostname: verification.hostname ?? null,
+          expectedHostname: request.nextUrl.hostname,
+          hostnameMatches,
+          action: verification.action ?? null,
+          actionMatches,
+        });
+        return NextResponse.json(
+          { success: false, error: "Security check failed. Reload the page and try again.", requestId },
+          { status: 403, headers: { "Cache-Control": "no-store" } },
+        );
       }
-    } catch {
-      return NextResponse.json({ success: false, error: "Security check is temporarily unavailable." }, { status: 503 });
+    } catch (error) {
+      console.error("[rail-atlas] Turnstile verification request failed", {
+        requestId,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+      });
+      return NextResponse.json(
+        { success: false, error: "Security check is temporarily unavailable.", requestId },
+        { status: 503, headers: { "Cache-Control": "no-store" } },
+      );
     }
   } else if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ success: false, error: "Security check is not configured." }, { status: 503 });

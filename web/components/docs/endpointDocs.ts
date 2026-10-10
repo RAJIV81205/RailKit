@@ -18,6 +18,7 @@ export type EndpointDoc = {
   icon: LucideIcon;
   description: string;
   signature: string;
+  quickCall: string;
   params: Array<{ name: string; type: string; desc: string }>;
   example: string;
   response: string;
@@ -38,6 +39,7 @@ const sdkEndpointDocs: SdkEndpointDoc[] = [
     description:
       "Get complete PNR status with passenger details, journey route, and confirmation updates.",
     signature: "checkPNRStatus(pnr: string)",
+    quickCall: 'await checkPNRStatus("6948325823");',
     params: [{ name: "pnr", type: "string", desc: "10-digit PNR number" }],
     example: `const result = await checkPNRStatus("6948325823");
 
@@ -84,6 +86,7 @@ if (result.success) {
     description:
       "Retrieve route details, running schedule, stoppages, and station-level metadata.",
     signature: "getTrainInfo(trainNumber: string)",
+    quickCall: 'await getTrainInfo("12345");',
     params: [
       { name: "trainNumber", type: "string", desc: "5-digit train number" },
     ],
@@ -108,6 +111,7 @@ if (result.success) {
     description:
       "Track live movement using the NTES-backed v1 endpoint, with station-by-station arrival, departure, platform, and delay context.",
     signature: "trackTrain(trainNumber: string, date: string)",
+    quickCall: 'await trackTrain("12345", "10-10-2026");',
     params: [
       { name: "trainNumber", type: "string", desc: "5-digit train number" },
       {
@@ -140,6 +144,7 @@ if (result.success) {
     description:
       "Track live movement using the WIMT-backed v2 endpoint, with expanded route points, current location, halt summaries, delay, speed, and coach-position data.",
     signature: "trackTrainV2(trainNumber: string, date: string)",
+    quickCall: 'await trackTrainV2("20888", "10-10-2026");',
     params: [
       { name: "trainNumber", type: "string", desc: "Exactly 5 numeric digits" },
       {
@@ -204,6 +209,7 @@ if (result.success) {
     description:
       "Get the completed journey history of a train for a specific date — full station-by-station timeline, per-stop delays, and final coach position once the train has reached its destination.",
     signature: "getTrainHistory(trainNumber: string, journeyDate: string)",
+    quickCall: 'await getTrainHistory("12301", "09-10-2026");',
     params: [
       { name: "trainNumber", type: "string", desc: "5-digit train number" },
       {
@@ -252,6 +258,7 @@ if (result.success) {
     description:
       "Get upcoming and passing trains at a station with near real-time status, delays, and platform info.",
     signature: "liveAtStation(stationCode: string, hours?: 2 | 4 | 8)",
+    quickCall: 'await liveAtStation("NDLS", 2);',
     params: [
       {
         name: "stationCode",
@@ -293,6 +300,7 @@ if (result.success) {
       "Find available trains between stations with timetable and running-day data.",
     signature:
       "searchTrainBetweenStations(fromStnCode: string, toStnCode: string, date?: string)",
+    quickCall: 'await searchTrainBetweenStations("NDLS", "BCT");',
     params: [
       { name: "fromStnCode", type: "string", desc: "Origin station code" },
       { name: "toStnCode", type: "string", desc: "Destination station code" },
@@ -320,6 +328,7 @@ if (result.success) {
       "Check availability forecasts and detailed fare breakup by quota and class.",
     signature:
       "getAvailability(trainNo: string, fromStnCode: string, toStnCode: string, date: string, coach: string, quota: string)",
+    quickCall: 'await getAvailability("12904", "NZM", "BDTS", "17-10-2026", "3A", "GN");',
     params: [
       { name: "trainNo", type: "string", desc: "5-digit train number" },
       { name: "fromStnCode", type: "string", desc: "Origin station code" },
@@ -349,6 +358,7 @@ if (result.success) {
       "Get the full fare breakdown for a journey — base fare, reservation, superfast, catering, GST, dynamic fare, and total collectible amount.",
     signature:
       "fareLookup(trainNo: string, fromStnCode: string, toStnCode: string, date: string, travelClass: string, quota: string)",
+    quickCall: 'await fareLookup("12904", "NZM", "BDTS", "17-10-2026", "3A", "GN");',
     params: [
       { name: "trainNo", type: "string", desc: "5-digit train number" },
       { name: "fromStnCode", type: "string", desc: "Origin station code" },
@@ -388,6 +398,7 @@ if (result.success) {
     description:
       "Get the complete list of fully and partially cancelled trains, with route details and the affected segment for partial cancellations.",
     signature: "cancelList()",
+    quickCall: "await cancelList();",
     params: [],
     example: `const result = await cancelList();
 
@@ -423,6 +434,7 @@ if (result.success) {
     icon: Building2,
     description: "Get all scheduled trains at a station, or filter by a nearby running date.",
     signature: "trainTimetableAtStation(stationCode: string, date?: string)",
+    quickCall: 'await trainTimetableAtStation("ASN");',
     params: [
       { name: "stationCode", type: "string", desc: "Station code such as ASN or NDLS" },
       { name: "date", type: "string", desc: "Optional DD-MM-YYYY date; only today, yesterday, or tomorrow is accepted" },
@@ -457,6 +469,7 @@ if (result.success) {
     icon: MapPin,
     description: "Resolve a station code to its name and coordinates.",
     signature: "stationByCode(stationCode: string)",
+    quickCall: 'await stationByCode("NDLS");',
     params: [{ name: "stationCode", type: "string", desc: "Station code such as NDLS or HWH" }],
     example: `const result = await stationByCode("NDLS");
 
@@ -474,6 +487,7 @@ if (result.success) {
     icon: Search,
     description: "Find up to 10 matching stations by partial name.",
     signature: "stationsByName(name: string)",
+    quickCall: 'await stationsByName("delhi");',
     params: [{ name: "name", type: "string", desc: "At least 2 characters; partial matching supported" }],
     example: `const result = await stationsByName("delhi");
 
@@ -500,6 +514,7 @@ if (result.success) {
     icon: Train,
     description: "Find up to 10 stored trains matching a train-number prefix.",
     signature: "trainByNumber(trainNumber: string)",
+    quickCall: 'await trainByNumber("12345");',
     params: [{ name: "trainNumber", type: "string", desc: "2-5 digit train-number prefix" }],
     example: `const result = await trainByNumber("12345");
 
@@ -517,6 +532,7 @@ if (result.success) {
     icon: Search,
     description: "Find up to 10 trains matching a partial train name.",
     signature: "trainsByName(name: string)",
+    quickCall: 'await trainsByName("rajdhani");',
     params: [{ name: "name", type: "string", desc: "At least 2 letters; letters and spaces only" }],
     example: `const result = await trainsByName("rajdhani");
 

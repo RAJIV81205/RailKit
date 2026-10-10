@@ -93,12 +93,15 @@ console.log(data);`;
 
 const installSnippet = "npm install railkit";
 
-const quickStartSnippet = `import { configure, stationByCode } from "railkit";
+function buildQuickStartSnippet() {
+  return `import * as railkit from "railkit";
 
-configure(process.env.RAILKIT_API_KEY);
-const result = await stationByCode("NDLS");
-if (result.success) console.log(result.data);
-else console.error(result.error);`;
+railkit.configure(process.env.RAILKIT_API_KEY);
+
+${endpointDocs
+  .map((endpoint) => `const ${getSdkFunctionName(endpoint)}Result = ${exampleCodeForToday(endpoint.quickCall, endpoint.id).replace("await ", "await railkit.")}`)
+  .join("\n")}`;
+}
 
 const docsBaseUrl = "https://railkit.in/docs";
 
@@ -899,7 +902,7 @@ export default function DocsPage({
             }
             code={
               setupView === "sdk"
-                ? quickStartSnippet
+                ? buildQuickStartSnippet()
                 : buildRestSnippet(
                     directApiBaseUrl,
                     endpointDocs[0].examplePath,

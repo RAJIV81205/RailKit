@@ -304,7 +304,7 @@ Get real-time live status of a train with a unified station timeline (stoppages 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `trainNumber` | string | 5-digit train number |
-| `date` | string | Required date in `DD-MM-YYYY` format or `today`. |
+| `date` | string | Required date in `DD-MM-YYYY` format, from today through five days ago (IST). |
 
 **Example:**
 ```javascript
@@ -706,11 +706,11 @@ const result = await stationsByName('delhi');
 
 ### 12. `trainByNumber(trainNumber)`
 
-Resolve an exact 5-digit numeric train number.
+Find up to 10 trains matching a 2–5 digit number prefix.
 
 ```javascript
 const result = await trainByNumber('12345');
-// result.data: { trainNo, trainName }
+// result.data: { query, count, trains: [{ trainNo, trainName }, ...] }
 ```
 
 ### 13. `trainsByName(name)`

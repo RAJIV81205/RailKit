@@ -25,8 +25,8 @@ export const packageInfo = {
   description: 'Comprehensive Node.js SDK for Indian Railways with real-time PNR status, live train tracking, cancellations, station updates, and complete route information.',
   stats: {
     downloads: '251',
-    license: 'MIT',
-    nodeVersion: '14+'
+    license: 'ISC',
+    nodeVersion: '18+'
   },
   links: {
     github: 'https://github.com/RAJIV81205/railkit',
@@ -172,7 +172,7 @@ export const features = [
 
 export const installation = {
   requirements: [
-    'Node.js 14 or higher',
+    'Node.js 18 or higher',
     'Active internet connection',
     'Valid PNR numbers or train numbers for testing'
   ],
@@ -180,7 +180,7 @@ export const installation = {
     'Node.js applications',
     'Express.js servers',
     'Next.js (App Router & Pages Router)',
-    'React Native'
+    'Other Node.js server runtimes'
   ]
 };
 

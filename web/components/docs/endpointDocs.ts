@@ -25,9 +25,10 @@ export type EndpointDoc = {
   path: string;
   examplePath: string;
   notes: string;
+  restParams: Array<{ name: string; in: "path" | "query"; required: boolean; desc: string }>;
 };
 
-type SdkEndpointDoc = Omit<EndpointDoc, "name" | "method" | "path" | "examplePath" | "notes">;
+type SdkEndpointDoc = Omit<EndpointDoc, "name" | "method" | "path" | "examplePath" | "notes" | "restParams">;
 
 const sdkEndpointDocs: SdkEndpointDoc[] = [
   {
@@ -112,10 +113,10 @@ if (result.success) {
       {
         name: "date",
         type: "string",
-        desc: "Required journey date in DD-MM-YYYY format or today",
+        desc: "Required DD-MM-YYYY date; today through five days ago (IST)",
       },
     ],
-    example: `const result = await trackTrain("12345", "28-08-2026");
+    example: `const result = await trackTrain("12345", "10-10-2026");
 
 if (result.success) {
   console.log(result.data.statusNote);
@@ -147,7 +148,7 @@ if (result.success) {
         desc: "Required date in DD-MM-YYYY or YYYY-MM-DD; today through five days ago",
       },
     ],
-    example: `const result = await trackTrainV2("20888", "2026-09-12");
+    example: `const result = await trackTrainV2("20888", "10-10-2026");
 
 if (result.success) {
   console.log(result.data.statusText);
@@ -250,7 +251,7 @@ if (result.success) {
     icon: Building2,
     description:
       "Get upcoming and passing trains at a station with near real-time status, delays, and platform info.",
-    signature: "liveAtStation(stationCode: string, hours?: number)",
+    signature: "liveAtStation(stationCode: string, hours?: 2 | 4 | 8)",
     params: [
       {
         name: "stationCode",
@@ -291,10 +292,10 @@ if (result.success) {
     description:
       "Find available trains between stations with timetable and running-day data.",
     signature:
-      "searchTrainBetweenStations(from: string, to: string, date?: string)",
+      "searchTrainBetweenStations(fromStnCode: string, toStnCode: string, date?: string)",
     params: [
-      { name: "from", type: "string", desc: "Origin station code" },
-      { name: "to", type: "string", desc: "Destination station code" },
+      { name: "fromStnCode", type: "string", desc: "Origin station code" },
+      { name: "toStnCode", type: "string", desc: "Destination station code" },
       {
         name: "date",
         type: "string",
@@ -318,14 +319,14 @@ if (result.success) {
     description:
       "Check availability forecasts and detailed fare breakup by quota and class.",
     signature:
-      "getAvailability(trainNo, fromStnCode, toStnCode, date, coach, quota)",
+      "getAvailability(trainNo: string, fromStnCode: string, toStnCode: string, date: string, coach: string, quota: string)",
     params: [
       { name: "trainNo", type: "string", desc: "5-digit train number" },
       { name: "fromStnCode", type: "string", desc: "Origin station code" },
       { name: "toStnCode", type: "string", desc: "Destination station code" },
       { name: "date", type: "string", desc: "Journey date in DD-MM-YYYY" },
-      { name: "coach", type: "string", desc: "SL, 3A, 2A, 1A, CC, EC, 2S" },
-      { name: "quota", type: "string", desc: "GN, TQ, LD, SS" },
+      { name: "coach", type: "string", desc: "1A, 2A, 3A, 3E, CC, EC, EA, FC, SL, 2S, VS, CH, HS, VC, VA" },
+      { name: "quota", type: "string", desc: "GN, TQ, LD, DF, FT, LB, PT, YU, DP, HP, PH, SS" },
     ],
     example: `const result = await getAvailability(
   "12904", "NZM", "BDTS",
@@ -347,7 +348,7 @@ if (result.success) {
     description:
       "Get the full fare breakdown for a journey — base fare, reservation, superfast, catering, GST, dynamic fare, and total collectible amount.",
     signature:
-      "fareLookup(trainNo, fromStnCode, toStnCode, date, travelClass, quota)",
+      "fareLookup(trainNo: string, fromStnCode: string, toStnCode: string, date: string, travelClass: string, quota: string)",
     params: [
       { name: "trainNo", type: "string", desc: "5-digit train number" },
       { name: "fromStnCode", type: "string", desc: "Origin station code" },
@@ -386,7 +387,7 @@ if (result.success) {
     icon: CircleX,
     description:
       "Get the complete list of fully and partially cancelled trains, with route details and the affected segment for partial cancellations.",
-    signature: "cancelList(): Promise<Result>",
+    signature: "cancelList()",
     params: [],
     example: `const result = await cancelList();
 
@@ -420,7 +421,7 @@ if (result.success) {
     id: "station-timetable",
     title: "Station Train Timetable",
     icon: Building2,
-    description: "Get the complete scheduled train timetable for a station on a nearby running date.",
+    description: "Get all scheduled trains at a station, or filter by a nearby running date.",
     signature: "trainTimetableAtStation(stationCode: string, date?: string)",
     params: [
       { name: "stationCode", type: "string", desc: "Station code such as ASN or NDLS" },
@@ -485,7 +486,7 @@ if (result.success) {
   "success": true,
   "data": {
     "query": "delhi",
-    "count": 10,
+    "count": 2,
     "stations": [
       { "code": "ANDI", "name": "ADARSH NAGAR DELHI", "lat": 28.714265, "lon": 77.166767 },
       { "code": "DAZ", "name": "DELHI AZADPUR", "lat": 28.703086, "lon": 77.177153 }
@@ -497,17 +498,17 @@ if (result.success) {
     id: "train-by-number",
     title: "Train Lookup by Number",
     icon: Train,
-    description: "Resolve a train number to its stored train name.",
+    description: "Find up to 10 stored trains matching a train-number prefix.",
     signature: "trainByNumber(trainNumber: string)",
-    params: [{ name: "trainNumber", type: "string", desc: "Exactly 5 numeric digits" }],
+    params: [{ name: "trainNumber", type: "string", desc: "2-5 digit train-number prefix" }],
     example: `const result = await trainByNumber("12345");
 
 if (result.success) {
-  console.log(result.data.trainNo, result.data.trainName);
+  result.data.trains.forEach((train) => console.log(train.trainNo, train.trainName));
 }`,
     response: `{
   "success": true,
-  "data": { "trainNo": "12345", "trainName": "HWH GHY SARAIGHAT EXPRESS" }
+  "data": { "query": "12345", "count": 1, "trains": [{ "trainNo": "12345", "trainName": "HWH GHY SARAIGHAT EXPRESS" }] }
 }`,
   },
   {
@@ -516,7 +517,7 @@ if (result.success) {
     icon: Search,
     description: "Find up to 10 trains matching a partial train name.",
     signature: "trainsByName(name: string)",
-    params: [{ name: "name", type: "string", desc: "At least 2 characters; partial matching supported" }],
+    params: [{ name: "name", type: "string", desc: "At least 2 letters; letters and spaces only" }],
     example: `const result = await trainsByName("rajdhani");
 
 if (result.success) {
@@ -528,7 +529,7 @@ if (result.success) {
   "success": true,
   "data": {
     "query": "rajdhani",
-    "count": 10,
+    "count": 2,
     "trains": [
       { "trainNo": "12301", "trainName": "RAJDHANI EXPRES" },
       { "trainNo": "12302", "trainName": "HWH RAJDHANI" }
@@ -547,7 +548,13 @@ type RestEndpointDoc = {
   path: string;
   examplePath: string;
   notes: string;
+  restParams: EndpointDoc["restParams"];
 };
+
+const path = (name: string, desc: string): EndpointDoc["restParams"][number] =>
+  ({ name, in: "path", required: true, desc });
+const query = (name: string, desc: string, required = false): EndpointDoc["restParams"][number] =>
+  ({ name, in: "query", required, desc });
 
 const restEndpointDocs: readonly RestEndpointDoc[] = [
   {
@@ -557,6 +564,7 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     path: "/api/v1/pnr/:pnr",
     examplePath: "/api/v1/pnr/6948325823",
     notes: "PNR must be 10 digits.",
+    restParams: [path("pnr", "10-digit PNR number")],
   },
   {
     id: "train-info",
@@ -565,6 +573,7 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     path: "/api/v1/trains/:trainNumber/info",
     examplePath: "/api/v1/trains/12345/info",
     notes: "Train number must be 5 digits.",
+    restParams: [path("trainNumber", "5-digit train number")],
   },
   {
     id: "live-tracking",
@@ -572,7 +581,8 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     method: "GET",
     path: "/api/v1/trains/:trainNumber/live/:date",
     examplePath: "/api/v1/trains/12345/live/28-08-2026",
-    notes: "Date format: DD-MM-YYYY. You can also pass `today` as date.",
+    notes: "Date: DD-MM-YYYY or YYYY-MM-DD; from today through five days ago (IST). Literal `today` is not accepted.",
+    restParams: [path("trainNumber", "5-digit train number"), path("date", "Journey date; today through five days ago (IST)")],
   },
   {
     id: "live-tracking-v2",
@@ -581,7 +591,8 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     path: "/api/v2/trains/:trainNumber/live/:date",
     examplePath: "/api/v2/trains/20888/live/2026-09-12",
     notes:
-      "Date is required in DD-MM-YYYY or YYYY-MM-DD format and must be from today through five days ago. The response shown is a real-time snapshot for train 20888.",
+      "Date is required in DD-MM-YYYY or YYYY-MM-DD, from today through five days ago (IST).",
+    restParams: [path("trainNumber", "5-digit train number"), path("date", "Journey date; today through five days ago (IST)")],
   },
   {
     id: "station-live",
@@ -591,6 +602,7 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     examplePath: "/api/v1/stations/NDLS/live?hrs=4",
     notes:
       "Use an uppercase station code. Optional `hrs` accepts 2, 4, or 8; default is 2.",
+    restParams: [path("stnCode", "Station code"), query("hrs", "2, 4, or 8; defaults to 2")],
   },
   {
     id: "train-history",
@@ -600,6 +612,7 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     examplePath: "/api/v1/trains/12301/history/11-06-2026",
     notes:
       "Date format: DD-MM-YYYY. Returns 404 when the train has not completed that journey.",
+    restParams: [path("trainNo", "5-digit train number"), path("journeyDate", "DD-MM-YYYY journey date")],
   },
   {
     id: "train-search",
@@ -608,6 +621,7 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     path: "/api/v1/trains/between/:fromStnCode/:toStnCode?date=DD-MM-YYYY",
     examplePath: "/api/v1/trains/between/NDLS/BCT?date=28-08-2026",
     notes: "The `date` query parameter is optional.",
+    restParams: [path("fromStnCode", "Origin station code"), path("toStnCode", "Destination station code"), query("date", "Optional DD-MM-YYYY journey date")],
   },
   {
     id: "seat-availability",
@@ -616,6 +630,7 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     path: "/api/v1/seats/:trainNo/:fromStnCode/:toStnCode/:date/:coach/:quota",
     examplePath: "/api/v1/seats/12904/NZM/BDTS/01-09-2026/3A/GN",
     notes: "Date format: DD-MM-YYYY.",
+    restParams: [path("trainNo", "5-digit train number"), path("fromStnCode", "Origin station code"), path("toStnCode", "Destination station code"), path("date", "DD-MM-YYYY journey date"), path("coach", "Travel class"), path("quota", "Booking quota")],
   },
   {
     id: "fare-lookup",
@@ -624,6 +639,7 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     path: "/api/v1/fare/:trainNo/:date/:fromStation/:toStation/:class/:quota",
     examplePath: "/api/v1/fare/12904/01-09-2026/NZM/BDTS/3A/GN",
     notes: "Returns full fare breakdown. Date format: DD-MM-YYYY.",
+    restParams: [path("trainNo", "5-digit train number"), path("date", "DD-MM-YYYY journey date"), path("fromStation", "Origin station code"), path("toStation", "Destination station code"), path("class", "Travel class"), path("quota", "Booking quota")],
   },
   {
     id: "cancelled-trains",
@@ -633,6 +649,7 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     examplePath: "/api/v1/trains/cancelled",
     notes:
       "Returns fully and partially cancelled trains. No parameters required.",
+    restParams: [],
   },
   {
     id: "station-timetable",
@@ -640,7 +657,8 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     method: "GET",
     path: "/api/v1/stations/:stationCode/timetable?date=DD-MM-YYYY",
     examplePath: "/api/v1/stations/ASN/timetable?date=28-08-2026",
-    notes: "Date is optional, must use DD-MM-YYYY format, and can only be today, yesterday, or tomorrow. Defaults to today.",
+    notes: "Omit date for all trains. A supplied DD-MM-YYYY date must be yesterday, today, or tomorrow (IST).",
+    restParams: [path("stationCode", "Station code"), query("date", "Optional DD-MM-YYYY date: yesterday, today, or tomorrow (IST)")],
   },
   {
     id: "station-by-code",
@@ -649,6 +667,7 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     path: "/api/v1/stations/:stationCode",
     examplePath: "/api/v1/stations/NDLS",
     notes: "Station code must be 1-5 letters or digits.",
+    restParams: [path("stationCode", "1-5 letters or digits")],
   },
   {
     id: "station-search",
@@ -657,6 +676,7 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     path: "/api/v1/stations/search?name=...",
     examplePath: "/api/v1/stations/search?name=delhi",
     notes: "Name must contain at least 2 characters. Returns at most 10 matches.",
+    restParams: [query("name", "At least 2 characters", true)],
   },
   {
     id: "train-by-number",
@@ -664,7 +684,8 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     method: "GET",
     path: "/api/v1/trains/:trainNumber",
     examplePath: "/api/v1/trains/12345",
-    notes: "Train number must be exactly 5 numeric digits.",
+    notes: "Accepts a 2-5 digit prefix and returns up to 10 matches.",
+    restParams: [path("trainNumber", "2-5 digit train-number prefix")],
   },
   {
     id: "train-name-search",
@@ -672,7 +693,8 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     method: "GET",
     path: "/api/v1/trains/search?name=...",
     examplePath: "/api/v1/trains/search?name=rajdhani",
-    notes: "Name must contain at least 2 characters. Returns at most 10 matches.",
+    notes: "Name must contain letters and spaces only, at least 2 letters. Returns at most 10 matches.",
+    restParams: [query("name", "At least 2 letters", true)],
   },
 ] as const;
 

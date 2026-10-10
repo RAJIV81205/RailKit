@@ -31,7 +31,7 @@ export function getTrainInfo(trainNumber: string): Promise<any>;
 /**
  * Get the live running status of a train.
  * @param trainNumber - 5-digit train number
- * @param date - Required journey date in DD-MM-YYYY format or "today"
+ * @param date - Required journey date in DD-MM-YYYY format, from today through five days ago (IST)
  *
  * @example
  * const result = await trackTrain('12301', '15-04-2025');
@@ -152,8 +152,8 @@ export function stationByCode(stationCode: string): Promise<any>;
 export function stationsByName(name: string): Promise<any>;
 
 /**
- * Resolve an exact 5-digit train number to its stored train name.
- * @param trainNumber - Exactly 5 numeric digits
+ * Find up to 10 trains by a 2-5 digit train-number prefix.
+ * @param trainNumber - 2-5 numeric digits
  */
 export function trainByNumber(trainNumber: string): Promise<any>;
 

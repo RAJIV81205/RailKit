@@ -6,12 +6,11 @@ import { useMemo, useState } from "react";
 import type { ThemeObject } from "react-json-view";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/hljs";
-import { packageInfo, sidebarGroups } from "./docsData";
 import { endpointDocs, type EndpointDoc } from "./endpointDocs";
+import { buildAiMarkdown, examplePathForToday, exampleCodeForToday } from "./aiMarkdown";
 import {
   AlertTriangle,
   BarChart3,
-  Building2,
   CheckCircle,
   ChevronRight,
   Copy,
@@ -20,8 +19,6 @@ import {
   KeyRound,
   Package,
   Rocket,
-  Ticket,
-  Train,
   type LucideIcon,
 } from "lucide-react";
 
@@ -66,8 +63,9 @@ function buildRestSnippet(
   baseUrl: string,
   examplePath: string,
   language: ApiCodeLanguage,
+  endpointId = "",
 ) {
-  const url = `${baseUrl}${examplePath}`;
+  const url = `${baseUrl}${examplePathForToday(examplePath, endpointId)}`;
   if (language === "python")
     return `import requests
 
@@ -95,30 +93,12 @@ console.log(data);`;
 
 const installSnippet = "npm install railkit";
 
-const quickStartSnippet = `import {
-  configure,
-  checkPNRStatus,
-  getTrainInfo,
-  trackTrain,
-  getTrainHistory,
-  liveAtStation,
-  searchTrainBetweenStations,
-  getAvailability,
-  fareLookup,
-  cancelList
-} from "railkit";
+const quickStartSnippet = `import { configure, stationByCode } from "railkit";
 
 configure(process.env.RAILKIT_API_KEY);
-
-const pnr    = await checkPNRStatus("1234567890");
-const train  = await getTrainInfo("12345");
-const liveV1 = await trackTrain("12345", "12-09-2026");
-const hist   = await getTrainHistory("12345", "06-12-2025");
-const stn    = await liveAtStation("NDLS");
-const search = await searchTrainBetweenStations("NDLS", "BCT");
-const seats  = await getAvailability("12496","ASN","DDU","27-12-2025","2A","GN");
-const fare   = await fareLookup("12313","ASN","NDLS","06-06-2026","3A","GN");
-const cancelled = await cancelList();`;
+const result = await stationByCode("NDLS");
+if (result.success) console.log(result.data);
+else console.error(result.error);`;
 
 const docsBaseUrl = "https://railkit.in/docs";
 
@@ -133,69 +113,8 @@ function buildSdkEndpointSnippet(endpoint: EndpointDoc) {
 
 configure(process.env.RAILKIT_API_KEY);
 
-${endpoint.example}`;
+${exampleCodeForToday(endpoint.example, endpoint.id)}`;
 }
-
-function getEndpointParamLocation(endpointId: string, name: string) {
-  const queryParams: Record<string, readonly string[]> = {
-    "station-live": ["hours"],
-    "train-search": ["date"],
-    "station-timetable": ["date"],
-    "station-search": ["name"],
-    "train-name-search": ["name"],
-  };
-
-  return queryParams[endpointId]?.includes(name) ? "query" : "path";
-}
-
-function isSdkParamOptional(endpointId: string, name: string) {
-  return (
-    (endpointId === "station-live" && name === "hours") ||
-    (endpointId === "train-search" && name === "date") ||
-    (endpointId === "station-timetable" && name === "date")
-  );
-}
-
-function isRestParamOptional(endpointId: string, name: string) {
-  return (
-    (endpointId === "station-live" && name === "hours") ||
-    (endpointId === "train-search" && name === "date") ||
-    (endpointId === "station-timetable" && name === "date")
-  );
-}
-
-const introductionEndpointGroups = [
-  {
-    title: "Trains",
-    icon: Train,
-    endpointIds: [
-      "train-info",
-      "live-tracking",
-      "train-history",
-      "train-search",
-      "seat-availability",
-      "fare-lookup",
-      "cancelled-trains",
-      "train-by-number",
-      "train-name-search",
-    ],
-  },
-  {
-    title: "PNR Status",
-    icon: Ticket,
-    endpointIds: ["pnr-status"],
-  },
-  {
-    title: "Stations",
-    icon: Building2,
-    endpointIds: [
-      "station-live",
-      "station-timetable",
-      "station-by-code",
-      "station-search",
-    ],
-  },
-] as const;
 
 export default function DocsPage({
   activeSlug = "introduction",
@@ -212,248 +131,10 @@ export default function DocsPage({
     process.env.NEXT_PUBLIC_DIRECT_API_BASE_URL ||
     "https://api.railkit.in";
 
-  const flatSections = useMemo(
-    () =>
-      sidebarGroups.flatMap((group) =>
-        group.items.flatMap((item) => item.children ?? [item]),
-      ),
-    [],
+  const aiDocsMarkdown = useMemo(
+    () => buildAiMarkdown(endpointDocs, directApiBaseUrl, docsBaseUrl),
+    [directApiBaseUrl],
   );
-
-  const aiDocsMarkdown = useMemo(() => {
-    const endpointDetails = endpointDocs
-      .map((ep, index) => {
-        const params = ep.params.length
-          ? `| Name | Type | REST location | SDK required | REST required | Description |
-|---|---|---|---|---|---|
-${ep.params
-  .map(
-    (param) =>
-      `| \`${param.name}\` | \`${param.type}\` | ${getEndpointParamLocation(ep.id, param.name)} | ${isSdkParamOptional(ep.id, param.name) ? "No" : "Yes"} | ${isRestParamOptional(ep.id, param.name) ? "No" : "Yes"} | ${param.desc} |`,
-  )
-  .join("\n")}`
-          : "No parameters.";
-
-        return `### ${index + 1}. ${ep.title}
-
-- ID: \`${ep.id}\`
-- Purpose: ${ep.description}
-- Documentation: [${docsBaseUrl}/${ep.id}](${docsBaseUrl}/${ep.id})
-- SDK function: \`${ep.signature}\`
-- REST contract: \`${ep.method} ${ep.path}\`
-- Complete REST URL example: \`${directApiBaseUrl}${ep.examplePath}\`
-- Endpoint notes: ${ep.notes}
-
-#### Parameters
-
-${params}
-
-Parameter order matters. For SDK calls, follow SDK signature. For REST calls, follow REST path exactly; fare lookup uses different argument/path ordering.
-
-#### Complete SDK example
-
-\`\`\`javascript
-${buildSdkEndpointSnippet(ep)}
-\`\`\`
-
-#### Complete REST JavaScript example
-
-\`\`\`javascript
-${buildRestSnippet(directApiBaseUrl, ep.examplePath, "javascript")}
-\`\`\`
-
-#### Complete REST cURL example
-
-\`\`\`bash
-${buildRestSnippet(directApiBaseUrl, ep.examplePath, "curl")}
-\`\`\`
-
-#### Sample successful response
-
-\`\`\`json
-${ep.response}
-\`\`\``;
-      })
-      .join("\n\n");
-
-    const sectionLinks = [
-      "installation",
-      "quickstart",
-      "pnr-status",
-      "train-info",
-      "live-tracking",
-      "train-history",
-      "station-live",
-      "train-search",
-      "seat-availability",
-      "fare-lookup",
-      "cancelled-trains",
-      "station-timetable",
-      "station-by-code",
-      "station-search",
-      "train-by-number",
-      "train-name-search",
-      "validation",
-      "status-codes",
-      "errors",
-    ]
-      .map((id) => {
-        const s = flatSections.find((i) => i.id === id);
-        return s ? `- [${s.label}](${docsBaseUrl}/${s.id})` : null;
-      })
-      .filter(Boolean)
-      .join("\n");
-
-    return `# RailKit — Complete AI Integration Reference
-
-This document is self-contained context for an AI model or developer integrating RailKit. Use only contracts documented here. Do not invent endpoint paths, parameter names, enum values, or response fields. Railway data is live and response values shown below are examples, not constants.
-
-## Product and official sources
-
-- Product: RailKit Indian Railways data service
-- Documentation: [${docsBaseUrl}](${docsBaseUrl})
-- Dashboard and API keys: [https://railkit.in/dashboard](https://railkit.in/dashboard)
-- npm package: [${packageInfo.links.npm}](${packageInfo.links.npm})
-- GitHub: [${packageInfo.links.github}](${packageInfo.links.github})
-- Package name: \`railkit\`
-- Runtime: Node.js 14 or newer
-- Module format: ESM named imports
-
-## Choose one integration mode
-
-### Node.js SDK
-
-- Recommended for Node.js, Express, Next.js server code, and other supported server runtimes.
-- Install with \`${installSnippet}\`.
-- Import named functions from \`railkit\`.
-- Call \`configure(apiKey)\` once during server startup before any endpoint function.
-- Every endpoint function returns a Promise resolving to a result object.
-- Always test \`result.success\` before reading \`result.data\`.
-
-### Direct REST API
-
-- Base URL: \`${directApiBaseUrl}\`
-- Authentication header on every request: \`x-api-key: YOUR_API_KEY\`
-- Optional request header: \`accept: application/json\`
-- All documented endpoints use HTTP GET.
-- REST endpoints use \`/api/v1\`. Legacy unversioned routes remain supported where documented.
-- Direct REST access requires the Advance plan.
-- Check both HTTP status and parsed JSON body.
-- URL-encode dynamic path and query values when constructing URLs from user input.
-
-## Security requirements
-
-- Keep API keys in server-side environment variables such as \`RAILKIT_API_KEY\`.
-- Never hard-code, log, commit, or expose an API key in browser/client code.
-- Route browser requests through your own authenticated backend.
-- Rotate a key from the RailKit dashboard if it is exposed.
-
-## Complete SDK setup
-
-\`\`\`bash
-${installSnippet}
-\`\`\`
-
-\`\`\`javascript
-${quickStartSnippet}
-\`\`\`
-
-## Complete SDK export list
-
-\`\`\`ts
-configure(apiKey: string): void
-checkPNRStatus(pnr: string): Promise<any>
-getTrainInfo(trainNumber: string): Promise<any>
-trackTrain(trainNumber: string, date: string): Promise<any>
-getTrainHistory(trainNumber: string, journeyDate: string): Promise<any>
-liveAtStation(stationCode: string, hours?: 2 | 4 | 8): Promise<any>
-searchTrainBetweenStations(fromStnCode: string, toStnCode: string, date?: string): Promise<any>
-getAvailability(trainNo: string, fromStnCode: string, toStnCode: string, date: string, coach: string, quota: string): Promise<any>
-fareLookup(trainNo: string, fromStnCode: string, toStnCode: string, date: string, travelClass: string, quota: string): Promise<any>
-cancelList(): Promise<any>
-stationByCode(stationCode: string): Promise<any>
-stationsByName(name: string): Promise<any>
-trainByNumber(trainNumber: string): Promise<any>
-trainsByName(name: string): Promise<any>
-trainTimetableAtStation(stationCode: string, date?: string): Promise<any>
-\`\`\`
-
-## Input and enum rules
-
-- PNR: exactly 10 numeric digits; treat as a string.
-- Train number: exactly 5 numeric digits; treat as a string to preserve leading zeros.
-- Date: \`DD-MM-YYYY\`; validate that it is a real calendar date.
-- V1 NTES tracking date: required in \`DD-MM-YYYY\` format or as \`today\` for both SDK and REST.
-- Station code: uppercase, 1–5 letters or digits; examples: \`NDLS\`, \`BCT\`, \`HWH\`.
-- Station or train name search: at least 2 characters; returns at most 10 matches.
-- Live station hours: \`2\`, \`4\`, or \`8\`; default is \`2\`.
-- Seat-availability classes: \`2S\`, \`SL\`, \`3A\`, \`3E\`, \`2A\`, \`1A\`, \`CC\`, \`EC\`.
-- Seat-availability quotas: \`GN\`, \`LD\`, \`SS\`, \`TQ\`.
-- Fare classes: \`1A\`, \`2A\`, \`3A\`, \`3E\`, \`CC\`, \`EC\`, \`EA\`, \`FC\`, \`SL\`, \`2S\`, \`VS\`, \`CH\`, \`HS\`, \`VC\`, \`VA\`.
-- Fare quotas: \`GN\`, \`TQ\`, \`PT\`, \`LD\`, \`DF\`, \`FT\`, \`LB\`, \`YU\`, \`DP\`, \`HP\`, \`PH\`, \`SS\`.
-- Station timetable date: optional, limited to today, yesterday, or tomorrow; omission defaults to today.
-
-## Response contract and error handling
-
-Successful response:
-
-\`\`\`json
-{ "success": true, "data": {} }
-\`\`\`
-
-Failed response:
-
-\`\`\`json
-{ "success": false, "error": "Description of what went wrong" }
-\`\`\`
-
-Never access \`data\` before checking \`success\`. Do not assume every endpoint returns the same fields inside \`data\`; use each endpoint's sample schema below.
-
-| HTTP status | Meaning | Integration action |
-|---|---|---|
-| 200 | Success | Read JSON and verify \`success === true\`. |
-| 400 | Invalid input or rejected upstream request | Fix request; do not retry unchanged input. |
-| 401 | Missing or invalid API key | Verify server-side key and \`x-api-key\` header. |
-| 403 | Inactive key or unavailable access | Reactivate key or verify plan access. |
-| 404 | Requested record not found | Treat as unavailable data; verify identifiers/date. |
-| 429 | Monthly usage limit exceeded | Stop retries; inspect account usage or increase limit. |
-| 500 | Backend or upstream failure | Retry later with bounded exponential backoff. |
-
-Also handle network failures and timeouts with \`try/catch\`. Never retry 400, 401, 403, or 404 responses without changing request/auth state.
-
-## PNR status codes
-
-- \`CNF\`: Confirmed
-- \`WL\`: Waiting List
-- \`RAC\`: Reservation Against Cancellation
-- \`CAN\`: Cancelled
-- \`PQWL\`: Pooled Quota Waiting List
-- \`TQWL\`: Tatkal Quota Waiting List
-- \`RLWL\`: Remote Location Waiting List
-- \`GNWL\`: General Waiting List
-
-## Endpoint contracts (${endpointDocs.length} total)
-
-${endpointDetails}
-
-## Integration checklist
-
-1. Choose SDK or REST; do not mix their parameter ordering.
-2. Create and store API key server-side.
-3. Validate all user inputs before calling RailKit.
-4. For SDK, call \`configure\` once before other functions.
-5. For REST, attach \`x-api-key\` to every request.
-6. Check HTTP status where available, then check JSON \`success\`.
-7. Read only fields documented for selected endpoint.
-8. Handle empty arrays, nullable fields, unavailable live data, timeouts, and documented errors.
-9. Avoid long-lived caching for live tracking, seat availability, PNR, and station-live results.
-10. Keep links below available for current human-readable documentation.
-
-## Documentation section links
-
-${sectionLinks}
-`;
-  }, [directApiBaseUrl, flatSections]);
 
   const copyInstall = async () => {
     try {
@@ -884,7 +565,7 @@ ${sectionLinks}
               marginBottom: 28,
             }}
           >
-            Use the typed Node.js SDK or call the REST API directly. Both
+            Use the Node.js SDK or call the REST API directly. Both
             integrations cover PNR status, train info, live tracking, station
             boards, train search, seat availability, and cancellations.
           </p>
@@ -936,7 +617,7 @@ ${sectionLinks}
           >
             {[
               { label: "Endpoints", value: String(endpointDocs.length) },
-              { label: "Runtime", value: "Node 14+" },
+              { label: "Runtime", value: "Node 18+" },
               { label: "Auth", value: "API Key" },
               { label: "Access", value: "SDK + REST" },
             ].map((stat) => (
@@ -994,49 +675,25 @@ ${sectionLinks}
                 lineHeight: 1.65,
               }}
             >
-              Browse every REST endpoint. Select one for parameters, examples,
-              and response contracts.
+              SDK functions and REST routes together. Select one for details.
             </p>
-
-            {introductionEndpointGroups.map((group) => {
-              const GroupIcon = group.icon;
-              const endpoints = group.endpointIds
-                .map((id) => endpointDocsById.get(id))
-                .filter((endpoint): endpoint is EndpointDoc => Boolean(endpoint));
-
-              return (
-                <section key={group.title} className="docs-endpoint-group">
-                  <h3 className="docs-endpoint-group-title">
-                    <GroupIcon size={15} strokeWidth={1.8} aria-hidden="true" />
-                    {group.title}
-                  </h3>
-                  <div className="docs-endpoint-grid">
-                    {endpoints.map((endpoint) => (
-                      <Link
-                        key={endpoint.id}
-                        href={`/docs/${endpoint.id}`}
-                        prefetch={false}
-                        className="docs-endpoint-card"
-                        aria-label={`${endpoint.title}: ${endpoint.method} ${endpoint.path}`}
-                      >
-                        <div className="docs-endpoint-card-top">
-                          <span className="docs-endpoint-method">
-                            {endpoint.method}
-                          </span>
-                          <code className="docs-endpoint-path" title={endpoint.path}>
-                            {endpoint.path}
-                          </code>
-                        </div>
-                        <p className="docs-endpoint-title">{endpoint.title}</p>
-                        <p className="docs-endpoint-description">
-                          {endpoint.description}
-                        </p>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
+            <div className="docs-card" style={{ overflowX: "auto" }}>
+              <table className="docs-table" style={{ minWidth: 820 }}>
+                <thead><tr><th>SDK function</th><th>REST route</th></tr></thead>
+                <tbody>
+                  {endpointDocs.map((endpoint) => (
+                    <tr key={endpoint.id}>
+                      <td>
+                        <Link href={`/docs/${endpoint.id}`} prefetch={false} style={{ color: "#111827", fontWeight: 500, textDecoration: "underline", textUnderlineOffset: 3 }}>
+                          <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, whiteSpace: "nowrap" }}>{endpoint.signature}</code>
+                        </Link>
+                      </td>
+                      <td><code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, whiteSpace: "nowrap" }}>{endpoint.method} {endpoint.path}</code></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
       )}
@@ -1138,7 +795,7 @@ ${sectionLinks}
                 <DocsInfoPanel
                   title="Requirements"
                   items={[
-                    "Node.js 14+",
+                    "Node.js 18+",
                     "Active internet connection",
                     "Valid API key in environment variables",
                   ]}
@@ -1149,7 +806,7 @@ ${sectionLinks}
                     "Node.js apps and scripts",
                     "Express servers",
                     "Next.js App Router projects",
-                    "React Native environments",
+                    "Other Node.js server runtimes",
                   ]}
                 />
               </div>
@@ -1247,6 +904,7 @@ ${sectionLinks}
                     directApiBaseUrl,
                     endpointDocs[0].examplePath,
                     quickStartLanguage,
+                    endpointDocs[0].id,
                   )
             }
             bodyMinHeight={setupView === "rest" ? 276 : undefined}
@@ -1315,7 +973,7 @@ ${sectionLinks}
             <DocsInfoPanel
               title="Train Number"
               items={[
-                "Exactly 5 digits",
+                "5 digits for train data; number lookup accepts 2–5 digit prefixes",
                 "Treat as string to preserve zeros",
                 "No spaces or symbols",
               ]}
@@ -1521,16 +1179,25 @@ function LanguageTabs({
   );
 }
 
-function EndpointParams({ endpointId, params }: { endpointId: string; params: EndpointDoc["params"] }) {
-  if (!params.length) return null;
+function EndpointParams({ endpoint, mode }: { endpoint: EndpointDoc; mode: IntegrationView }) {
+  const params = mode === "sdk"
+    ? endpoint.params.map((param) => ({
+        name: param.name,
+        in: "argument",
+        type: param.type,
+        required: !endpoint.signature.includes(`${param.name}?:`),
+        desc: param.desc,
+      }))
+    : endpoint.restParams.map((param) => ({ ...param, type: "string" }));
+  if (!params.length) return <p style={{ fontSize: 12, color: "#6F6F6F", marginBottom: 16 }}>No parameters.</p>;
   return (
     <div className="docs-card" style={{ overflowX: "auto", marginBottom: 16 }}>
       <table className="docs-table">
         <thead><tr><th>Name</th><th>In</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
         <tbody>
           {params.map((param) => {
-            const location = getEndpointParamLocation(endpointId, param.name).toUpperCase();
-            const required = !isRestParamOptional(endpointId, param.name);
+            const location = param.in.toUpperCase();
+            const required = param.required;
             return <tr key={param.name}>
               <td><code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{param.name}</code></td>
               <td><code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: "#6b7280" }}>{location}</code></td>
@@ -1596,7 +1263,7 @@ function EndpointDocsCard({
       {view === "sdk" ? (
         <div key="sdk" className="docs-code-swap">
           <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 7 }}>Parameters</p>
-          <EndpointParams endpointId={endpoint.id} params={endpoint.params} />
+          <EndpointParams endpoint={endpoint} mode="sdk" />
           <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 7 }}>Code Example</p>
           <DocsCodePanel
             language="javascript"
@@ -1607,7 +1274,6 @@ function EndpointDocsCard({
         <div key="rest" className="docs-code-swap">
           <RestEndpointPanel
             endpoint={rest}
-            params={endpoint.params}
             baseUrl={baseUrl}
             language={language}
             onLanguageChange={setLanguage}
@@ -1630,13 +1296,11 @@ function EndpointDocsCard({
 
 function RestEndpointPanel({
   endpoint,
-  params,
   baseUrl,
   language,
   onLanguageChange,
 }: {
   endpoint: EndpointDoc;
-  params: EndpointDoc["params"];
   baseUrl: string;
   language: ApiCodeLanguage;
   onLanguageChange: (value: ApiCodeLanguage) => void;
@@ -1653,12 +1317,13 @@ function RestEndpointPanel({
       >
         {endpoint.notes}
       </p>
-      <EndpointParams endpointId={endpoint.id} params={params} />
+      <p style={{ fontSize: 11, color: "#6F6F6F", marginBottom: 8 }}>Base URL: <code>{baseUrl}</code></p>
+      <EndpointParams endpoint={endpoint} mode="rest" />
       <LanguageTabs value={language} onChange={onLanguageChange} />
       <DocsCodePanel
         key={language}
         language={apiLanguageMeta[language].syntax}
-        code={buildRestSnippet(baseUrl, endpoint.examplePath, language)}
+        code={buildRestSnippet(baseUrl, endpoint.examplePath, language, endpoint.id)}
         bodyMinHeight={276}
         swapping
       />

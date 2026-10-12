@@ -14,6 +14,12 @@ function timestamp(value?: string | null) {
 }
 
 export function getDashboardBilling(user: DashboardBillingUser) {
+  // Plan is authoritative: retained dates from an old paid plan are not
+  // the expiry or billing cycle of a user's current free plan.
+  if (user.plan === "free") {
+    return { isAnnual: false, isFinalCycle: false, cycleStart: null,
+      cycleEnd: null, termEnd: null, nextResetAt: null };
+  }
   const isAnnual = user.plan !== "free" && user.entitlementVersion === 2 && user.billingInterval === "year";
   const billingStart = timestamp(user.billingDate);
   const termEnd = timestamp(user.expirationDate) ??

@@ -699,7 +699,7 @@ export default function DashboardPage() {
   const isAnnual = billingDates?.isAnnual ?? false;
   const billing = isAnnual ? quotaTimer : planTimer;
 
-  const activeExpirationTimestamp = dbUser?.expirationDate
+  const activeExpirationTimestamp = dbUser?.plan !== "free" && dbUser?.expirationDate
     ? new Date(dbUser.expirationDate).getTime()
     : NaN;
   const hasActiveExpirationOverride =
@@ -1108,14 +1108,9 @@ export default function DashboardPage() {
     normalizedPlan === "enterprise" ||
     normalizedPlan === "advance" ||
     normalizedPlan === "advanced";
-  const billingStartTimestamp = dbUser.billingDate
-    ? new Date(dbUser.billingDate).getTime()
+  const topupExpirationTimestamp = canBuyLimitTopup
+    ? billingDates?.termEnd ?? NaN
     : NaN;
-  const topupExpirationTimestamp = hasActiveExpirationOverride
-    ? activeExpirationTimestamp
-    : Number.isFinite(billingStartTimestamp)
-      ? billingStartTimestamp + 30 * 24 * 60 * 60 * 1000
-      : NaN;
   const billingDaysMatch = planTimer.display.match(/^(\d+)d\b/);
   const topupDaysLeft = billingDaysMatch
     ? Number(billingDaysMatch[1])
@@ -1147,7 +1142,9 @@ export default function DashboardPage() {
             icon: "text-[#ea580c]",
             text: "text-[#c2410c]",
           };
-  const topupValidityMessage = isAnnual
+  const topupValidityMessage = !canBuyLimitTopup
+    ? "Extra requests are available on paid plans. Upgrade your plan to add requests."
+    : isAnnual
     ? `Unused top-up requests carry over between monthly cycles and expire with your annual plan on ${topupExpiryDate}.`
     : topupDaysLeft === null || topupDaysLeft > 7
       ? Number.isFinite(topupExpirationTimestamp)
@@ -1397,7 +1394,9 @@ export default function DashboardPage() {
                     {
                       label: isAnnual ? (billingDates?.isFinalCycle ? "Plan Ends" : "Next Reset") : "Billing Cycle",
                       value: billing.display,
-                      sub: isAnnual
+                      sub: normalizedPlan === "free"
+                        ? "No paid subscription"
+                        : isAnnual
                         ? formatBillingDate(billingDates?.cycleEnd ?? null)
                         : hasActiveExpirationOverride
                         ? `until ${new Date(activeExpirationTimestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`

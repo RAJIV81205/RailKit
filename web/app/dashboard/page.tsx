@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import useSWR from "swr";
+import { ArrowRight, LockKeyhole } from "lucide-react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import {
@@ -1589,101 +1590,123 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Topup */}
-                <div className="group/topup relative rounded-2xl border border-[#ebebeb] bg-white p-6 max-[768px]:p-5 max-[480px]:rounded-[13px] max-[480px]:p-4">
-                  <div className="mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                    <p className="text-[10px] font-bold tracking-[0.08em] text-[#c0c0c0] uppercase">
-                      ADD EXTRA REQUESTS
-                    </p>
-                    <p className="text-[11px] leading-normal text-[#9ca3af]">
-                      {usageLeft.toLocaleString("en-IN")} left
-                      {topupDaysLeft !== null && (
-                        <>
-                          {" "}
-                          · {topupDaysLeft}{" "}
-                          {topupDaysLeft === 1 ? "day" : "days"} left
-                        </>
+                <div className="relative rounded-2xl border border-[#ebebeb] bg-white p-6 max-[768px]:p-5 max-[480px]:rounded-[13px] max-[480px]:p-4">
+                  <div>
+                    <div className="mb-3.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                      <p className={canBuyLimitTopup ? "text-[10px] font-bold tracking-[0.08em] text-[#c0c0c0] uppercase" : "text-sm font-bold text-[#111827]"}>
+                        {canBuyLimitTopup ? "ADD EXTRA REQUESTS" : "Buy extra requests here"}
+                      </p>
+                      {!canBuyLimitTopup ? (
+                        <p id="topup-preview-help" className="w-full text-xs leading-relaxed text-[#6b7280]">Select a pack below. You can buy it here after upgrading to a paid plan.</p>
+                      ) : (
+                      <p className="text-[11px] leading-normal text-[#9ca3af]">
+                        {usageLeft.toLocaleString("en-IN")} left
+                        {topupDaysLeft !== null && (
+                          <>
+                            {" "}
+                            · {topupDaysLeft}{" "}
+                            {topupDaysLeft === 1 ? "day" : "days"} left
+                          </>
+                        )}
+                        {Number.isFinite(topupExpirationTimestamp) && (
+                          <> · Expires {topupExpiryDate}</>
+                        )}
+                      </p>
                       )}
-                      {Number.isFinite(topupExpirationTimestamp) && (
-                        <> · Expires {topupExpiryDate}</>
-                      )}
-                    </p>
-                  </div>
-                  <div className="mb-3 grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2.5">
-                    {TOPUP_OPTIONS.map((option, index) => {
-                      const active = index === topupSelection;
-                      return (
-                        <button
-                          key={option.requests}
-                          type="button"
-                          onClick={() => setTopupSelection(index)}
-                          disabled={limitPurchaseLoading}
-                          aria-pressed={active}
-                          className={`cursor-pointer rounded-xl px-3.5 py-3 text-left text-[#111827] outline-none transition-[border-color,background] duration-150 disabled:cursor-wait ${active ? "border-2 border-[#111] bg-[#f8f8f8]" : "border border-[#e5e7eb] bg-[#fafafa]"}`}
+                    </div>
+                    <div className="mb-3 grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2.5">
+                      {TOPUP_OPTIONS.map((option, index) => {
+                        const active = index === topupSelection;
+                        return (
+                          <button
+                            key={option.requests}
+                            type="button"
+                            onClick={() => setTopupSelection(index)}
+                            disabled={limitPurchaseLoading}
+                            aria-pressed={active}
+                            aria-describedby={!canBuyLimitTopup ? "topup-preview-help" : undefined}
+                            className={`rounded-xl px-3.5 py-3 text-left text-[#111827] outline-none focus-visible:ring-2 focus-visible:ring-[#111827] focus-visible:ring-offset-2 transition-[border-color,background] duration-150 ${limitPurchaseLoading ? "cursor-wait" : "cursor-pointer"} ${active ? "border-2 border-[#111] bg-[#f8f8f8]" : "border border-[#e5e7eb] bg-[#fafafa]"}`}
+                          >
+                            <div
+                              className={`text-xs ${active ? "font-bold" : "font-semibold"}`}
+                            >
+                              +{option.requests.toLocaleString("en-IN")} requests
+                            </div>
+                            <div
+                              className={`mt-[5px] text-[11px] ${active ? "text-[#374151]" : !canBuyLimitTopup ? "text-[#6b7280]" : "text-[#9ca3af]"}`}
+                            >
+                              ₹{option.price} · ₹{option.perReq.toFixed(3)}/req
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {!canBuyLimitTopup && (
+                      <button type="button" disabled className="flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-[#e5e7eb] bg-[#f3f4f6] px-3 py-3 text-[13px] font-semibold text-[#6b7280]" aria-describedby="topup-purchase-requirement">
+                        <LockKeyhole aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.75} />
+                        Buy {selectedTopup.requests.toLocaleString("en-IN")} requests — ₹{selectedTopup.price.toLocaleString("en-IN")}
+                      </button>
+                    )}
+                    {canBuyLimitTopup && (
+                      <>
+                        <div
+                          className={`${topupValidityTone.box} mb-3 flex items-start gap-[7px] rounded-[9px] border px-3 py-2.5`}
                         >
-                          <div
-                            className={`text-xs ${active ? "font-bold" : "font-semibold"}`}
+                          <span
+                            aria-hidden="true"
+                            className={`${topupValidityTone.icon} shrink-0 text-[13px] leading-normal`}
                           >
-                            +{option.requests.toLocaleString("en-IN")} requests
-                          </div>
-                          <div
-                            className={`mt-[5px] text-[11px] ${active ? "text-[#374151]" : "text-[#9ca3af]"}`}
+                            {topupDaysLeft !== null && topupDaysLeft <= 7 ? "⚠" : "ⓘ"}
+                          </span>
+                          <p
+                            className={`${topupValidityTone.text} min-w-0 text-[11px] leading-normal [overflow-wrap:anywhere]`}
                           >
-                            ₹{option.price} · ₹{option.perReq.toFixed(3)}/req
-                          </div>
+                            {topupValidityMessage}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={startLimitTopupPayment}
+                          disabled={limitPurchaseLoading || !canBuyLimitTopup}
+                          className={`w-full rounded-xl border-none p-[13px] text-[13px] font-bold tracking-[0.01em] transition-colors duration-150 ${limitPurchaseLoading ? "cursor-wait bg-[#e5e7eb] text-[#9ca3af]" : "cursor-pointer bg-[#4f46e5] text-white"}`}
+                        >
+                          {limitPurchaseLoading
+                            ? "Processing..."
+                            : `Add ${selectedTopup.requests.toLocaleString("en-IN")} Requests — ₹${selectedTopup.price.toLocaleString("en-IN")} →`}
                         </button>
-                      );
-                    })}
+                        <p className="mt-[7px] text-center text-[10px] leading-[1.4] text-[#9ca3af]">
+                          Payments securely processed by Cashfree.
+                        </p>
+                        {limitPurchaseMessage && (
+                          <p
+                            role="status"
+                            className={`mt-2 rounded-lg border px-[9px] py-[7px] text-[11px] leading-[1.45] ${topupMessageIsError ? "border-[#fecaca] bg-[#fef2f2] text-[#dc2626]" : "border-[#e5e7eb] bg-[#f9fafb] text-[#6b7280]"}`}
+                          >
+                            {limitPurchaseMessage}
+                          </p>
+                        )}
+                      </>
+                    )}
                   </div>
-                  <div
-                    className={`${topupValidityTone.box} mb-3 flex items-start gap-[7px] rounded-[9px] border px-3 py-2.5`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`${topupValidityTone.icon} shrink-0 text-[13px] leading-normal`}
-                    >
-                      {topupDaysLeft !== null && topupDaysLeft <= 7 ? "⚠" : "ⓘ"}
-                    </span>
-                    <p
-                      className={`${topupValidityTone.text} min-w-0 text-[11px] leading-normal [overflow-wrap:anywhere]`}
-                    >
-                      {topupValidityMessage}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={startLimitTopupPayment}
-                    disabled={limitPurchaseLoading}
-                    className={`w-full rounded-xl border-none p-[13px] text-[13px] font-bold tracking-[0.01em] transition-colors duration-150 ${limitPurchaseLoading ? "cursor-wait bg-[#e5e7eb] text-[#9ca3af]" : "cursor-pointer bg-[#4f46e5] text-white"}`}
-                  >
-                    {limitPurchaseLoading
-                      ? "Processing..."
-                      : `Add ${selectedTopup.requests.toLocaleString("en-IN")} Requests — ₹${selectedTopup.price.toLocaleString("en-IN")} →`}
-                  </button>
-                  <p className="mt-[7px] text-center text-[10px] leading-[1.4] text-[#9ca3af]">
-                    Payments securely processed by Cashfree.
-                  </p>
-                  {limitPurchaseMessage && (
-                    <p
-                      role="status"
-                      className={`mt-2 rounded-lg border px-[9px] py-[7px] text-[11px] leading-[1.45] ${topupMessageIsError ? "border-[#fecaca] bg-[#fef2f2] text-[#dc2626]" : "border-[#e5e7eb] bg-[#f9fafb] text-[#6b7280]"}`}
-                    >
-                      {limitPurchaseMessage}
-                    </p>
-                  )}
                   {!canBuyLimitTopup && (
                     <div
-                      className="pointer-events-none absolute inset-0 z-[2] flex items-center justify-center gap-2.5 rounded-xl bg-white/60 p-5 opacity-0 transition-opacity duration-[180ms] group-hover/topup:opacity-100 max-[768px]:flex-col max-[768px]:text-center"
-                      data-topup-overlay
+                      className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-[#e5e7eb] bg-[#fafafa] p-4"
+                      data-topup-lock="true"
                     >
-                      <p className="text-[13px] text-[#374151]">
-                        Purchase a plan to increase your request limit
-                      </p>
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-[10px] border border-[#e5e7eb] bg-white text-[#374151]">
+                        <LockKeyhole aria-hidden="true" className="size-5" strokeWidth={1.75} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-[13px] font-semibold text-[#111827]">Buy a paid plan first</h3>
+                        <p id="topup-purchase-requirement" className="mt-1 text-xs leading-relaxed text-[#6b7280]">Then return here to buy your selected request pack.</p>
+                      </div>
                       <button
                         type="button"
                         onClick={() => router.push("/pricing")}
-                        className="pointer-events-auto cursor-pointer rounded-lg border-none bg-[#111827] px-3.5 py-2 text-xs font-semibold text-white"
+                        className="flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-[#111827] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111827] max-[640px]:w-full"
                       >
-                        View plans
+                        Upgrade plan
+                        <ArrowRight aria-hidden="true" className="size-4" strokeWidth={1.75} />
                       </button>
                     </div>
                   )}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import useSWR from "swr";
-import { ArrowRight, LockKeyhole } from "lucide-react";
+import { ArrowRight, KeyRound, LockKeyhole } from "lucide-react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import {
@@ -593,6 +593,54 @@ function OrderModal({ order, onClose }: { order: Order; onClose: () => void }) {
   );
 }
 
+function RegenerateKeyDialog({ pending, error, onCancel, onConfirm }: {
+  pending: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    cancelRef.current?.focus();
+    return () => dialog?.close();
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="regenerate-key-title"
+      aria-describedby="regenerate-key-warning"
+      aria-busy={pending}
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!pending) onCancel();
+      }}
+      className="fixed inset-0 m-auto max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-[420px] overflow-y-auto rounded-2xl border border-[#e5e7eb] bg-white p-6 font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] text-[#111827] shadow-[0_20px_56px_rgba(0,0,0,0.15)] backdrop:bg-black/35 backdrop:backdrop-blur-sm max-[480px]:p-5"
+    >
+      <div className="mb-4 flex size-11 items-center justify-center rounded-xl border border-[#fed7aa] bg-[#fff7ed] text-[#c2410c]">
+        <KeyRound aria-hidden="true" className="size-5" strokeWidth={1.75} />
+      </div>
+      <h2 id="regenerate-key-title" className="text-lg font-bold tracking-[-0.02em]">Regenerate API key?</h2>
+      <p id="regenerate-key-warning" className="mt-2 text-[13px] leading-relaxed text-[#6b7280]">
+        <strong className="font-semibold text-[#374151]">Your current API key will stop working immediately.</strong>{" "}
+        Any apps using it will fail until you update them with the new key. This cannot be undone.
+      </p>
+      {error && <p role="alert" className="mt-3 rounded-lg border border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs leading-relaxed text-[#dc2626]">{error}</p>}
+      <div className="mt-6 flex gap-3 max-[480px]:flex-col-reverse">
+        <button ref={cancelRef} type="button" onClick={onCancel} disabled={pending} className="flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-[10px] border border-[#e5e7eb] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#374151] hover:bg-[#fafafa] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111827] disabled:cursor-not-allowed disabled:opacity-50"><span aria-hidden="true"><IconX /></span>Cancel</button>
+        <button type="button" onClick={onConfirm} disabled={pending} className="flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-2 rounded-[10px] bg-[#dc2626] px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-[#b91c1c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#dc2626] disabled:cursor-wait disabled:opacity-60">
+          <span aria-hidden="true" className={pending ? "animate-spin" : ""}><IconRefresh /></span>
+          {pending ? "Regenerating..." : "Regenerate key"}
+        </button>
+      </div>
+    </dialog>
+  );
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const router = useRouter();
@@ -600,6 +648,8 @@ export default function DashboardPage() {
   const authRetryCountRef = useRef(0);
   const [copied, setCopied] = useState(false);
   const [regeneratingKey, setRegeneratingKey] = useState(false);
+  const [confirmRegenerateKey, setConfirmRegenerateKey] = useState(false);
+  const regenerateInFlightRef = useRef(false);
   const [regenerateError, setRegenerateError] = useState<string | null>(null);
   const [keyVisible, setKeyVisible] = useState(false);
   const [limitPurchaseLoading, setLimitPurchaseLoading] = useState(false);
@@ -870,7 +920,8 @@ export default function DashboardPage() {
   };
 
   const regenerateApiKey = async () => {
-    if (!dbUser?.apiKey || !dbUser?.email || regeneratingKey) return;
+    if (!confirmRegenerateKey || !dbUser?.apiKey || !dbUser?.email || regenerateInFlightRef.current) return;
+    regenerateInFlightRef.current = true;
     setRegeneratingKey(true);
     setRegenerateError(null);
     setCopied(false);
@@ -880,12 +931,18 @@ export default function DashboardPage() {
       if (!res.ok || !data?.success)
         throw new Error(data?.message || "Failed to regenerate key");
       setKeyVisible(true);
-      await mutateUser();
+      await mutateUser((current) => current ? {
+        ...current, user: { ...current.user, apiKey: data.apiKey },
+      } : current, { revalidate: false });
+      setConfirmRegenerateKey(false);
+      // A failed background refresh must not suggest that rotation failed.
+      void mutateUser().catch(() => {});
     } catch (error) {
       setRegenerateError(
         error instanceof Error ? error.message : "Failed to regenerate key",
       );
     } finally {
+      regenerateInFlightRef.current = false;
       setRegeneratingKey(false);
     }
   };
@@ -1210,6 +1267,9 @@ export default function DashboardPage() {
 
   return (
     <>
+      {confirmRegenerateKey && (
+        <RegenerateKeyDialog pending={regeneratingKey} error={regenerateError} onCancel={() => setConfirmRegenerateKey(false)} onConfirm={regenerateApiKey} />
+      )}
       {viewOrder && (
         <OrderModal order={viewOrder} onClose={() => setViewOrder(null)} />
       )}
@@ -1776,7 +1836,7 @@ export default function DashboardPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={regenerateApiKey}
+                    onClick={() => { setRegenerateError(null); setConfirmRegenerateKey(true); }}
                     disabled={regeneratingKey}
                     className={`flex h-11 items-center gap-2 whitespace-nowrap rounded-[10px] border-none px-5 text-[13px] font-semibold transition-colors duration-200 max-[768px]:w-full max-[768px]:justify-center ${regeneratingKey ? "cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]" : "cursor-pointer bg-black text-white"}`}
                   >
@@ -1788,8 +1848,8 @@ export default function DashboardPage() {
                     {regeneratingKey ? "Regenerating..." : "Regenerate Key"}
                   </button>
                 </div>
-                {regenerateError && (
-                  <p className="mt-2.5 text-xs text-[#dc2626]">
+                {regenerateError && !confirmRegenerateKey && (
+                  <p role="alert" className="mt-2.5 text-xs text-[#dc2626]">
                     {regenerateError}
                   </p>
                 )}

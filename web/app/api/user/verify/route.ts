@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/db";
 import User from "@/lib/db/models/User";
 import AuditLog from "@/lib/db/models/AuditLog";
+import { getCurrentEntitlement } from "@/lib/billing/entitlements";
 import {
   getAuthCookieName,
   getAuthTokenFromCookies,
@@ -29,7 +30,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const user = await User.findById(payload.userId).lean();
+    const storedUser = await User.findById(payload.userId).lean();
+    const user = storedUser ? getCurrentEntitlement(storedUser) : null;
 
     if (!user || !user.active) {
       const response = NextResponse.json(
@@ -141,6 +143,8 @@ export async function GET(request: Request) {
           billingInterval: user.billingInterval ?? null,
           baseLimit: user.baseLimit ?? null,
           addonLimit: user.addonLimit ?? null,
+          quotaPeriodStart: user.quotaPeriodStart ?? null,
+          quotaPeriodEnd: user.quotaPeriodEnd ?? null,
         },
         logs: {
           timelineDays,

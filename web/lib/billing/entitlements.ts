@@ -1,8 +1,11 @@
-import type { HydratedDocument } from "mongoose";
 import { getPaidPlanRuntime, type PaidPlanType } from "@/lib/constants";
 import type { UserDocument } from "@/lib/db/models/User";
 
-type User = HydratedDocument<UserDocument>;
+type User = Pick<UserDocument,
+  "plan" | "usage" | "limit" | "billingDate" | "expirationDate" |
+  "entitlementVersion" | "billingInterval" | "baseLimit" | "addonLimit" |
+  "quotaPeriodStart" | "quotaPeriodEnd"
+>;
 
 const BILLING_CYCLE_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -132,3 +135,10 @@ export function syncV2Entitlement(user: User, now = new Date()) {
 }
 
 export { addMonths };
+
+/** Read-only view of the current quota; runtime/cron remains responsible for persistence. */
+export function getCurrentEntitlement<T extends User>(user: T, now = new Date()): T {
+  const current = { ...user };
+  syncV2Entitlement(current, now);
+  return current;
+}

@@ -30,6 +30,7 @@ import {
 } from "railkit";
 import { auth } from "../../lib/firebase";
 import { TOPUP_OPTIONS } from "../../lib/constants";
+import { getDashboardBilling, formatBillingDate } from "../../lib/billing/dashboard";
 import { endpointDocs } from "../../components/docs/endpointDocs";
 import ApiPlayground from "../../components/playground/ApiPlayground";
 
@@ -43,7 +44,13 @@ type DbUser = {
   limit: number;
   active: boolean;
   plan: string;
-  billingDate?: string;
+  billingDate?: string | null;
+  entitlementVersion?: number | null;
+  billingInterval?: "month" | "year" | null;
+  baseLimit?: number | null;
+  addonLimit?: number | null;
+  quotaPeriodStart?: string | null;
+  quotaPeriodEnd?: string | null;
   expirationDate?: string | null;
 };
 
@@ -493,95 +500,40 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 // ─── Billing Timer ────────────────────────────────────────────────────────────
-function useBillingTimer(user: DbUser | null) {
+function useBillingTimer(user: DbUser | null, quota = false) {
   const [display, setDisplay] = useState("");
   const [pct, setPct] = useState(0);
+  const dates = user ? getDashboardBilling(user) : null;
+  const end = quota ? dates?.cycleEnd : dates?.termEnd;
+  const start = dates?.cycleStart;
+  const plan = user?.plan;
 
   useEffect(() => {
     const update = () => {
-      if (!user) {
-        setDisplay("Not started");
-        setPct(0);
+      if (!plan || plan === "free" || end == null) {
+        setDisplay(plan === "free" ? "Free plan" : "Not available");
+        setPct(plan === "free" ? 100 : 0);
         return;
       }
-      if (user.plan === "free") {
-        setDisplay("Free plan");
-        setPct(100);
-        return;
-      }
-      const now = Date.now();
-      const expirationAt = user.expirationDate
-        ? new Date(user.expirationDate).getTime()
-        : NaN;
-      if (Number.isFinite(expirationAt) && expirationAt > now) {
-        const remaining = expirationAt - now;
-        const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
-        const hours = Math.floor(
-          (remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
-        );
-        const minutes = Math.floor(
-          (remaining % (1000 * 60 * 60)) / (1000 * 60),
-        );
-        setDisplay(
-          days > 0 ? `${days}d ${hours}h left` : `${hours}h ${minutes}m left`,
-        );
-        if (user.billingDate) {
-          const start = new Date(user.billingDate).getTime();
-          const total =
-            Number.isFinite(start) && expirationAt > start
-              ? expirationAt - start
-              : remaining;
-          setPct(
-            Math.max(0, Math.min(100, (remaining / Math.max(total, 1)) * 100)),
-          );
-        } else {
-          setPct(100);
-        }
-        return;
-      }
-      if (!user.billingDate) {
-        setDisplay("Not started");
-        setPct(0);
-        return;
-      }
-      const CYCLE = 30 * 24 * 60 * 60 * 1000;
-      const start = new Date(user.billingDate).getTime();
-      if (Number.isNaN(start)) {
-        setDisplay("Invalid date");
-        setPct(0);
-        return;
-      }
-      const end = start + CYCLE;
-      const remaining = end - now;
+      const remaining = end - Date.now();
       if (remaining <= 0) {
-        setDisplay("Expired");
+        setDisplay(quota && dates?.nextResetAt !== null ? "Reset due" : "Expired");
         setPct(0);
         return;
       }
-      setPct((remaining / CYCLE) * 100);
-      const days = Math.floor(remaining / (1000 * 60 * 60 * 24));
-      const hours = Math.floor(
-        (remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
-      );
-      setDisplay(
-        days > 0
-          ? `${days}d ${hours}h left`
-          : `${hours}h ${Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60))}m left`,
-      );
+      const total = start != null && end > start ? end - start : remaining;
+      setPct(Math.max(0, Math.min(100, (remaining / total) * 100)));
+      const days = Math.floor(remaining / 86400000);
+      const hours = Math.floor((remaining % 86400000) / 3600000);
+      const minutes = Math.floor((remaining % 3600000) / 60000);
+      setDisplay(days > 0 ? `${days}d ${hours}h left` : `${hours}h ${minutes}m left`);
     };
     update();
     const id = setInterval(update, 60_000);
     return () => clearInterval(id);
-  }, [user?.plan, user?.billingDate, user?.expirationDate]);
+  }, [plan, start, end, quota, dates?.nextResetAt]);
 
-  const color =
-    display === "Expired"
-      ? "#dc2626"
-      : pct > 50
-        ? "#16a34a"
-        : pct > 20
-          ? "#d97706"
-          : "#dc2626";
+  const color = pct > 50 ? "#16a34a" : pct > 20 ? "#d97706" : "#dc2626";
   return { display, pct, color };
 }
 
@@ -718,7 +670,10 @@ export default function DashboardPage() {
   } = useSWR<VerifyUserResponse>(
     `/api/user/verify?days=${logsTimelineDays}`,
     fetcher,
-    { revalidateOnFocus: true },
+    {
+      revalidateOnFocus: true,
+      refreshInterval: (data) => data?.user.billingInterval === "year" ? 60_000 : 0,
+    },
   );
 
   const {
@@ -738,7 +693,11 @@ export default function DashboardPage() {
   const refreshing = userValidating || ordersValidating;
 
   const selectedTopup = TOPUP_OPTIONS[topupSelection] || TOPUP_OPTIONS[0];
-  const billing = useBillingTimer(dbUser);
+  const planTimer = useBillingTimer(dbUser);
+  const quotaTimer = useBillingTimer(dbUser, true);
+  const billingDates = dbUser ? getDashboardBilling(dbUser) : null;
+  const isAnnual = billingDates?.isAnnual ?? false;
+  const billing = isAnnual ? quotaTimer : planTimer;
 
   const activeExpirationTimestamp = dbUser?.expirationDate
     ? new Date(dbUser.expirationDate).getTime()
@@ -1111,6 +1070,36 @@ export default function DashboardPage() {
     : "";
   const paidOrders = orders.filter((o) => o.status === "paid");
   const totalSpent = paidOrders.reduce((a, o) => a + o.amount, 0);
+  const paymentSummary = (
+    <div className="grid grid-cols-2 gap-2.5 max-[480px]:grid-cols-1">
+      {[
+        {
+          label: "Paid Orders",
+          value: paidOrders.length,
+          color: "#16a34a",
+        },
+        {
+          label: "Total Spent",
+          value: `₹${totalSpent.toFixed(0)}`,
+          color: "#d97706",
+        },
+      ].map((s) => (
+        <div
+          key={s.label}
+          className="rounded-[10px] border border-[#f0f0f0] bg-[#f8f8f8] px-3.5 py-3"
+        >
+          <p className="mb-[5px] text-[10px] font-bold tracking-[0.07em] text-[#c0c0c0] uppercase">
+            {s.label}
+          </p>
+          <p
+            className={`text-xl font-extrabold tracking-[-0.03em] ${s.color === "#16a34a" ? "text-[#16a34a]" : "text-[#d97706]"}`}
+          >
+            {s.value}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
   const normalizedPlan = (dbUser.plan || "").toLowerCase();
   const avatarSeed = encodeURIComponent(dbUser.name || dbUser.email);
   const dicebearUrl = `https://api.dicebear.com/10.x/pixel-art/svg?seed=${avatarSeed}`;
@@ -1127,10 +1116,10 @@ export default function DashboardPage() {
     : Number.isFinite(billingStartTimestamp)
       ? billingStartTimestamp + 30 * 24 * 60 * 60 * 1000
       : NaN;
-  const billingDaysMatch = billing.display.match(/^(\d+)d\b/);
+  const billingDaysMatch = planTimer.display.match(/^(\d+)d\b/);
   const topupDaysLeft = billingDaysMatch
     ? Number(billingDaysMatch[1])
-    : /^\d+h\b/.test(billing.display) || billing.display === "Expired"
+    : /^\d+h\b/.test(planTimer.display) || planTimer.display === "Expired"
       ? 0
       : null;
   const topupExpiryDate = Number.isFinite(topupExpirationTimestamp)
@@ -1158,8 +1147,9 @@ export default function DashboardPage() {
             icon: "text-[#ea580c]",
             text: "text-[#c2410c]",
           };
-  const topupValidityMessage =
-    topupDaysLeft === null || topupDaysLeft > 7
+  const topupValidityMessage = isAnnual
+    ? `Unused top-up requests carry over between monthly cycles and expire with your annual plan on ${topupExpiryDate}.`
+    : topupDaysLeft === null || topupDaysLeft > 7
       ? Number.isFinite(topupExpirationTimestamp)
         ? `Expires with your current plan on ${topupExpiryDate} · Unused requests do not carry forward.`
         : "Expires with your current plan · Unused requests do not carry forward."
@@ -1383,7 +1373,7 @@ export default function DashboardPage() {
                     {
                       label: "Current Plan",
                       value: dbUser.plan.toUpperCase(),
-                      sub: dbUser.active ? "Account active" : "Inactive",
+                      sub: isAnnual ? "Annual plan" : dbUser.active ? "Account active" : "Inactive",
                       color:
                         normalizedPlan === "advance" ||
                         normalizedPlan === "enterprise"
@@ -1405,9 +1395,11 @@ export default function DashboardPage() {
                       color: "#2563eb",
                     },
                     {
-                      label: "Billing Cycle",
+                      label: isAnnual ? (billingDates?.isFinalCycle ? "Plan Ends" : "Next Reset") : "Billing Cycle",
                       value: billing.display,
-                      sub: hasActiveExpirationOverride
+                      sub: isAnnual
+                        ? formatBillingDate(billingDates?.cycleEnd ?? null)
+                        : hasActiveExpirationOverride
                         ? `until ${new Date(activeExpirationTimestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
                         : dbUser.billingDate
                           ? `since ${new Date(dbUser.billingDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}`
@@ -1435,9 +1427,9 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Profile + Usage */}
-                <div className="grid grid-cols-2 gap-4 max-[768px]:grid-cols-1">
+                <div className="grid grid-cols-2 items-start gap-4 max-[768px]:grid-cols-1">
                   {/* Profile */}
-                  <div className="rounded-2xl border border-[#ebebeb] bg-white p-6 max-[768px]:p-5 max-[480px]:rounded-[13px] max-[480px]:p-4">
+                  <div className="flex flex-col rounded-2xl border border-[#ebebeb] bg-white p-6 max-[768px]:p-5 max-[480px]:rounded-[13px] max-[480px]:p-4">
                     <p className="mb-3 text-[10px] font-bold tracking-[0.08em] text-[#c0c0c0] uppercase">
                       Profile
                     </p>
@@ -1477,14 +1469,6 @@ export default function DashboardPage() {
                           </span>
                         ),
                       },
-                      {
-                        k: "Total Spent",
-                        v: (
-                          <span className="text-[13px] font-bold text-[#16a34a]">
-                            ₹{totalSpent.toFixed(2)}
-                          </span>
-                        ),
-                      },
                     ].map(({ k, v }) => (
                       <div
                         key={k}
@@ -1496,6 +1480,7 @@ export default function DashboardPage() {
                         {v}
                       </div>
                     ))}
+                    {isAnnual && <div className="pt-3">{paymentSummary}</div>}
                   </div>
 
                   {/* Usage & Billing */}
@@ -1547,7 +1532,7 @@ export default function DashboardPage() {
                         <div className="mb-5">
                           <div className="mb-[7px] flex justify-between">
                             <span className="text-xs font-semibold text-[#374151]">
-                              Billing Cycle
+                              {isAnnual ? "Monthly usage cycle" : "Billing Cycle"}
                             </span>
                             <span
                               className={`text-xs font-bold ${billing.color === "#16a34a" ? "text-[#16a34a]" : billing.color === "#d97706" ? "text-[#d97706]" : "text-[#dc2626]"}`}
@@ -1576,34 +1561,31 @@ export default function DashboardPage() {
                           </svg>
                         </div>
                       )}
-                    <div className="grid grid-cols-2 gap-2.5 max-[480px]:grid-cols-1">
-                      {[
-                        {
-                          label: "Paid Orders",
-                          value: paidOrders.length,
-                          color: "#16a34a",
-                        },
-                        {
-                          label: "Total Spent",
-                          value: `₹${totalSpent.toFixed(0)}`,
-                          color: "#d97706",
-                        },
-                      ].map((s) => (
-                        <div
-                          key={s.label}
-                          className="rounded-[10px] border border-[#f0f0f0] bg-[#f8f8f8] px-3.5 py-3"
-                        >
-                          <p className="mb-[5px] text-[10px] font-bold tracking-[0.07em] text-[#c0c0c0] uppercase">
-                            {s.label}
-                          </p>
-                          <p
-                            className={`text-xl font-extrabold tracking-[-0.03em] ${s.color === "#16a34a" ? "text-[#16a34a]" : "text-[#d97706]"}`}
-                          >
-                            {s.value}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
+                    {isAnnual && billingDates && (
+                      <div className="border-t border-[#f3f4f6] pt-3">
+                        <dl className="space-y-2.5 text-xs">
+                          {[
+                            [billingDates.isFinalCycle ? "Final cycle ends" : "Requests reset", formatBillingDate(billingDates.cycleEnd)],
+                            ["Plan expires", formatBillingDate(billingDates.termEnd)],
+                            ["Monthly allowance", `${(dbUser.baseLimit ?? dbUser.limit).toLocaleString("en-IN")} requests`],
+                            ["Extra requests left", Math.max(0, (dbUser.addonLimit ?? 0) - Math.max(0, dbUser.usage - (dbUser.baseLimit ?? dbUser.limit))).toLocaleString("en-IN")],
+                          ].map(([label, value]) => (
+                            <div key={label} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                              <dt className="text-[#6b7280]">{label}</dt>
+                              <dd className="font-semibold text-[#374151]">{value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                        <p className="mt-3 text-[11px] leading-relaxed text-[#6b7280]">
+                          {billingDates.isFinalCycle
+                            ? "Final cycle — renew your plan before expiry."
+                            : "Monthly requests reset automatically. Unused monthly requests do not carry over."}
+                          {" "}Unused extra requests stay until plan expiry.
+                        </p>
+                      </div>
+                    )}
+
+                    {!isAnnual && paymentSummary}
                   </div>
                 </div>
 

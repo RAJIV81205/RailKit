@@ -9,6 +9,18 @@ const POST_MESSAGE_TYPE = "railkit:google-auth";
 const STATE_COOKIE_NAME =
   process.env.OAUTH_STATE_COOKIE_NAME || "railkit_oauth_state";
 
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&": return "&amp;";
+      case "<": return "&lt;";
+      case ">": return "&gt;";
+      case '"': return "&quot;";
+      default: return "&#39;";
+    }
+  });
+}
+
 function renderShim(payload: {
   type: string;
   success: boolean;
@@ -28,7 +40,7 @@ function renderShim(payload: {
     </style>
   </head>
   <body>
-    <p>${payload.success ? "Signed in. Redirecting…" : (payload.message || "Sign in failed.")}</p>
+    <p>${escapeHtml(payload.success ? "Signed in. Redirecting…" : (payload.message || "Sign in failed."))}</p>
     <script>
       (function () {
         var payload = ${safe};

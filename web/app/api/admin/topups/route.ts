@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/db";
 import LimitTopup from "@/lib/db/models/LimitTopup";
+import User from "@/lib/db/models/User";
 import { getAdminAuthTokenFromCookies, verifyAdminAuthToken } from "@/lib/auth";
 
 async function verifyRequest() {
@@ -18,7 +19,7 @@ export async function GET() {
 
 		await connectToDatabase();
 		const topups = await LimitTopup.find({})
-			.populate("userId", "name email")
+			.populate({ path: "userId", select: "name email", model: User })
 			.sort({ createdAt: -1 })
 			.limit(200);
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/db";
 import User from "@/lib/db/models/User";
-import { getAdminAuthTokenFromCookies, verifyAdminAuthToken } from "@/lib/auth";
+import { getActiveAdmin } from "@/lib/auth/admin";
 import { sendRawHtmlEmail, sendRawHtmlEmailBatch } from "@/lib/services/email";
 import { reminder_template } from "@/lib/services/templates.email";
 
@@ -36,11 +36,7 @@ type EmailTargetUser = {
 };
 
 async function verifyRequest() {
-  const token = await getAdminAuthTokenFromCookies();
-  if (!token) return null;
-  const payload = verifyAdminAuthToken(token);
-  if (!payload || payload.role !== "admin") return null;
-  return payload;
+  return getActiveAdmin();
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

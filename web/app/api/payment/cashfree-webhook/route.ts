@@ -9,6 +9,7 @@ import {
 } from "@/lib/payments/validation";
 import { fulfillLimitTopup } from "@/lib/payments/topup";
 import LimitTopup from "@/lib/db/models/LimitTopup";
+import { readLimitedText, RequestBodyTooLargeError } from "@/lib/security/body";
 
 type CashfreeWebhookPayload = {
   type?: string;
@@ -70,8 +71,6 @@ function getOrderStatusForPaymentStatus(paymentStatus?: string | null) {
 
 export async function POST(request: Request) {
   try {
-    await connectToDatabase();
-
     const signature = request.headers.get("x-webhook-signature");
     const timestamp = request.headers.get("x-webhook-timestamp");
     const webhookVersion = request.headers.get("x-webhook-version");
@@ -107,7 +106,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const rawBody = await request.text();
+    const rawBody = await readLimitedText(request, 256 * 1024);
     const verified = cashfree.PGVerifyWebhookSignature(
       signature,
       rawBody,
@@ -115,6 +114,7 @@ export async function POST(request: Request) {
     );
 
     const eventPayload = getVerifiedWebhookPayload(verified, rawBody);
+    await connectToDatabase();
     const orderId = eventPayload?.data?.order?.order_id?.trim();
     const paymentStatus = eventPayload?.data?.payment?.payment_status || null;
     const orderStatus =
@@ -216,6 +216,9 @@ export async function POST(request: Request) {
       { status: 200 }
     );
   } catch (error: unknown) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 413 });
+    }
     const errorMessage =
       error instanceof Error ? error.message : "unknown webhook error";
 

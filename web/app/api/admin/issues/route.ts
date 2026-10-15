@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAdminAuthTokenFromCookies, verifyAdminAuthToken } from "@/lib/auth";
+import { getActiveAdmin } from "@/lib/auth/admin";
 
 const DEFAULT_OWNER = "RAJIV81205";
 const DEFAULT_REPO = "railkit";
@@ -7,11 +7,7 @@ const RECENT_WINDOW_DAYS = 14;
 const MAX_ISSUES = 30;
 
 async function verifyRequest() {
-  const token = await getAdminAuthTokenFromCookies();
-  if (!token) return null;
-  const payload = verifyAdminAuthToken(token);
-  if (!payload || payload.role !== "admin") return null;
-  return payload;
+  return getActiveAdmin();
 }
 
 type GitHubIssue = {

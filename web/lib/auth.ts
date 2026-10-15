@@ -1,4 +1,4 @@
-import jwt, { JwtPayload, Secret } from "jsonwebtoken";
+import jwt, { JwtPayload } from "jsonwebtoken";
 import { cookies } from "next/headers";
 
 const COOKIE_NAME = process.env.AUTH_COOKIE_NAME || "irctc_auth_token";
@@ -40,14 +40,18 @@ export function signAdminAuthToken(payload: Omit<AdminAuthTokenPayload, "iat" | 
 
 export function verifyAuthToken(token: string): AuthTokenPayload | null {
   try {
-    return jwt.verify(token, getJwtSecret()) as AuthTokenPayload;
-  } catch(e) { return null }
+    return jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as AuthTokenPayload;
+  } catch { return null }
 }
 
 export function verifyAdminAuthToken(token: string): AdminAuthTokenPayload | null {
   try {
-    return jwt.verify(token, getJwtSecret()) as AdminAuthTokenPayload;
-  } catch(e) { return null }
+    const payload = jwt.verify(token, getJwtSecret(), { algorithms: ["HS256"] }) as AdminAuthTokenPayload;
+    const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+    return payload.role === "admin" && adminEmail && payload.email?.toLowerCase() === adminEmail
+      ? payload
+      : null;
+  } catch { return null }
 }
 
 export function getAuthCookieName() {

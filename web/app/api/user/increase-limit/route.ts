@@ -106,7 +106,7 @@ async function getAuthenticatedUser() {
   if (!payload?.userId) return null;
 
   const user = await User.findById(payload.userId);
-  if (!user?.active) return null;
+  if (!user?.active || user.status === "banned") return null;
 
   const sync = syncV2Entitlement(user);
   if (sync.changed) await user.save();

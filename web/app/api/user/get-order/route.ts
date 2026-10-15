@@ -25,7 +25,7 @@ function unauthorizedResponse() {
   return response;
 }
 
-export async function GET(request: Request) {
+async function getOrder(request: Request, shouldSync: boolean) {
   try {
     await connectToDatabase();
 
@@ -40,13 +40,12 @@ export async function GET(request: Request) {
       return unauthorizedResponse();
     }
     const user = await User.findById(payload.userId).lean();
-    if (!user || !user.active) {
+    if (!user || !user.active || user.status === "banned") {
       return unauthorizedResponse();
     }
 
     const { searchParams } = new URL(request.url);
     const orderId = searchParams.get("orderId")?.trim();
-    const shouldSync = searchParams.get("sync") === "true";
 
     if (!orderId) {
       return NextResponse.json(
@@ -141,4 +140,12 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
+}
+
+export async function GET(request: Request) {
+  return getOrder(request, false);
+}
+
+export async function POST(request: Request) {
+  return getOrder(request, true);
 }

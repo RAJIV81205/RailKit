@@ -4,12 +4,17 @@ import {
   authenticateWithGoogleCode,
   buildAuthCookie,
 } from "@/lib/auth/google";
+import { readLimitedJson, RequestBodyTooLargeError } from "@/lib/security/body";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const code: string | undefined =
-      typeof body?.code === "string" ? body.code : undefined;
+    const body = await readLimitedJson<{ code?: unknown }>(req, 8 * 1024).catch((error) => {
+      if (error instanceof RequestBodyTooLargeError) throw error;
+      return { code: undefined };
+    });
+    const code = typeof body?.code === "string" && body.code.length <= 2048
+      ? body.code
+      : undefined;
 
     if (!code) {
       return NextResponse.json(
@@ -41,6 +46,9 @@ export async function POST(req: Request) {
 
     return response;
   } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json({ success: false, message: error.message }, { status: 413 });
+    }
     console.error("Google login route error:", error);
     return NextResponse.json(
       { success: false, message: "Authentication failed" },

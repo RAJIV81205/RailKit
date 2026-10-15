@@ -78,7 +78,7 @@ export async function GET() {
         success: true,
         users: cleaned.length > 0 ? cleaned : shuffleUsers(FALLBACK_USERS),
       },
-      { status: 200 },
+      { status: 200, headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },
     );
   } catch (error) {
     console.error("Enterprise users public route error:", error);
@@ -87,7 +87,7 @@ export async function GET() {
         success: true,
         users: shuffleUsers(FALLBACK_USERS),
       },
-      { status: 200 },
+      { status: 200, headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } },
     );
   }
 }

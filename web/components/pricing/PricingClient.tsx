@@ -384,7 +384,7 @@ function PricingPageContent({
 
   const verifyPayment = useCallback(async (orderId: string, paidPlanType?: PaidPlanType) => {
     showNotice("info", "Verifying payment status…");
-    const response = await fetch(`/api/user/get-order?orderId=${encodeURIComponent(orderId)}&sync=true`, { method: "GET", cache: "no-store" });
+    const response = await fetch(`/api/user/get-order?orderId=${encodeURIComponent(orderId)}`, { method: "POST", cache: "no-store" });
     const data = await response.json();
     if (!response.ok) throw new Error(data?.message || "Unable to verify payment status");
     if (data?.order?.credited) {

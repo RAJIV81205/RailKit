@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminAuthTokenFromCookies, verifyAdminAuthToken } from "@/lib/auth";
+import { getActiveAdmin } from "@/lib/auth/admin";
 
 type AdminIpLocationsRequest = {
   ips?: unknown;
@@ -15,11 +15,7 @@ type IpApiBatchItem = {
 };
 
 async function verifyRequest() {
-  const token = await getAdminAuthTokenFromCookies();
-  if (!token) return null;
-  const payload = verifyAdminAuthToken(token);
-  if (!payload || payload.role !== "admin") return null;
-  return payload;
+  return getActiveAdmin();
 }
 
 function normalizeIp(value: unknown) {

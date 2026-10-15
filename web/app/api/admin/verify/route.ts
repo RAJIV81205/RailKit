@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
-import { getAdminAuthTokenFromCookies, verifyAdminAuthToken } from "@/lib/auth";
+import { getActiveAdmin } from "@/lib/auth/admin";
 import { connectToDatabase } from "@/lib/db/db";
 import User from "@/lib/db/models/User";
 
 export async function GET() {
-  const token = await getAdminAuthTokenFromCookies();
-  if (!token) {
-    return NextResponse.json({ authenticated: false }, { status: 401 });
-  }
-
-  const payload = verifyAdminAuthToken(token);
-  if (!payload || payload.role !== "admin") {
+  const payload = await getActiveAdmin();
+  if (!payload) {
     return NextResponse.json({ authenticated: false }, { status: 401 });
   }
 

@@ -926,7 +926,7 @@ export default function DashboardPage() {
     setRegenerateError(null);
     setCopied(false);
     try {
-      const res = await fetch("/api/user/key/regenerate", { method: "GET" });
+      const res = await fetch("/api/user/key/regenerate", { method: "POST" });
       const data = await res.json();
       if (!res.ok || !data?.success)
         throw new Error(data?.message || "Failed to regenerate key");

@@ -39,8 +39,8 @@ export async function GET() {
 			return unauthorizedResponse("unauthorized: invalid token payload");
 		}
 
-		const user = await User.findById(payload.userId).select("_id active").lean();
-		if (!user || !user.active) {
+		const user = await User.findById(payload.userId).select("_id active status").lean();
+		if (!user || !user.active || user.status === "banned") {
 			return unauthorizedResponse("unauthorized: invalid user");
 		}
 

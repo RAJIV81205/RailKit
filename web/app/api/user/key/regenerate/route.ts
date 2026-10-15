@@ -8,7 +8,7 @@ function createApiKey() {
   return `irctc_${crypto.randomBytes(24).toString("hex")}`;
 }
 
-export async function GET() {
+export async function POST() {
   try {
     await connectToDatabase();
 
@@ -29,7 +29,7 @@ export async function GET() {
     }
 
     const user = await User.findById(payload.userId);
-    if (!user || !user.active) {
+    if (!user || !user.active || user.status === "banned") {
       return NextResponse.json(
         { success: false, message: "user not found or inactive" },
         { status: 404 }

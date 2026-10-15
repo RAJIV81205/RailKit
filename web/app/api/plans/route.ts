@@ -13,7 +13,7 @@ export async function GET() {
         contactEmail: config.contactEmail,
         plans: config.plans,
       },
-      { status: 200 }
+      { status: 200, headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } }
     );
   } catch (error) {
     console.error("Public plans fetch error:", error);

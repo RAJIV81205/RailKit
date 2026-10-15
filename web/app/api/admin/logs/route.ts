@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/db";
 import AuditLog from "@/lib/db/models/AuditLog";
-import { getAdminAuthTokenFromCookies, verifyAdminAuthToken } from "@/lib/auth";
+import { getActiveAdmin } from "@/lib/auth/admin";
 
 async function verifyRequest() {
-  const token = await getAdminAuthTokenFromCookies();
-  if (!token) return null;
-  const payload = verifyAdminAuthToken(token);
-  if (!payload || payload.role !== "admin") return null;
-  return payload;
+  return getActiveAdmin();
 }
 
 export async function GET(req: NextRequest) {

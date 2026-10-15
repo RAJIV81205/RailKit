@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { connectToDatabase } from "@/lib/db/db";
 import Email from "@/lib/db/models/Email";
+import { readLimitedText, RequestBodyTooLargeError } from "@/lib/security/body";
 
 type ResendEmailAttachment = {
 	id?: string;
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
 			);
 		}
 
-		const rawBody = await request.text();
+		const rawBody = await readLimitedText(request, 256 * 1024);
 		const webhookId = request.headers.get("svix-id");
 		const webhookTimestamp = request.headers.get("svix-timestamp");
 		const webhookSignature = request.headers.get("svix-signature");
@@ -129,6 +130,9 @@ export async function POST(request: Request) {
 			{ status: 200 }
 		);
 	} catch (error: unknown) {
+		if (error instanceof RequestBodyTooLargeError) {
+			return NextResponse.json({ success: false, message: error.message }, { status: 413 });
+		}
 		const message = error instanceof Error ? error.message : "unknown webhook error";
 		const invalidSignature = message.toLowerCase().includes("signature");
 

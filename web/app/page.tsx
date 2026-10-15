@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { headers } from "next/headers";
 import {
   ArrowRight,
   CheckCircle2,
@@ -75,15 +74,8 @@ function shuffleUsers<T>(items: T[]): T[] {
 
 async function getEnterpriseShowcaseUsers(): Promise<EnterpriseShowcaseUser[]> {
   try {
-    const headerStore = await headers();
-    const host =
-      headerStore.get("x-forwarded-host") || headerStore.get("host");
-    const proto =
-      headerStore.get("x-forwarded-proto") ||
-      (host?.includes("localhost") ? "http" : "https");
-    const base = host ? `${proto}://${host}` : absoluteUrl("/");
-    const res = await fetch(`${base}/api/public/enterprise-users`, {
-      cache: "no-store",
+    const res = await fetch(absoluteUrl("/api/public/enterprise-users"), {
+      next: { revalidate: 300 },
     });
     const data = (await res.json()) as {
       success?: boolean;

@@ -27,7 +27,7 @@
     "leaflet": "^1.9.4",
     "lucide-react": "^0.556.0",
     "mongoose": "^9.7.2",
-    "next": "^16.2.11",
+    "next": "^16.4.1",
     "railkit": "^6.0.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
@@ -50,5 +50,8 @@
     "tailwindcss": "^4.1.18",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.6"
   }
 }

@@ -46,19 +46,16 @@ export function getGoogleRedirectUri(req: Request) {
   if (process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI) {
     return process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI;
   }
-
-  const proto =
-    req.headers.get("x-forwarded-proto") ||
-    (req.headers.get("host")?.startsWith("localhost") ? "http" : "https");
-  const host = req.headers.get("host");
-  if (host) {
-    return `${proto}://${host}/api/auth/google/callback`;
-  }
-
   if (process.env.APP_BASE_URL) {
     return `${process.env.APP_BASE_URL.replace(/\/$/, "")}/api/auth/google/callback`;
   }
-
+  // An untrusted Host/X-Forwarded-Proto must never select the OAuth callback.
+  if (process.env.NODE_ENV !== "production") {
+    const url = new URL(req.url);
+    if (["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) {
+      return `${url.origin}/api/auth/google/callback`;
+    }
+  }
   return "";
 }
 
@@ -80,6 +77,9 @@ export async function authenticateWithGoogleCode(
 
   const googleClient = getGoogleClient();
   const redirectUri = redirectUriOverride || getGoogleRedirectUri(req);
+  if (!redirectUri) {
+    throw new Error("Google OAuth redirect URI is not configured");
+  }
 
   const { tokens } = await googleClient.getToken({
     code,

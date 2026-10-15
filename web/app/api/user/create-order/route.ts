@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     }
 
     const user = await User.findById(payload.userId).lean();
-    if (!user || !user.active) {
+    if (!user || !user.active || user.status === "banned") {
       return unauthorizedResponse();
     }
 

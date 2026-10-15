@@ -2,14 +2,10 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/db";
 import Order from "@/lib/db/models/Order";
 import User from "@/lib/db/models/User";
-import { getAdminAuthTokenFromCookies, verifyAdminAuthToken } from "@/lib/auth";
+import { getActiveAdmin } from "@/lib/auth/admin";
 
 async function verifyRequest() {
-  const token = await getAdminAuthTokenFromCookies();
-  if (!token) return null;
-  const payload = verifyAdminAuthToken(token);
-  if (!payload || payload.role !== "admin") return null;
-  return payload;
+  return getActiveAdmin();
 }
 
 export async function GET() {
@@ -26,27 +22,6 @@ export async function GET() {
     return NextResponse.json({ success: true, orders }, { status: 200 });
   } catch (error) {
     console.error("Fetch orders error:", error);
-    return NextResponse.json({ success: false, message: "Internal Server Error" }, { status: 500 });
-  }
-}
-
-export async function PUT(req: Request) {
-  try {
-    const admin = await verifyRequest();
-    if (!admin) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
-    
-    await connectToDatabase();
-    const body = await req.json();
-    const { _id, ...updates } = body;
-    
-    if (!_id) return NextResponse.json({ success: false, message: "Order ID missing" }, { status: 400 });
-    
-    const order = await Order.findByIdAndUpdate(_id, updates, { new: true });
-    if (!order) return NextResponse.json({ success: false, message: "Order not found" }, { status: 404 });
-    
-    return NextResponse.json({ success: true, order }, { status: 200 });
-  } catch (error) {
-    console.error("Update order error:", error);
     return NextResponse.json({ success: false, message: "Internal Server Error" }, { status: 500 });
   }
 }

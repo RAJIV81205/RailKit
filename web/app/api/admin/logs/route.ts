@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/db";
 import AuditLog from "@/lib/db/models/AuditLog";
 import { getActiveAdmin } from "@/lib/auth/admin";
@@ -7,7 +7,7 @@ async function verifyRequest() {
   return getActiveAdmin();
 }
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const admin = await verifyRequest();
     if (!admin) {
@@ -17,9 +17,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const { searchParams } = new URL(req.url);
-    const daysParam = searchParams.get("days");
-    const timelineDays = daysParam === "30" ? 30 : 14;
+    const timelineDays = 14;
 
     await connectToDatabase();
 
@@ -66,7 +64,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Most recent 100 logs across all users, newest first
-    const recentLogsRaw = await AuditLog.find()
+    const recentLogsRaw = await AuditLog.find({ createdAt: { $gte: startDate } })
       .sort({ createdAt: -1 })
       .limit(100)
       .select("email trainNo userAgent referer statusCode path ip duration source createdAt")

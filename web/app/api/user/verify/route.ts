@@ -64,9 +64,7 @@ export async function GET(request: Request) {
     }
 
     const email = String(user.email || "").trim().toLowerCase();
-    const { searchParams } = new URL(request.url);
-    const daysParam = Number(searchParams.get("days") || 14);
-    const timelineDays = daysParam === 30 ? 30 : 14;
+    const timelineDays = 14;
     const now = new Date();
     const usageFromDate = new Date(now);
     usageFromDate.setDate(usageFromDate.getDate() - (timelineDays - 1));
@@ -90,7 +88,7 @@ export async function GET(request: Request) {
         },
         { $sort: { _id: 1 } },
       ]),
-      AuditLog.find({ email })
+      AuditLog.find({ email, createdAt: { $gte: usageFromDate } })
         .sort({ createdAt: -1 })
         .limit(50)
         .select("email statusCode path ip duration createdAt")

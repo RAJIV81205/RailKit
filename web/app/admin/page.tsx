@@ -2354,7 +2354,6 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<
     "users" | "orders" | "unpaid" | "topups" | "issues" | "playground" | "logs"
   >("users");
-  const [logsTimelineDays, setLogsTimelineDays] = useState<14 | 30>(14);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [clearingUnpaid, setClearingUnpaid] = useState(false);
@@ -2477,7 +2476,7 @@ export default function AdminPanel() {
     isValidating: logsValidating,
     mutate: mutateLogs,
   } = useSWR<LogsData>(
-    isAdmin ? `/api/admin/logs?days=${logsTimelineDays}` : null,
+    isAdmin ? "/api/admin/logs" : null,
     fetcher,
     { revalidateOnFocus: true, refreshInterval: 60_000 },
   );
@@ -3467,7 +3466,7 @@ export default function AdminPanel() {
               {
                 label: "Avg Requests/Day",
                 value: avgRequestsPerDay.toLocaleString("en-IN"),
-                sub: `last ${logsTimelineDays} days`,
+                sub: "last 14 days",
                 color: "#60a5fa",
               },
               {
@@ -5116,7 +5115,7 @@ export default function AdminPanel() {
                       fontFamily: "'JetBrains Mono', monospace",
                     }}
                   >
-                    Last {logsTimelineDays} days
+                    Last 14 days
                   </span>
                 </div>
 
@@ -5135,28 +5134,7 @@ export default function AdminPanel() {
                       overflow: "hidden",
                     }}
                   >
-                    {([14, 30] as const).map((days) => (
-                      <button
-                        type="button"
-                        key={days}
-                        onClick={() => setLogsTimelineDays(days)}
-                        style={{
-                          background:
-                            logsTimelineDays === days ? "#1f3048" : "#0a0d13",
-                          color:
-                            logsTimelineDays === days ? "#93c5fd" : "#64748b",
-                          border: "none",
-                          borderRight:
-                            days === 14 ? "1px solid #243042" : "none",
-                          padding: "6px 12px",
-                          fontSize: 11,
-                          fontFamily: "'JetBrains Mono', monospace",
-                          cursor: "pointer",
-                        }}
-                      >
-                        {days}D
-                      </button>
-                    ))}
+                    <span style={{ padding: "6px 12px", color: "#93c5fd", fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>14D</span>
                   </div>
                 </div>
 

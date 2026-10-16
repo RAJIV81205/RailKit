@@ -660,7 +660,6 @@ export default function DashboardPage() {
     string | null
   >(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
-  const [logsTimelineDays, setLogsTimelineDays] = useState<14 | 30>(14);
   const [topupSelection, setTopupSelection] = useState(1);
   const [apiCodeLanguage, setApiCodeLanguage] =
     useState<ApiCodeLanguage>("javascript");
@@ -719,7 +718,7 @@ export default function DashboardPage() {
     isValidating: userValidating,
     mutate: mutateUser,
   } = useSWR<VerifyUserResponse>(
-    `/api/user/verify?days=${logsTimelineDays}`,
+    "/api/user/verify",
     fetcher,
     {
       revalidateOnFocus: true,
@@ -2340,16 +2339,7 @@ export default function DashboardPage() {
                       API Requests Per Day
                     </p>
                     <div className="flex overflow-hidden rounded-lg border border-[#e5e7eb]">
-                      {([14, 30] as const).map((days) => (
-                        <button
-                          type="button"
-                          key={days}
-                          onClick={() => setLogsTimelineDays(days)}
-                          className={`cursor-pointer border-none px-3.5 py-1.5 text-xs font-semibold transition-colors duration-150 ${days === 14 ? "border-r border-r-[#e5e7eb]" : ""} ${logsTimelineDays === days ? "bg-black text-white" : "bg-white text-[#6b7280]"}`}
-                        >
-                          {days}D
-                        </button>
-                      ))}
+                      <span className="px-3.5 py-1.5 text-xs font-semibold text-[#6b7280]">Last 14 days</span>
                     </div>
                   </div>
                   <div className="h-[260px] rounded-xl border border-[#f0f0f0] bg-[#fafafa] p-3 max-[768px]:h-[230px] max-[768px]:p-2 max-[480px]:h-[210px]">

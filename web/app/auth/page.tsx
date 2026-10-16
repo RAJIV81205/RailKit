@@ -122,10 +122,16 @@ function openGooglePopup(redirectUri: string): Promise<void> {
     };
     window.addEventListener("message", onMessage);
 
-    const pollClosed = window.setInterval(() => {
+    const pollClosed = window.setInterval(async () => {
       if (popup.closed) {
         window.removeEventListener("message", onMessage);
         clearInterval(pollClosed);
+        // COOP/browser isolation can drop window.opener after Google redirects
+        // back, even though callback already set the session cookie.
+        if (await waitForAuthSession()) {
+          finish(resolve);
+          return;
+        }
         finish(() => reject(new Error("Google sign in was cancelled.")));
       }
     }, 500);
@@ -139,12 +145,9 @@ function AuthPageInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Always derive the redirect URI from the current origin so it matches
-  // whatever host the user is on (localhost, staging, production, etc.).
-  // The env var override exists for cases where Google must be told a
-  // different URI than the one the browser actually visits.
+  // Use current origin; NEXT_PUBLIC env values are baked into builds and can
+  // accidentally pin production OAuth redirects to localhost.
   const redirectUri =
-    process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI ||
     (typeof window !== "undefined"
       ? `${window.location.origin}/api/auth/google/callback`
       : "/api/auth/google/callback");

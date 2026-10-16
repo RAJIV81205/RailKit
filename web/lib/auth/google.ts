@@ -43,18 +43,16 @@ function getGoogleClient() {
 }
 
 export function getGoogleRedirectUri(req: Request) {
-  if (process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI) {
-    return process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI;
-  }
-  if (process.env.APP_BASE_URL) {
-    return `${process.env.APP_BASE_URL.replace(/\/$/, "")}/api/auth/google/callback`;
-  }
-  // An untrusted Host/X-Forwarded-Proto must never select the OAuth callback.
+  // Local development origin must win even when APP_BASE_URL points to prod.
   if (process.env.NODE_ENV !== "production") {
     const url = new URL(req.url);
     if (["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)) {
       return `${url.origin}/api/auth/google/callback`;
     }
+  }
+  // Production uses configured canonical origin; never trust forwarded host.
+  if (process.env.APP_BASE_URL) {
+    return `${process.env.APP_BASE_URL.trim().replace(/\/$/, "")}/api/auth/google/callback`;
   }
   return "";
 }

@@ -133,14 +133,23 @@ export async function GET(req: Request) {
     });
   }
 
-  const result = await authenticateWithGoogleCode(code, req);
+  try {
+    const result = await authenticateWithGoogleCode(code, req);
 
-  if (!result.ok) {
-    return shimResponse(false, result.message, { clearStateCookie: true });
+    if (!result.ok) {
+      return shimResponse(false, result.message, { clearStateCookie: true });
+    }
+
+    return shimResponse(true, undefined, {
+      setAuthCookie: result.token,
+      clearStateCookie: true,
+    });
+  } catch (error) {
+    console.error("Google OAuth callback failed:", error);
+    return shimResponse(
+      false,
+      "Google authentication failed. Check server configuration and callback URI.",
+      { clearStateCookie: true },
+    );
   }
-
-  return shimResponse(true, undefined, {
-    setAuthCookie: result.token,
-    clearStateCookie: true,
-  });
 }

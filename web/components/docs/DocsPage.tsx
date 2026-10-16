@@ -697,6 +697,16 @@ export default function DocsPage({
                 </tbody>
               </table>
             </div>
+            <div className="docs-card" style={{ padding: 20, marginTop: 20 }}>
+              <h2 className="docs-section-title">Implementation guides</h2>
+              <p style={{ color: "#64748b", fontSize: 13, lineHeight: 1.65, marginTop: 8, marginBottom: 12 }}>
+                Start with complete request examples, response fields, errors, and data freshness notes.
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 18 }}>
+                <Link href="/guides/pnr-status-api" style={{ textDecoration: "underline", textUnderlineOffset: 3 }}>PNR status API guide</Link>
+                <Link href="/guides/live-train-tracking-api" style={{ textDecoration: "underline", textUnderlineOffset: 3 }}>Live train tracking API guide</Link>
+              </div>
+            </div>
           </div>
         </section>
       )}
@@ -1366,7 +1376,7 @@ function DocsSectionHeader({
       >
         <Icon size={15} />
       </div>
-      <h2 className="docs-section-title">{title}</h2>
+      <h1 className="docs-section-title">{title}</h1>
     </div>
   );
 }

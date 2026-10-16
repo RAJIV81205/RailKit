@@ -14,6 +14,7 @@ import {
   buildMetadata,
   SITE_DESCRIPTION,
   SITE_NAME,
+  SITE_TITLE,
 } from "../lib/seo";
 import { CinematicHero } from "../components/CinematicHero";
 import { MoochiFollower } from "../components/MoochiFollower";
@@ -26,6 +27,7 @@ export const metadata: Metadata = {
       "RailKit is a Node.js SDK and Indian Railways API for PNR status, live train tracking, cancelled trains, train search, station boards, and seat availability.",
     path: "/",
   }),
+  title: { absolute: SITE_TITLE },
 };
 
 /* ─────────────────────────────────────────────
@@ -294,6 +296,28 @@ export default async function LandingPage() {
                 <p className="lp-ep-desc">{ep.description}</p>
               </Link>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="lp-section lp-section-tinted" aria-labelledby="guide-heading">
+        <div className="lp-inner">
+          <div className="lp-section-head">
+            <p className="lp-eyebrow">Implementation guides</p>
+            <h2 className="lp-h2" id="guide-heading">Build with real railway data.</h2>
+            <p className="lp-body">Follow request, response, error, and data freshness examples for common integrations.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Link href="/guides/pnr-status-api" className="rounded-2xl border border-neutral-200 bg-white p-6 transition hover:border-neutral-400">
+              <h3 className="text-xl font-semibold">PNR status API guide</h3>
+              <p className="mt-2 text-sm leading-6 text-neutral-600">Booking and current status, passenger details, chart status, and safe error handling.</p>
+              <span className="mt-5 inline-flex items-center gap-2 text-sm font-medium">Read guide <ArrowRight size={15} /></span>
+            </Link>
+            <Link href="/guides/live-train-tracking-api" className="rounded-2xl border border-neutral-200 bg-white p-6 transition hover:border-neutral-400">
+              <h3 className="text-xl font-semibold">Live train tracking API guide</h3>
+              <p className="mt-2 text-sm leading-6 text-neutral-600">Journey dates, station timeline, delays, update timestamps, and polling errors.</p>
+              <span className="mt-5 inline-flex items-center gap-2 text-sm font-medium">Read guide <ArrowRight size={15} /></span>
+            </Link>
           </div>
         </div>
       </section>

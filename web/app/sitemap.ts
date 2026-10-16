@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { absoluteUrl } from "../lib/seo";
+import { sections } from "../components/docs/docsData";
 import {
   PRIVACY_POLICY,
   TERMS_AND_CONDITIONS,
@@ -20,6 +21,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 0.9,
     },
+    ...sections.map(({ id }) => ({
+      url: absoluteUrl(`/docs/${id}`),
+    })),
+    { url: absoluteUrl("/guides/pnr-status-api") },
+    { url: absoluteUrl("/guides/live-train-tracking-api") },
     {
       url: absoluteUrl("/rail-atlas"),
       changeFrequency: "daily",

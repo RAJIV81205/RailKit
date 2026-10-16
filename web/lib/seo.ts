@@ -1,6 +1,6 @@
 export const SITE_NAME = "RailKit";
 export const SITE_TITLE =
-  "RailKit - Indian Railways API & Node.js SDK for PNR Status, Live Train Tracking & Seat Availability";
+  "Indian Railways API & Node.js SDK | RailKit";
 export const SITE_DESCRIPTION =
   "RailKit is an independent, developer-first Indian Railways data API and Node.js SDK for PNR status, live train tracking, trains between stations, seat availability, fares, and station boards.";
 
@@ -12,6 +12,9 @@ export const SITE_KEYWORDS = [
   "railway api",
   "indian railways sdk",
   "pnr status api",
+  "irctc api",
+  "ntes api",
+  "wimt api",
   "live train tracking api",
   "train running status api",
   "train between stations api",
@@ -68,7 +71,8 @@ export function buildMetadata({
   const isArticle = type === "article";
 
   return {
-    title: resolvedTitle,
+    // Root layout's title template adds the brand for inner pages.
+    title: title || SITE_TITLE,
     description,
     keywords: resolvedKeywords,
     alternates: {

@@ -143,7 +143,7 @@ export default function TermsPage() {
                   return (
                     <article key={section.heading} id={id} className="scroll-mt-[100px]">
                       <h2 className="mb-3.5 flex items-baseline gap-3 font-['Instrument_Serif',Georgia,serif] text-[clamp(24px,3vw,36px)] font-normal leading-[1.1] tracking-[-0.02em] text-black">
-                        <span className="text-[11px] font-semibold tracking-[0.12em] text-neutral-400">
+                        <span data-nosnippet className="text-[11px] font-semibold tracking-[0.12em] text-neutral-400">
                           {String(index + 1).padStart(2, "0")}
                         </span>
                         {section.heading}

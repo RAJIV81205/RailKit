@@ -109,7 +109,7 @@ if (result.success) {
     title: "Track Train — V1 NTES",
     icon: MapPin,
     description:
-      "Track live movement using the NTES-backed v1 endpoint, with station-by-station arrival, departure, platform, and delay context.",
+      "Track live movement with the complete NTES schedule, intermediate station times, distance and progress metrics, Hindi names when supplied, coach metadata, and layout snapshots when coach composition changes.",
     signature: "trackTrain(trainNumber: string, date: string)",
     quickCall: 'await trackTrain("12345", "10-10-2026");',
     params: [
@@ -129,11 +129,39 @@ if (result.success) {
     response: `{
   "success": true,
   "data": {
-    "trainNo": "12345", "trainName": "SARAIGHAT EXP", "date": "28-Aug-2026",
-    "statusNote": "Yet to start from its source", "lastUpdate": "", "totalStations": 161,
-    "coachPosition": [],
-    "timeline": [{ "type": "stoppage", "status": "current", "stationCode": "HWH", "stationName": "HOWRAH JN", "platform": "15", "distanceKm": "", "arrival": { "scheduled": "SRC", "actual": "SRC", "delay": "" }, "departure": { "scheduled": "16:05 28-Aug", "actual": "16:05 28-Aug*", "delay": "On Time" } }],
-    "currentStationCode": "HWH"
+    "trainNo": "12345", "trainName": "SARAIGHAT EXP", "trainNameHindi": "हव्ह् घ्य् सरैघत् इएक्सप्रेस्स्",
+    "date": "17-Oct-2026", "statusNote": "Arrived at RAMPUR HAT (RPH)",
+    "lastUpdate": "17-Oct-2026 19:19", "totalStations": 161,
+    "totalStoppageStations": 18, "currentStationCode": "RPH",
+    "totalDistanceKm": 998, "averageSpeedKmph": 61.29,
+    "progress": {
+      "journeyStatus": "running", "currentStationIndex": 50,
+      "totalStations": 161, "passedStations": 49, "remainingStations": 111,
+      "currentDistanceKm": 207, "distanceRemainingKm": 791, "percent": 20.74
+    },
+    "timeline": [
+      {
+        "type": "stoppage", "status": "passed", "stationCode": "HWH",
+        "stationName": "HOWRAH JN", "stationNameHindi": "हावड़ा जं",
+        "platform": "15", "distanceKm": "0",
+        "arrival": { "scheduled": "SRC", "actual": "SRC", "delay": "" },
+        "departure": { "scheduled": "16:05 17-Oct", "actual": "16:06 17-Oct", "delay": "00:01" }
+      },
+      {
+        "type": "intermediate", "status": "passed", "stationCode": "SYAE",
+        "stationName": "Example intermediate station", "distanceKm": "3",
+        "arrival": { "scheduled": "16:10" }, "departure": { "scheduled": "16:10" }
+      }
+    ],
+    "coachPosition": [{
+      "type": "HA1", "number": "HA1", "position": "4", "id": "710580",
+      "operatedBy": "ER", "coachType": "LWFCWAC", "coachNo": "194544",
+      "manufacturedIn": 2019, "coachClass": "1A+2A", "variant": "1A-10-2A-28-V1"
+    }],
+    "coachPositionTimeline": [{
+      "fromStationCode": "HWH", "fromStationName": "HOWRAH JN",
+      "coachPosition": [{ "type": "HA1", "number": "HA1", "position": "4", "id": "710580", "operatedBy": "ER", "coachType": "LWFCWAC", "coachNo": "194544", "manufacturedIn": 2019, "coachClass": "1A+2A", "variant": "1A-10-2A-28-V1" }]
+    }]
   }
 }`,
   },

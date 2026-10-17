@@ -72,7 +72,7 @@ curl "https://api.railkit.in/api/v1/pnr/$PNR" \\
   "live-train-tracking-api": {
     title: "Live Train Tracking API Guide",
     description: "Track an Indian train with RailKit REST API. Learn journey-date handling, live status fields, sample requests and responses, errors, and freshness limits.",
-    intro: "Look up a train's latest reported movement by five-digit train number and journey start date. The V1 endpoint returns station timeline, platform and delay context. Use V2 when you need expanded route and current-location fields.",
+    intro: "Look up a train's latest reported movement by five-digit train number and journey start date. V1 returns the full NTES route, stoppage and intermediate station times, journey metrics, Hindi names when available, and detailed coach composition.",
     endpoint: "GET /api/v1/trains/:trainNumber/live/:date",
     docsPath: "/docs/live-tracking",
     relatedPath: "/guides/pnr-status-api",
@@ -80,7 +80,7 @@ curl "https://api.railkit.in/api/v1/pnr/$PNR" \\
     steps: [
       "Get a RailKit API key and keep it on your server.",
       "Use a five-digit train number and its journey start date in DD-MM-YYYY format. Date must be today or within the previous five days in India time.",
-      "Read statusNote, lastUpdate, currentStationCode, and timeline. Treat last reported position as an estimate, not GPS location.",
+      "Read statusNote, lastUpdate, currentStationCode, progress, and timeline. Stoppages include actual and scheduled times; intermediate points include scheduled times only. Treat last reported position as an estimate, not GPS location.",
     ],
     request: `export RAILKIT_API_KEY="your_api_key"
 export TRAIN_NUMBER="12345"
@@ -94,20 +94,75 @@ curl "https://api.railkit.in/api/v1/trains/$TRAIN_NUMBER/live/$JOURNEY_DATE" \\
   "data": {
     "trainNo": "12345",
     "trainName": "Example Express",
-    "date": "16-Oct-2026",
-    "statusNote": "Departed from last reported station",
-    "lastUpdate": "16-Oct-2026 10:15 IST",
-    "currentStationCode": "HWH",
-    "timeline": [{
-      "type": "stoppage",
-      "stationCode": "HWH",
-      "platform": "15",
-      "departure": { "scheduled": "10:00", "actual": "10:12", "delay": "12 Min" }
+    "trainNameHindi": "उदाहरण एक्सप्रेस",
+    "date": "17-Oct-2026",
+    "statusNote": "Arrived at RAMPUR HAT (RPH)",
+    "lastUpdate": "17-Oct-2026 19:19 IST",
+    "currentStationCode": "RPH",
+    "totalStations": 161,
+    "totalStoppageStations": 18,
+    "totalDistanceKm": 998,
+    "averageSpeedKmph": 61.29,
+    "progress": {
+      "journeyStatus": "running",
+      "currentStationIndex": 50,
+      "totalStations": 161,
+      "passedStations": 49,
+      "remainingStations": 111,
+      "currentDistanceKm": 207,
+      "distanceRemainingKm": 791,
+      "percent": 20.74
+    },
+    "timeline": [
+      {
+        "type": "stoppage",
+        "status": "passed",
+        "stationCode": "HWH",
+        "stationName": "HOWRAH JN",
+        "stationNameHindi": "हावड़ा जं",
+        "platform": "15",
+        "distanceKm": "0",
+        "arrival": { "scheduled": "SRC", "actual": "SRC", "delay": "" },
+        "departure": { "scheduled": "16:05 17-Oct", "actual": "16:06 17-Oct", "delay": "00:01" }
+      },
+      {
+        "type": "intermediate",
+        "status": "passed",
+        "stationCode": "SYAE",
+        "stationName": "Example intermediate station",
+        "distanceKm": "3",
+        "arrival": { "scheduled": "16:10" },
+        "departure": { "scheduled": "16:10" }
+      }
+    ],
+    "coachPosition": [{
+      "type": "HA1",
+      "number": "HA1",
+      "position": "4",
+      "id": "710580",
+      "operatedBy": "ER",
+      "coachType": "LWFCWAC",
+      "coachNo": "194544",
+      "manufacturedIn": 2019,
+      "coachClass": "1A+2A",
+      "variant": "1A-10-2A-28-V1"
+    }],
+    "coachPositionTimeline": [{
+      "fromStationCode": "HWH",
+      "fromStationName": "HOWRAH JN",
+      "coachPosition": [{
+        "type": "HA1", "number": "HA1", "position": "4", "id": "710580",
+        "operatedBy": "ER", "coachType": "LWFCWAC", "coachNo": "194544",
+        "manufacturedIn": 2019, "coachClass": "1A+2A", "variant": "1A-10-2A-28-V1"
+      }]
     }]
   }
 }`,
     responseNotes: [
-      "statusNote summarizes reported movement; timeline gives station-level scheduled and actual times.",
+      "statusNote summarizes reported movement. Stoppage points carry scheduled and actual arrival/departure; intermediate points carry scheduled arrival/departure only.",
+      "totalStations counts stoppage and intermediate points; totalStoppageStations counts only stoppages. Hindi names appear when NTES provides them. Missing intermediate English names can be filled from the local station catalog.",
+      "averageSpeedKmph is route distance divided by scheduled running time after interior station dwell is subtracted.",
+      "Coach metadata includes position label, upstream record ID, owning railway, transportation type, stock number, derived manufacture year, class, and variant. coachPositionTimeline is present when composition changes along the route.",
       "lastUpdate may be empty before movement begins. Check it before showing a 'live' badge.",
       "Example response is illustrative; actual fields and times vary by journey and provider.",
     ],

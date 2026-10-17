@@ -29,7 +29,11 @@ export function checkPNRStatus(pnr: string): Promise<any>;
 export function getTrainInfo(trainNumber: string): Promise<any>;
 
 /**
- * Get the live running status of a train.
+ * Get live running status with ordered stoppage and intermediate-station timeline,
+ * route/progress metrics, Hindi names when supplied, and coach composition metadata.
+ * Stoppage timeline points include scheduled/actual arrivals and departures with delays;
+ * intermediate points include scheduled arrival/departure only. Coach metadata includes
+ * id, operatedBy, coachType, coachNo, manufacturedIn, coachClass, and variant.
  * @param trainNumber - 5-digit train number
  * @param date - Required journey date in DD-MM-YYYY format, from today through five days ago (IST)
  *

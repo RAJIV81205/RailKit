@@ -297,7 +297,7 @@ if (result.success) {
 
 ### 3. `trackTrain(trainNumber, date)`
 
-Get real-time live status of a train with a unified station timeline (stoppages + intermediate stations in route order).
+Get live train status with a complete, ordered timeline of stoppages and intermediate stations. The V1 NTES endpoint provides scheduled and actual stop timings, Hindi names where available, distance and progress metrics, and detailed coach metadata.
 
 **Parameters:**
 
@@ -308,7 +308,7 @@ Get real-time live status of a train with a unified station timeline (stoppages 
 
 **Example:**
 ```javascript
-const result = await trackTrain('12301', '31-03-2026');
+const result = await trackTrain('12345', '17-10-2026');
 
 if (result.success) {
   const { trainNo, trainName, statusNote, currentStationCode, timeline } = result.data;
@@ -335,38 +335,63 @@ if (result.success) {
 {
   success: true,
   data: {
-    trainNo: "12301",
-    trainName: "HOWRAH RAJDHANI",
-    date: "31-Mar-2026",
-    statusNote: "Arrived at HOWRAH JN(HWH) — On Time",
-    lastUpdate: "31-Mar-2026 10:01",
-    totalStations: 8, // stoppage count from source
-    currentStationCode: "HWH",
+    trainNo: "12345",
+    trainName: "SARAIGHAT EXP",
+    trainNameHindi: "हव्ह् घ्य् सरैघत् इएक्सप्रेस्स्", // when supplied by NTES
+    date: "17-Oct-2026",
+    statusNote: "Arrived at RAMPUR HAT (RPH)",
+    lastUpdate: "17-Oct-2026 19:19",
+    totalStations: 161, // stoppages plus intermediate points
+    totalStoppageStations: 18,
+    currentStationCode: "RPH",
+    totalDistanceKm: 998,
+    averageSpeedKmph: 61.29, // scheduled running time, excluding station dwell
+    progress: {
+      journeyStatus: "running",
+      currentStationIndex: 50,
+      totalStations: 161,
+      passedStations: 49,
+      remainingStations: 111,
+      currentDistanceKm: 207,
+      distanceRemainingKm: 791,
+      percent: 20.74
+    },
     timeline: [
       {
         type: "stoppage", // stoppage | intermediate
         status: "passed", // passed | current | upcoming
-        stationCode: "NDLS", stationName: "NEW DELHI",
-        platform: "16", distanceKm: "0",
+        stationCode: "HWH", stationName: "HOWRAH JN", stationNameHindi: "हावड़ा जं",
+        platform: "15", distanceKm: "0",
         arrival:   { scheduled: "SRC", actual: "SRC",        delay: ""        },
-        departure: { scheduled: "17:00", actual: "17:00",    delay: "On Time" },
-        coachPosition: [
-          { type: "ENG", number: "ENG", position: "0" },
-          { type: "3A",  number: "B1",  position: "5" }
-          // ...
-        ]
+        departure: { scheduled: "16:05 17-Oct", actual: "16:06 17-Oct", delay: "00:01" },
       },
       {
         type: "intermediate",
         status: "current",
-        stationCode: "SZM",
-        stationName: "SUBZI MANDI"
+        stationCode: "SYAE",
+        stationName: "SUBZI MANDI",
+        distanceKm: "8",
+        arrival: { scheduled: "17:12" },
+        departure: { scheduled: "17:12" }
       }
       // ... more timeline points
+    ],
+    coachPosition: [
+      {
+        type: "HA1", number: "HA1", position: "4",
+        id: "710580", operatedBy: "ER", coachType: "LWFCWAC",
+        coachNo: "194544", manufacturedIn: 2019,
+        coachClass: "1A+2A", variant: "1A-10-2A-28-V1"
+      }
+    ],
+    coachPositionTimeline: [
+      { fromStationCode: "HWH", fromStationName: "HOWRAH JN", coachPosition: [/* coach metadata objects */] }
     ]
   }
 }
 ```
+
+`stationNameHindi` and `trainNameHindi` are included when NTES supplies them. Intermediate station names may be filled from the local station catalog; stoppage names remain from NTES. Intermediate `arrival` and `departure` contain scheduled times only. `averageSpeedKmph` excludes scheduled dwell between interior station arrival and departure. Coach `id` is the upstream coach record ID; `coachNo` is the physical stock number, and `manufacturedIn` is derived from its first two digits. `coachPositionTimeline` appears when coach composition changes along the route.
 
 ---
 

@@ -206,7 +206,7 @@ export default async function LandingPage() {
     },
     {
       q: "How do I track a train live and get its running status?",
-      a: "Use the live train tracking method with a train number to fetch real-time running status: current location, last reported station, delay in minutes, and upcoming stops with expected arrival and departure times. It works for any train on the Indian Railways network.",
+      a: "Use the live train tracking method with a five-digit train number and journey date. V1 returns stoppages and intermediate stations in route order, scheduled and actual stop times, scheduled-only intermediate times, distance and progress metrics, and detailed coach metadata. Hindi names are included when supplied by NTES.",
     },
     {
       q: "How do I search for trains between two stations?",

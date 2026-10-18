@@ -54,6 +54,8 @@ interface User {
   apiKey?: string;
   billingDate?: string | null;
   expirationDate?: string | null;
+  entitlementStartsAt?: string | null;
+  entitlementVersion?: 1 | 2 | null;
   billingInterval?: "month" | "year" | null;
   baseLimit?: number | null;
   addonLimit?: number | null;
@@ -130,6 +132,8 @@ interface AuditLog {
   source: "SDK" | "API";
   createdAt: string;
 }
+
+const EMPTY_AUDIT_LOGS: AuditLog[] = [];
 
 interface LogsData {
   success: boolean;
@@ -526,6 +530,19 @@ const toDateTimeLocalValue = (value?: string | null) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
+const addMonthsToDate = (value: string, months: number) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const day = date.getUTCDate();
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() + months);
+  const lastDay = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  date.setUTCDate(Math.min(day, lastDay));
+  return date.toISOString();
+};
+
 const toInputDate = (ddmmyyyy: string) => {
   if (!ddmmyyyy || !ddmmyyyy.includes("-")) return "";
   const [dd, mm, yyyy] = ddmmyyyy.split("-");
@@ -832,6 +849,8 @@ function EditUserModal({
   showSensitiveInfo: boolean;
 }) {
   const [draft, setDraft] = useState({ ...user });
+  const isPaidPlan = draft.plan !== "free";
+  const isAnnualPlan = isPaidPlan && draft.billingInterval === "year";
   const [statusReason, setStatusReason] = useState("");
   const [statusNote, setStatusNote] = useState("");
 
@@ -1268,7 +1287,7 @@ function EditUserModal({
           </section>
 
           {/* Billing controls */}
-          <section
+          {isPaidPlan && <section
             style={{
               border: "1px solid #1e2330",
               borderRadius: 10,
@@ -1289,7 +1308,7 @@ function EditUserModal({
                 fontFamily: "'JetBrains Mono', monospace",
               }}
             >
-              Billing controls
+              Billing and monthly quota reset
             </span>
             <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <span style={{ color: "#94a3b8", fontSize: 12 }}>Interval</span>
@@ -1379,19 +1398,27 @@ function EditUserModal({
                 style={{ display: "flex", flexDirection: "column", gap: 6 }}
               >
                 <span style={{ color: "#94a3b8", fontSize: 12 }}>
-                  Quota period start
+                  Monthly quota reset starts
                 </span>
                 <input
                   type="datetime-local"
                   value={toDateTimeLocalValue(draft.quotaPeriodStart)}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const quotaPeriodStart = value
+                      ? new Date(value).toISOString()
+                      : null;
                     setDraft({
                       ...draft,
-                      quotaPeriodStart: e.target.value
-                        ? new Date(e.target.value).toISOString()
-                        : null,
-                    })
-                  }
+                      quotaPeriodStart,
+                      ...(draft.billingDate
+                        ? { billingDate: quotaPeriodStart }
+                        : {}),
+                      ...(value && draft.quotaPeriodEnd
+                        ? { quotaPeriodEnd: addMonthsToDate(quotaPeriodStart!, 1) }
+                        : {}),
+                    });
+                  }}
                   style={{
                     background: "#1a1f2e",
                     border: "1px solid #2d3548",
@@ -1406,7 +1433,7 @@ function EditUserModal({
                 style={{ display: "flex", flexDirection: "column", gap: 6 }}
               >
                 <span style={{ color: "#94a3b8", fontSize: 12 }}>
-                  Quota period end
+                  Monthly quota resets on
                 </span>
                 <input
                   type="datetime-local"
@@ -1430,49 +1457,9 @@ function EditUserModal({
                 />
               </label>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                type="button"
-                onClick={() => setDraft({ ...draft, usage: 0 })}
-                style={{
-                  background: "#1a1f2e",
-                  border: "1px solid #2d3548",
-                  color: "#fbbf24",
-                  borderRadius: 6,
-                  padding: "6px 10px",
-                  minHeight: 44,
-                  fontSize: 11,
-                  cursor: "pointer",
-                }}
-              >
-                Reset usage
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setDraft({
-                    ...draft,
-                    addonLimit: 0,
-                    limit: draft.baseLimit ?? draft.limit,
-                  })
-                }
-                style={{
-                  background: "#1a1f2e",
-                  border: "1px solid #2d3548",
-                  color: "#fb7185",
-                  borderRadius: 6,
-                  padding: "6px 10px",
-                  minHeight: 44,
-                  fontSize: 11,
-                  cursor: "pointer",
-                }}
-              >
-                Clear add-ons
-              </button>
-            </div>
-          </section>
+          </section>}
 
-          <section
+          {isPaidPlan && <section
             style={{
               border: "1px solid #1e2330",
               borderRadius: 10,
@@ -1494,7 +1481,7 @@ function EditUserModal({
                 fontFamily: "'JetBrains Mono', monospace",
               }}
             >
-              Plan dates
+              {isAnnualPlan ? "Annual plan dates" : "Monthly plan dates"}
             </span>
           {/* Billing Date */}
           <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1507,16 +1494,32 @@ function EditUserModal({
                 fontFamily: "'JetBrains Mono', monospace",
               }}
             >
-              Billing Date
+              {isAnnualPlan ? "Annual plan start date" : "Monthly plan start date"}
             </span>
             <input
               type="datetime-local"
-              value={toDateTimeLocalValue(draft.billingDate)}
+              value={toDateTimeLocalValue(draft.entitlementStartsAt ?? draft.billingDate)}
               onChange={(e) => {
                 const value = e.target.value;
+                const startDate = value ? new Date(value).toISOString() : null;
                 setDraft({
                   ...draft,
-                  billingDate: value ? new Date(value).toISOString() : null,
+                  entitlementStartsAt: startDate,
+                  ...(draft.billingDate ? { billingDate: startDate } : {}),
+                  ...(draft.quotaPeriodStart
+                    ? { quotaPeriodStart: startDate }
+                    : {}),
+                  ...(value && draft.quotaPeriodEnd
+                    ? { quotaPeriodEnd: addMonthsToDate(startDate!, 1) }
+                    : {}),
+                  ...(value
+                    ? {
+                        expirationDate: addMonthsToDate(
+                          startDate!,
+                          isAnnualPlan ? 12 : 1,
+                        ),
+                      }
+                    : {}),
                 });
               }}
               style={{
@@ -1541,7 +1544,7 @@ function EditUserModal({
                 fontFamily: "'JetBrains Mono', monospace",
               }}
             >
-              Expiration Date
+              {isAnnualPlan ? "Annual plan expiry date" : "Monthly plan expiry date (optional)"}
             </span>
             <input
               type="datetime-local"
@@ -1563,7 +1566,7 @@ function EditUserModal({
               }}
             />
           </label>
-          </section>
+          </section>}
         </div>
 
         <div
@@ -1602,6 +1605,7 @@ function EditUserModal({
                 "active",
                 "usage",
                 "limit",
+                "entitlementStartsAt",
                 "billingDate",
                 "expirationDate",
                 "billingInterval",
@@ -1613,7 +1617,10 @@ function EditUserModal({
                 "status",
                 "whitelisted",
               ] as const;
-              for (const field of editableFields) {
+              const applicableFields = editableFields.filter((field) =>
+                isPaidPlan || !["billingDate", "entitlementStartsAt", "expirationDate", "billingInterval", "baseLimit", "addonLimit", "quotaPeriodStart", "quotaPeriodEnd"].includes(field),
+              );
+              for (const field of applicableFields) {
                 if (draft[field] !== user[field]) {
                   Object.assign(changed, { [field]: draft[field] ?? null });
                 }
@@ -2492,7 +2499,7 @@ export default function AdminPanel() {
   const paidTopups = topups.filter((t) => t.status === "paid");
   const issues = issuesData?.issues ?? [];
   const auditDailyUsage = logsData?.logs?.dailyUsage ?? [];
-  const recentLogs = logsData?.logs?.recent ?? [];
+  const recentLogs = logsData?.logs?.recent ?? EMPTY_AUDIT_LOGS;
   const [recentIpLocations, setRecentIpLocations] = useState<
     Record<
       string,

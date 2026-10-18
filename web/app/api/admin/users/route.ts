@@ -62,6 +62,7 @@ export async function PUT(req: Request) {
       "limit",
       "billingDate",
       "expirationDate",
+      "entitlementStartsAt",
       "billingInterval",
       "baseLimit",
       "addonLimit",
@@ -272,6 +273,17 @@ export async function PUT(req: Request) {
         );
       }
       updates.expirationDate = normalized;
+    }
+
+    if ("entitlementStartsAt" in updates) {
+      const normalized = normalizeNullableDate(updates.entitlementStartsAt);
+      if (normalized === undefined) {
+        return NextResponse.json(
+          { success: false, message: "Invalid entitlementStartsAt" },
+          { status: 400 },
+        );
+      }
+      updates.entitlementStartsAt = normalized;
     }
 
     if ("bannedUntil" in updates) {

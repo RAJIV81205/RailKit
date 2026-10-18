@@ -20,7 +20,7 @@
         "lucide-react": "^0.556.0",
         "mongoose": "^9.7.2",
         "next": "^16.4.1",
-        "railkit": "^6.0.0",
+        "railkit": "^6.0.2",
         "react": "19.2.0",
         "react-dom": "19.2.0",
         "react-json-view": "^1.21.3",
@@ -1339,7 +1339,7 @@
 
     "queue-microtask": ["queue-microtask@1.2.3", "", {}, "sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A=="],
 
-    "railkit": ["railkit@6.0.0", "", {}, "sha512-0kKV2K55IJXui0jn8ZQlH70KZ/zfkEnSZhud4S15GL/rgt+CLu8WOPuif8+h/l530J1WokGPgCUx7qGrCQNIEQ=="],
+    "railkit": ["railkit@6.0.2", "", {}, "sha512-3vYCoQm8MLAtUYi+TScxumUG4hnPZpPf7kgOnQIIygkhY0rNOOqoicRUrkwh0fvvKZ7RvlBgqiX3SRai+g7NvA=="],
 
     "react": ["react@19.2.0", "", {}, "sha512-tmbWg6W31tQLeB5cdIBOicJDJRR2KzXsV7uSK9iNfLWQ5bIZfxuPEHp7M8wiHyHnn0DD1i7w3Zmin0FtkrwoCQ=="],
 

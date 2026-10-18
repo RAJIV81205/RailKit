@@ -68,6 +68,7 @@ export const sidebarGroups: SidebarGroup[] = [
     title: "Lookup",
     items: [
       { id: "station-by-code", label: "Station Lookup", icon: MapPin, badge: "NEW" },
+      { id: "station-amenities", label: "Station Amenities", icon: Building2, badge: "NEW" },
       { id: "station-search", label: "Station Search", icon: Search, badge: "NEW" },
       { id: "train-by-number", label: "Train Lookup", icon: Train, badge: "NEW" },
       { id: "train-name-search", label: "Train Search by Name", icon: Search, badge: "NEW" },
@@ -100,6 +101,7 @@ export const sections: Array<{ id: string; label: string; icon: LucideIcon }> = 
   { id: "fare-lookup", label: "Fare Lookup", icon: IndianRupee },
   { id: "cancelled-trains", label: "Cancelled Trains", icon: CircleX },
   { id: "station-by-code", label: "Station Lookup", icon: MapPin },
+  { id: "station-amenities", label: "Station Amenities", icon: Building2 },
   { id: "station-search", label: "Station Search", icon: Search },
   { id: "train-by-number", label: "Train Lookup", icon: Train },
   { id: "train-name-search", label: "Train Search by Name", icon: Search },

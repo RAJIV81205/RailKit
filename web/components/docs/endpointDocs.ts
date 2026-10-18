@@ -510,6 +510,53 @@ if (result.success) {
 }`,
   },
   {
+    id: "station-amenities",
+    title: "Station Amenities",
+    icon: Building2,
+    description:
+      "Get station facilities in a readable structure, including platforms, passenger amenities, counts, and facility availability.",
+    signature: "stationAmenities(stationCode: string)",
+    quickCall: 'await stationAmenities("ASN");',
+    params: [{ name: "stationCode", type: "string", desc: "Station code such as ASN or NDLS" }],
+    example: `const result = await stationAmenities("ASN");
+
+if (result.success) {
+  console.log(result.data.platforms);
+  console.log(result.data.wheelchairAvailable);
+  console.log(result.data.dailyPassengerCount);
+}`,
+    response: `{
+  "success": true,
+  "data": {
+    "stationCategory": "NSG2 (A)",
+    "platforms": "1-2, 3-4, 5-6, 7",
+    "dailyPassengerCount": 29206,
+    "footOverBridgeCount": 4,
+    "subwayCount": 0,
+    "atmCount": 2,
+    "toiletCount": 65,
+    "retiringRoomCount": 7,
+    "waitingRoomSeatCount": 230,
+    "seatingCapacity": 1300,
+    "escalatorCount": 2,
+    "wheelchairAvailable": true,
+    "enquiryOfficeCount": 1,
+    "bookingWindowCount": 13,
+    "concourseArea": 14000,
+    "foodPlazaAvailable": true,
+    "electronicTrainDisplayAvailable": true,
+    "fanCount": 143,
+    "liftCount": 2,
+    "waterFacilityCount": 142,
+    "parkingAvailable": true,
+    "entryCount": 2,
+    "exitCount": 2,
+    "passengerReservationWindowAvailable": true,
+    "cashCoinSmartCardTicketVendingMachineAvailable": true
+  }
+}`,
+  },
+  {
     id: "station-search",
     title: "Station Search by Name",
     icon: Search,
@@ -711,6 +758,15 @@ const restEndpointDocs: readonly RestEndpointDoc[] = [
     path: "/api/v1/stations/:stationCode",
     examplePath: "/api/v1/stations/NDLS",
     notes: "Station code must be 1-5 letters or digits.",
+    restParams: [path("stationCode", "1-5 letters or digits")],
+  },
+  {
+    id: "station-amenities",
+    name: "Get Station Amenities",
+    method: "GET",
+    path: "/api/v1/stations/:stationCode/amenities",
+    examplePath: "/api/v1/stations/ASN/amenities",
+    notes: "Station code must be 1-5 letters or digits. Availability fields are booleans; measurements and counts retain their source values.",
     restParams: [path("stationCode", "1-5 letters or digits")],
   },
   {

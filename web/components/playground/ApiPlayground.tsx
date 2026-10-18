@@ -13,6 +13,7 @@ import {
   getTrainInfo,
   liveAtStation,
   searchTrainBetweenStations,
+  stationAmenities,
   stationByCode,
   stationsByName,
   trackTrain,
@@ -35,6 +36,7 @@ type Action =
   | "fare"
   | "cancelled"
   | "stationCode"
+  | "stationAmenities"
   | "stationSearch"
   | "trainLookup"
   | "trainNameSearch"
@@ -142,6 +144,12 @@ const groups: { label: string; items: Endpoint[] }[] = [
         label: "Station by Code",
         path: "/api/v1/stations/:stationCode",
         description: "Resolve a station code to its details.",
+      },
+      {
+        id: "stationAmenities",
+        label: "Station Amenities",
+        path: "/api/v1/stations/:stationCode/amenities",
+        description: "Get normalized station facilities and availability.",
       },
       {
         id: "stationSearch",
@@ -261,6 +269,8 @@ export default function ApiPlayground({
         return "/api/v1/trains/cancelled";
       case "stationCode":
         return `/api/v1/stations/${value(form.stationCode, "stationCode")}`;
+      case "stationAmenities":
+        return `/api/v1/stations/${value(form.stationCode, "stationCode")}/amenities`;
       case "stationSearch":
         return `/api/v1/stations/search?name=${value(form.name, "name")}`;
       case "trainLookup":
@@ -346,6 +356,9 @@ export default function ApiPlayground({
           break;
         case "stationCode":
           result = await stationByCode(form.stationCode);
+          break;
+        case "stationAmenities":
+          result = await stationAmenities(form.stationCode);
           break;
         case "stationSearch":
           result = await stationsByName(form.name);
@@ -571,7 +584,7 @@ export default function ApiPlayground({
                     : "Required · DD-MM-YYYY",
                   "date",
                 )}
-              {["station", "stationCode", "timetable"].includes(selected) &&
+              {["station", "stationCode", "stationAmenities", "timetable"].includes(selected) &&
                 field("stationCode", "Station code", "Example: ASN")}
               {selected === "station" &&
                 select("stationHours", "Time window", ["2", "4", "8"])}

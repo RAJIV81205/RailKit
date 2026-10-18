@@ -91,9 +91,9 @@ npm install railkit
 \`\`\`
 
 \`\`\`js
-import { configure, stationByCode } from "railkit";
+import { configure, stationAmenities } from "railkit";
 configure(process.env.RAILKIT_API_KEY);
-const result = await stationByCode("NDLS");
+const result = await stationAmenities("ASN");
 if (result.success) console.log(result.data);
 else console.error(result.error);
 \`\`\`

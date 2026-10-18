@@ -28,7 +28,7 @@
     "lucide-react": "^0.556.0",
     "mongoose": "^9.7.2",
     "next": "^16.4.1",
-    "railkit": "^6.0.0",
+    "railkit": "^6.0.2",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-json-view": "^1.21.3",

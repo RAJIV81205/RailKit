@@ -77,6 +77,7 @@ import {
   fareLookup,
   cancelList,
   stationByCode,
+  stationAmenities,
   stationsByName,
   trainByNumber,
   trainsByName,
@@ -109,6 +110,7 @@ const fareResult = await fareLookup('12313', 'ASN', 'NDLS', '06-06-2026', '3A', 
 
 // Look up stations and trains
 const station = await stationByCode('NDLS');
+const amenities = await stationAmenities('ASN');
 const stationMatches = await stationsByName('delhi');
 const train = await trainByNumber('12345');
 const trainMatches = await trainsByName('rajdhani');
@@ -720,7 +722,19 @@ const result = await stationByCode('NDLS');
 // result.data: { code, name, lat, lon }
 ```
 
-### 11. `stationsByName(name)`
+### 11. `stationAmenities(stationCode)`
+
+Get normalized station amenities with readable camelCase fields and boolean
+availability values.
+
+```javascript
+const result = await stationAmenities('ASN');
+// result.data.dailyPassengerCount
+// result.data.wheelchairAvailable
+// result.data.cashCoinSmartCardTicketVendingMachineAvailable
+```
+
+### 12. `stationsByName(name)`
 
 Find up to 10 stations matching a partial name.
 
@@ -729,7 +743,7 @@ const result = await stationsByName('delhi');
 // result.data.stations: [{ code, name, lat, lon }, ...]
 ```
 
-### 12. `trainByNumber(trainNumber)`
+### 13. `trainByNumber(trainNumber)`
 
 Find up to 10 trains matching a 2–5 digit number prefix.
 
@@ -738,7 +752,7 @@ const result = await trainByNumber('12345');
 // result.data: { query, count, trains: [{ trainNo, trainName }, ...] }
 ```
 
-### 13. `trainsByName(name)`
+### 14. `trainsByName(name)`
 
 Find up to 10 trains matching a partial name.
 
@@ -747,7 +761,7 @@ const result = await trainsByName('rajdhani');
 // result.data.trains: [{ trainNo, trainName }, ...]
 ```
 
-### 14. `trainTimetableAtStation(stationCode, date?)`
+### 15. `trainTimetableAtStation(stationCode, date?)`
 
 Get the complete scheduled timetable for trains crossing a station. Omit the
 date to return all trains and their running days. If supplied, date must be

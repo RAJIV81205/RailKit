@@ -149,6 +149,45 @@ export function cancelList(): Promise<any>;
  */
 export function stationByCode(stationCode: string): Promise<any>;
 
+/** Normalized station amenities returned by stationAmenities(). */
+export interface StationAmenities {
+  stationCategory: string;
+  platforms: string;
+  dailyPassengerCount: number;
+  footOverBridgeCount: number;
+  subwayCount: number;
+  atmCount: number;
+  toiletCount: number;
+  retiringRoomCount: number;
+  waitingRoomSeatCount: number;
+  seatingCapacity: number;
+  escalatorCount: number;
+  wheelchairAvailable: boolean | null;
+  enquiryOfficeCount: number;
+  bookingWindowCount: number;
+  concourseArea: number;
+  foodPlazaAvailable: boolean | null;
+  electronicTrainDisplayAvailable: boolean | null;
+  fanCount: number;
+  liftCount: number;
+  waterFacilityCount: number;
+  parkingAvailable: boolean | null;
+  entryCount: number;
+  exitCount: number;
+  passengerReservationWindowAvailable: boolean | null;
+  cashCoinSmartCardTicketVendingMachineAvailable: boolean | null;
+}
+
+export type StationAmenitiesResult =
+  | { success: true; data: StationAmenities; statusCode?: number }
+  | { success: false; error: string; statusCode?: number };
+
+/**
+ * Get normalized station facilities and amenities.
+ * @param stationCode - Station code of 1-5 letters or digits
+ */
+export function stationAmenities(stationCode: string): Promise<StationAmenitiesResult>;
+
 /**
  * Find up to 10 stations matching a partial name.
  * @param name - Partial station name, at least 2 characters

@@ -6,7 +6,9 @@ import { sendWelcomeEmail } from "../services/email";
 import {
   getEffectiveExpirationDate,
   grantV2Plan,
+  syncV2Entitlement,
 } from "@/lib/billing/entitlements";
+import { getEffectiveUpgradeTermStart } from "@/lib/billing/upgrade";
 import {
   isSuccessfulPaymentStatus,
   normalizeNonSuccessfulOrderStatus,
@@ -131,14 +133,42 @@ export async function applyOrderPaymentState(
 
       // A stale checkout must never overwrite or shorten an entitlement that
       // was activated by another payment. Keep the payment for manual review.
-      if (hasActivePaidPlan) {
+      if (order.orderKind === "upgrade") {
+        const snapshot = order.upgradeSnapshot;
+        syncV2Entitlement(user, now);
+        const currentExpiration = getEffectiveExpirationDate(user);
+        const snapshotInterval = snapshot?.interval ?? order.billingInterval ?? "month";
+        const currentTermStart = currentExpiration ? getEffectiveUpgradeTermStart(user, currentExpiration) : null;
+        if (
+          !snapshot || snapshotInterval !== "month" || order.billingInterval !== "month" || user.plan !== "pro" || !currentExpiration ||
+          currentExpiration.getTime() <= now.getTime() ||
+          currentExpiration.getTime() !== snapshot.termEndsAt?.getTime() ||
+          currentTermStart?.getTime() !== snapshot.termStartsAt?.getTime()
+        ) {
+          order.note = "Upgrade payment received after the Pro entitlement changed or expired; manual review required.";
+          await order.save({ session });
+          result = { found: true, paid: true, credited: false, fulfillmentBlocked: true };
+          return;
+        }
+        const runtime = getPaidPlanRuntime("advance", snapshotInterval);
+        if (!runtime || order.monthlyLimit !== runtime.limit) throw new Error("Upgrade quota snapshot is invalid");
+        user.plan = runtime.userPlan;
+        user.entitlementVersion = 2;
+        user.billingInterval = snapshotInterval;
+        user.baseLimit = order.monthlyLimit;
+        user.limit = order.monthlyLimit + Math.max(0, user.addonLimit ?? 0);
+        user.entitlementStartsAt = snapshot.termStartsAt;
+        user.expirationDate = snapshot.termEndsAt;
+        order.entitlementStartsAt = snapshot.termStartsAt;
+        order.entitlementEndsAt = snapshot.termEndsAt;
+      } else if (hasActivePaidPlan) {
         order.note = "Payment received while another paid entitlement was active; manual review required.";
         await order.save({ session });
         result = { found: true, paid: true, credited: false, fulfillmentBlocked: true };
         return;
       }
 
-      if (order.entitlementVersion === 2 && order.billingInterval) {
+      if (order.orderKind !== "upgrade" && order.entitlementVersion === 2 && order.billingInterval) {
         const entitlement = grantV2Plan(user, order.planType, order.billingInterval, now);
         const purchasedLimit = order.monthlyLimit;
         if (typeof purchasedLimit !== "number" || !Number.isFinite(purchasedLimit)) {
@@ -146,9 +176,10 @@ export async function applyOrderPaymentState(
         }
         user.baseLimit = purchasedLimit;
         user.limit = purchasedLimit;
+        user.entitlementStartsAt = entitlement.startsAt;
         order.entitlementStartsAt = entitlement.startsAt;
         order.entitlementEndsAt = entitlement.endsAt;
-      } else {
+      } else if (order.orderKind !== "upgrade") {
         const planConfig = getPaidPlanRuntime(order.planType);
         if (!planConfig) throw new Error(`Unsupported paid plan type: ${order.planType}`);
         user.plan = planConfig.userPlan;

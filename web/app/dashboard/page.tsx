@@ -1645,6 +1645,16 @@ export default function DashboardPage() {
                     )}
 
                     {!isAnnual && paymentSummary}
+                    {(normalizedPlan === "pro" && dbUser.billingInterval !== "year") && (
+                      <button
+                        type="button"
+                        onClick={() => router.push("/pricing")}
+                        className="mt-5 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#111827] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111827]"
+                      >
+                        Upgrade to Advance
+                        <ArrowRight aria-hidden="true" className="size-4" strokeWidth={1.75} />
+                      </button>
+                    )}
                   </div>
                 </div>
 

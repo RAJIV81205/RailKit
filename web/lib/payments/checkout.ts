@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Order from "@/lib/db/models/Order";
 import User from "@/lib/db/models/User";
 import { getEffectiveExpirationDate } from "@/lib/billing/entitlements";
+import { getEffectiveUpgradeTermStart } from "@/lib/billing/upgrade";
 import type { PaidPlanType } from "@/lib/constants";
 
 const CHECKOUT_TTL_MS = 30 * 60 * 1000;
@@ -10,7 +11,9 @@ const MAX_ORDERS_PER_TEN_MINUTES = 10;
 export type CheckoutReservationErrorCode =
   | "USER_NOT_ACTIVE"
   | "ACTIVE_PLAN"
-  | "RATE_LIMITED";
+  | "RATE_LIMITED"
+  | "UPGRADE_INELIGIBLE"
+  | "UPGRADE_CHECKOUT_PENDING";
 
 export class CheckoutReservationError extends Error {
   constructor(public readonly code: CheckoutReservationErrorCode) {
@@ -28,6 +31,115 @@ type ReservePlanCheckoutInput = {
   amount: number;
   currency: string;
 };
+
+type ReserveUpgradeCheckoutInput = {
+  userId: string;
+  orderId: string;
+  amount: number;
+  currency: string;
+  quote: {
+    billingInterval: "month";
+    termMonths: number;
+    monthlyLimit: number;
+    termStartsAt: Date;
+    termEndsAt: Date;
+    sourceTermPrice: number;
+    targetTermPrice: number;
+    remainingFraction: number;
+    creditAmount: number;
+  };
+};
+
+export async function reserveUpgradeCheckout(
+  input: ReserveUpgradeCheckoutInput,
+  now = new Date(),
+) {
+  const session = await mongoose.startSession();
+  let reservedOrderId: string | null = null;
+  try {
+    await session.withTransaction(async () => {
+      await User.updateOne(
+        { _id: input.userId },
+        { $set: { updatedAt: now } },
+        { session },
+      );
+      const user = await User.findById(input.userId).session(session).lean();
+      if (!user?.active || user.status === "banned" || user.plan !== "pro")
+        throw new CheckoutReservationError("UPGRADE_INELIGIBLE");
+      const expiration = getEffectiveExpirationDate(user);
+      if (
+        !expiration ||
+        expiration.getTime() <= now.getTime() ||
+        expiration.getTime() !== input.quote.termEndsAt.getTime()
+      )
+        throw new CheckoutReservationError("UPGRADE_INELIGIBLE");
+      const termStart = getEffectiveUpgradeTermStart(user, expiration);
+      if (termStart.getTime() !== input.quote.termStartsAt.getTime())
+        throw new CheckoutReservationError("UPGRADE_INELIGIBLE");
+      const staleBefore = new Date(now.getTime() - CHECKOUT_TTL_MS);
+      await Order.updateMany(
+        {
+          userId: user._id,
+          credited: false,
+          status: { $in: ["created", "active"] },
+          createdAt: { $lte: staleBefore },
+        },
+        { $set: { status: "expired", cashfreeOrderStatus: "EXPIRED" } },
+        { session },
+      );
+      const pendingUpgrade = await Order.exists({
+        userId: user._id,
+        orderKind: "upgrade",
+        credited: false,
+        status: { $in: ["created", "active"] },
+        createdAt: { $gt: staleBefore },
+      }).session(session);
+      if (pendingUpgrade)
+        throw new CheckoutReservationError("UPGRADE_CHECKOUT_PENDING");
+      const recentOrderCount = await Order.countDocuments({
+        userId: user._id,
+        createdAt: { $gte: new Date(now.getTime() - 10 * 60 * 1000) },
+      }).session(session);
+      if (recentOrderCount >= MAX_ORDERS_PER_TEN_MINUTES)
+        throw new CheckoutReservationError("RATE_LIMITED");
+      const order = new Order({
+        userId: user._id,
+        orderId: input.orderId,
+        cfOrderId: null,
+        paymentSessionId: null,
+        planType: "advance",
+        orderKind: "upgrade",
+        entitlementVersion: 2,
+        billingInterval: input.quote.billingInterval,
+        termMonths: input.quote.termMonths,
+        monthlyLimit: input.quote.monthlyLimit,
+        amount: input.amount,
+        currency: input.currency,
+        status: "created",
+        paymentStatus: "PENDING",
+        credited: false,
+        cashfreeOrderStatus: null,
+        upgradeSnapshot: {
+          fromPlan: "pro",
+          interval: input.quote.billingInterval,
+          termStartsAt: input.quote.termStartsAt,
+          termEndsAt: input.quote.termEndsAt,
+          sourceTermPrice: input.quote.sourceTermPrice,
+          targetTermPrice: input.quote.targetTermPrice,
+          remainingFraction: input.quote.remainingFraction,
+          creditAmount: input.quote.creditAmount,
+        },
+      });
+      await order.save({ session });
+      reservedOrderId = order.orderId;
+    });
+  } finally {
+    await session.endSession();
+  }
+  if (!reservedOrderId)
+    throw new Error("Upgrade checkout reservation did not produce an order");
+  return { orderId: reservedOrderId };
+}
 
 export async function reservePlanCheckout(
   input: ReservePlanCheckoutInput,
@@ -101,6 +213,7 @@ export async function reservePlanCheckout(
     await session.endSession();
   }
 
-  if (!reservedOrderId) throw new Error("Checkout reservation did not produce an order");
+  if (!reservedOrderId)
+    throw new Error("Checkout reservation did not produce an order");
   return { orderId: reservedOrderId };
 }

@@ -1,10 +1,20 @@
 import { getPaidPlanRuntime, type PaidPlanType } from "@/lib/constants";
 import type { UserDocument } from "@/lib/db/models/User";
 
-type User = Pick<UserDocument,
-  "plan" | "usage" | "limit" | "billingDate" | "expirationDate" |
-  "entitlementVersion" | "billingInterval" | "baseLimit" | "addonLimit" |
-  "quotaPeriodStart" | "quotaPeriodEnd"
+type User = Pick<
+  UserDocument,
+  | "plan"
+  | "usage"
+  | "limit"
+  | "billingDate"
+  | "expirationDate"
+  | "entitlementStartsAt"
+  | "entitlementVersion"
+  | "billingInterval"
+  | "baseLimit"
+  | "addonLimit"
+  | "quotaPeriodStart"
+  | "quotaPeriodEnd"
 >;
 
 const BILLING_CYCLE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -47,6 +57,7 @@ export function grantV2Plan(
     interval === "month"
       ? new Date(now.getTime() + BILLING_CYCLE_MS)
       : addMonths(now, runtime.termMonths);
+  user.entitlementStartsAt = now;
 
   return { startsAt: now, endsAt: user.expirationDate };
 }
@@ -55,7 +66,9 @@ export function grantV2Plan(
  * Resolve plan expiry using explicit admin/payment expiry first, then the
  * legacy 30-day billing window used by existing paid accounts.
  */
-export function getEffectiveExpirationDate(user: Pick<UserDocument, "billingDate" | "expirationDate">) {
+export function getEffectiveExpirationDate(
+  user: Pick<UserDocument, "billingDate" | "expirationDate">,
+) {
   if (user.expirationDate) return user.expirationDate;
   if (user.billingDate) {
     return new Date(user.billingDate.getTime() + BILLING_CYCLE_MS);
@@ -85,7 +98,10 @@ export function syncV2Entitlement(user: User, now = new Date()) {
 
   const effectiveExpirationDate = getEffectiveExpirationDate(user);
 
-  if (effectiveExpirationDate && effectiveExpirationDate.getTime() <= now.getTime()) {
+  if (
+    effectiveExpirationDate &&
+    effectiveExpirationDate.getTime() <= now.getTime()
+  ) {
     user.plan = "free";
     user.limit = 50;
     user.usage = 0;
@@ -137,7 +153,10 @@ export function syncV2Entitlement(user: User, now = new Date()) {
 export { addMonths };
 
 /** Read-only view of the current quota; runtime/cron remains responsible for persistence. */
-export function getCurrentEntitlement<T extends User>(user: T, now = new Date()): T {
+export function getCurrentEntitlement<T extends User>(
+  user: T,
+  now = new Date(),
+): T {
   const current = { ...user };
   syncV2Entitlement(current, now);
   return current;

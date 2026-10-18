@@ -17,6 +17,10 @@ import {
   Loader2,
   Mail,
   ShieldCheck,
+  ArrowUpRight,
+  CalendarDays,
+  Gauge,
+  Wallet,
 } from "lucide-react";
 
 import type { PricingPlan, PaidPlanType, PricingFeature } from "../../lib/constants";
@@ -29,7 +33,7 @@ type Notice = { id: number; kind: NoticeKind; text: string } | null;
 type AuthState =
   | { status: "loading" }
   | { status: "unauthenticated" }
-  | { status: "authenticated"; plan: "free" | PaidPlanType };
+  | { status: "authenticated"; plan: "free" | PaidPlanType; billingInterval?: "month" | "year" | null };
 type TimeLeft = { days: number; hours: number; minutes: number; seconds: number; expired: boolean };
 type CashfreeCheckoutMode = "sandbox" | "production";
 type CashfreeCheckoutClient = {
@@ -41,6 +45,7 @@ type CreatedPaymentOrder = {
   planType?: PaidPlanType;
   cashfreeMode?: CashfreeCheckoutMode;
 };
+type UpgradeQuote = { amount: number; creditAmount: number; billingInterval: "month"; monthlyLimit: number; termEndsAt: string; expiresAt: string };
 
 declare global {
   interface Window {
@@ -268,13 +273,14 @@ function useCountdown(offerEndsAt: string | null): TimeLeft {
 // ─── Payment modal ────────────────────────────────────────────────────────────
 
 function PaymentModal({
-  selectedPlan, billingInterval, isCreatingOrder, onConfirm, onCancel,
+  selectedPlan, billingInterval, isCreatingOrder, onConfirm, onCancel, upgradeQuote,
 }: {
   selectedPlan: PaidPlanType;
   billingInterval: "month" | "year";
   isCreatingOrder: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  upgradeQuote?: UpgradeQuote | null;
 }) {
   const modalRef = useRef<HTMLDivElement>(null);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
@@ -315,31 +321,60 @@ function PaymentModal({
         className="w-full max-w-md overflow-y-auto rounded-3xl border border-black/8 bg-white p-8 shadow-2xl"
         style={{ maxHeight: "90dvh" }}
         onClick={(e) => e.stopPropagation()}>
-        <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-2xl bg-black">
-          <ShieldCheck className="h-5 w-5 text-white" aria-hidden />
-        </div>
-        <h3 id="modal-title" className="text-xl font-semibold text-black" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
-          Secure Checkout
-        </h3>
-        <p className="mt-3 text-sm leading-7 text-[#6F6F6F]">
-          A secure Cashfree popup will open to complete payment for the{" "}
-          <span className="font-semibold text-black uppercase">{selectedPlan}</span> plan ({billingInterval === "year" ? "annual" : "monthly"}).
-        </p>
-        <ul className="mt-6 space-y-2.5">
-          {["256-bit SSL encrypted transaction", "Payment processed by Cashfree — card data never stored here", "Instant plan activation on success"].map((item) => (
-            <li key={item} className="flex items-center gap-2.5 text-sm text-[#6F6F6F]">
-              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-black">
-                <Check className="h-2.5 w-2.5 text-white" aria-hidden />
-              </span>
-              {item}
-            </li>
-          ))}
-        </ul>
+        {upgradeQuote ? (
+          <>
+            <div className="relative mb-6 overflow-hidden rounded-2xl border border-black/8 bg-gradient-to-br from-[#f5f5f5] via-white to-[#fafafa] p-5">
+              <div aria-hidden className="pointer-events-none absolute -right-8 -top-10 size-28 rounded-full bg-black/[0.035] blur-2xl animate-pulse motion-reduce:animate-none" />
+              <div className="relative flex items-center gap-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#0a0a0a] text-white shadow-sm">
+                  <ArrowUpRight className="size-5" aria-hidden />
+                </span>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777]">Plan upgrade</p>
+                  <h3 id="modal-title" className="mt-0.5 text-2xl text-[#111827]" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
+                    Pro <span className="px-1 text-[#9ca3af]" aria-hidden>→</span> Advance
+                  </h3>
+                </div>
+              </div>
+              <div className="relative mt-5 border-t border-black/8 pt-4">
+                <p className="text-xs font-medium text-[#6F6F6F]">Pay today</p>
+                <p className="mt-0.5 text-4xl font-semibold tracking-tight text-[#111827]">{formatINR(upgradeQuote.amount)}</p>
+                <p className="mt-1 text-xs text-[#6F6F6F]">One-time upgrade charge</p>
+              </div>
+            </div>
+            <div className="mb-2 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-black/6 bg-[#fafafa] p-4">
+                <span className="mb-3 flex size-8 items-center justify-center rounded-lg bg-white text-[#333] shadow-sm"><Gauge className="size-4" aria-hidden /></span>
+                <p className="text-lg font-semibold text-[#111827]">{upgradeQuote.monthlyLimit.toLocaleString("en-IN")}</p>
+                <p className="mt-0.5 text-xs text-[#6F6F6F]">requests / month</p>
+              </div>
+              <div className="rounded-2xl border border-black/6 bg-[#fafafa] p-4">
+                <span className="mb-3 flex size-8 items-center justify-center rounded-lg bg-white text-[#333] shadow-sm"><CalendarDays className="size-4" aria-hidden /></span>
+                <p className="text-lg font-semibold text-[#111827]">{new Date(upgradeQuote.termEndsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                <p className="mt-0.5 text-xs text-[#6F6F6F]">current term ends</p>
+              </div>
+            </div>
+            <p className="mb-1 mt-3 flex items-center gap-2 text-xs text-[#6F6F6F]"><Wallet className="size-3.5 text-[#555]" aria-hidden />Your existing billing term stays unchanged.</p>
+          </>
+        ) : (
+          <>
+            <div className="mb-6 flex h-11 w-11 items-center justify-center rounded-2xl bg-black">
+              <ShieldCheck className="h-5 w-5 text-white" aria-hidden />
+            </div>
+            <h3 id="modal-title" className="text-xl font-semibold text-black" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>Secure Checkout</h3>
+            <p className="mt-3 text-sm leading-7 text-[#6F6F6F]">A secure Cashfree popup will open to complete payment for the <span className="font-semibold text-black uppercase">{selectedPlan}</span> plan ({billingInterval === "year" ? "annual" : "monthly"}).</p>
+            <ul className="mt-6 space-y-2.5">
+              {["256-bit SSL encrypted transaction", "Payment processed by Cashfree — card data never stored here", "Instant plan activation on success"].map((item) => (
+                <li key={item} className="flex items-center gap-2.5 text-sm text-[#6F6F6F]"><span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-black"><Check className="h-2.5 w-2.5 text-white" aria-hidden /></span>{item}</li>
+              ))}
+            </ul>
+          </>
+        )}
         <div className="mt-8 flex flex-col gap-3">
           <button type="button" ref={confirmBtnRef} onClick={onConfirm} disabled={isCreatingOrder}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-black px-6 py-3.5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:opacity-60">
+            className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60 motion-reduce:transform-none ${upgradeQuote ? "bg-[#0a0a0a] shadow-lg shadow-black/10 hover:bg-neutral-800" : "bg-black hover:bg-neutral-800"}`}>
             {isCreatingOrder && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-            {isCreatingOrder ? "Opening Checkout…" : "Proceed to Payment"}
+            {isCreatingOrder ? "Opening Checkout…" : upgradeQuote ? `Pay ${formatINR(upgradeQuote.amount)} and upgrade` : "Proceed to Payment"}
           </button>
           <button type="button" onClick={onCancel} disabled={isCreatingOrder}
             className="rounded-full border border-black/10 px-6 py-3.5 text-sm text-[#6F6F6F] transition hover:bg-gray-50 disabled:opacity-50">
@@ -370,6 +405,7 @@ function PricingPageContent({
   const [selectedPlan, setSelectedPlan] = useState<PaidPlanType | null>(null);
   const [billingInterval, setBillingInterval] = useState<"month" | "year">("month");
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
+  const [upgradeQuote, setUpgradeQuote] = useState<UpgradeQuote | null>(null);
 
   const timeLeft = useCountdown(initialOfferEndsAt);
   const missingByPlan = computeMissingByPlan(initialPlans);
@@ -389,7 +425,7 @@ function PricingPageContent({
     if (!response.ok) throw new Error(data?.message || "Unable to verify payment status");
     if (data?.order?.credited) {
       showNotice("success", "Payment successful! Your plan is now active.");
-      if (paidPlanType) setAuthState({ status: "authenticated", plan: paidPlanType });
+      if (paidPlanType) setAuthState({ status: "authenticated", plan: paidPlanType, billingInterval: paidPlanType === "pro" ? billingInterval : null });
       const url = new URL(window.location.href);
       url.searchParams.delete("order_id");
       url.searchParams.delete("payment_return");
@@ -400,7 +436,7 @@ function PricingPageContent({
     if (data?.order?.paymentStatus === "FAILED") { showNotice("error", "Payment failed. Please try again or contact support."); return; }
     if (data?.order?.paymentStatus === "USER_DROPPED") { showNotice("info", "Payment was cancelled. You can try again anytime."); return; }
     showNotice("info", "Payment is still processing — please check back shortly.");
-  }, [showNotice, router]);
+  }, [showNotice, router, billingInterval]);
 
   // Auth check
   useEffect(() => {
@@ -413,7 +449,7 @@ function PricingPageContent({
         const data = await res.json();
         if (!data?.success) { setAuthState({ status: "unauthenticated" }); return; }
         const plan = normalizePlan(String(data?.user?.plan || ""));
-        setAuthState({ status: "authenticated", plan: plan ?? "free" });
+        setAuthState({ status: "authenticated", plan: plan ?? "free", billingInterval: data?.user?.billingInterval ?? null });
       } catch { if (!cancelled) setAuthState({ status: "unauthenticated" }); }
     };
     verifyAuth();
@@ -433,12 +469,24 @@ function PricingPageContent({
     return () => { cancelled = true; };
   }, [isPaymentReturn, orderIdFromQuery, authState.status, verifyPayment, showNotice]);
 
-  const openPaymentModal = (planType: PaidPlanType | "free") => {
+  const openPaymentModal = async (planType: PaidPlanType | "free", upgrade = false) => {
     if (planType === "free") return;
     if (!initialBillingV2Enabled) { showNotice("info", "New billing plans are temporarily unavailable."); return; }
     if (authState.status === "loading") { showNotice("info", "Please wait while we check your login status."); return; }
     if (authState.status === "unauthenticated") { router.push("/auth?redirect=/pricing"); return; }
     setSelectedPlan(planType);
+    setUpgradeQuote(null);
+    if (upgrade) {
+      try {
+        const response = await fetch("/api/user/upgrade-quote", { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok || !data?.quote) throw new Error(data?.message || "Unable to calculate upgrade quote");
+        setUpgradeQuote(data.quote as UpgradeQuote);
+      } catch (error) {
+        showNotice("error", getErrorMessage(error, "Unable to calculate upgrade quote."));
+        return;
+      }
+    }
     setShowPaymentModal(true);
   };
 
@@ -447,7 +495,7 @@ function PricingPageContent({
     setIsCreatingOrder(true);
     dismissNotice();
     try {
-      const response = await fetch("/api/user/create-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ planType: selectedPlan, billingInterval }) });
+      const response = await fetch("/api/user/create-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(upgradeQuote ? { orderKind: "upgrade", quoteAmount: upgradeQuote.amount, quoteExpiresAt: upgradeQuote.expiresAt } : { planType: selectedPlan, billingInterval }) });
       const data = await response.json();
       const order = data?.order as CreatedPaymentOrder | undefined;
       if (!response.ok || !order?.orderId || !order?.paymentSessionId) throw new Error(data?.message || "Unable to create order. Please try again.");
@@ -469,6 +517,7 @@ function PricingPageContent({
     const isAuthed = authState.status === "authenticated";
     const currentPlan = isAuthed ? (authState as { plan: "free" | PaidPlanType }).plan : null;
     if (!initialBillingV2Enabled && plan.planType !== "free") return { label: "Coming soon", disabled: true, action: () => {} };
+    if (isAuthed && currentPlan === "pro" && authState.status === "authenticated" && authState.billingInterval !== "year" && plan.planType === "advance") return { label: "Upgrade to Advance", disabled: false, action: () => { void openPaymentModal("advance", true); } };
     if (isAuthed && currentPlan && currentPlan !== "free") return { label: "Current plan active", disabled: true, action: () => {} };
     if (plan.planType === "free") return { label: plan.buttonText, disabled: false, action: () => router.push("/auth?redirect=/pricing") };
     if (isLoading) return { label: "Checking Login…", disabled: true, action: () => {} };
@@ -762,6 +811,7 @@ function PricingPageContent({
           selectedPlan={selectedPlan}
           billingInterval={billingInterval}
           isCreatingOrder={isCreatingOrder}
+          upgradeQuote={upgradeQuote}
           onConfirm={startPayment}
           onCancel={() => { if (!isCreatingOrder) { setShowPaymentModal(false); setSelectedPlan(null); } }}
         />

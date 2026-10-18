@@ -24,6 +24,8 @@ export function DevtoolsGuard() {
   const pathname = usePathname();
 
   useLayoutEffect(() => {
+    if (process.env.NEXT_PUBLIC_DISABLE_DEVTOOL === "true") return;
+
     disableDevtool({
       // Keep regular context menus, selection, and clipboard behavior intact.
       disableMenu: false,
@@ -41,6 +43,8 @@ export function DevtoolsGuard() {
   }, []);
 
   useLayoutEffect(() => {
+    if (process.env.NEXT_PUBLIC_DISABLE_DEVTOOL === "true") return;
+
     if (isExemptRoute(pathname)) {
       disableDevtool.isSuspend = true;
       return;

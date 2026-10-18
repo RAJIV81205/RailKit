@@ -57,6 +57,7 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    entitlementStartsAt: { type: Date, default: null },
 
     // Null/1 = legacy entitlement behavior. 2 = interval-aware entitlement.
     entitlementVersion: {

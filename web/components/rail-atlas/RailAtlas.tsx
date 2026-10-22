@@ -174,6 +174,12 @@ function isCancelledScheduleStop(stop: TrainTimelineItem) {
     || isCancelledScheduleValue(stop.departure?.actual);
 }
 
+function renewRailAtlasSessionOnUnauthorized(response: Response) {
+  if (response.status === 401 && typeof window !== "undefined") {
+    window.dispatchEvent(new Event("rail-atlas:session-expired"));
+  }
+}
+
 const INDIA_MAP_BOUNDS: [[number, number], [number, number]] = [
   [6, 68],
   [38, 98],
@@ -192,6 +198,58 @@ function isMappedStation(station: StationRecord): station is Station {
     && station.lon! >= 68 && station.lon! <= 98;
 }
 
+const STATION_GRID_CELL = 0.25;
+
+function stationGridKey(lat: number, lon: number) {
+  return `${Math.floor(lat / STATION_GRID_CELL)}:${Math.floor(lon / STATION_GRID_CELL)}`;
+}
+
+function indexStations(stations: Station[]) {
+  const grid = new Map<string, Station[]>();
+  for (const station of stations) {
+    const key = stationGridKey(station.lat, station.lon);
+    const bucket = grid.get(key);
+    if (bucket) bucket.push(station);
+    else grid.set(key, [station]);
+  }
+  return grid;
+}
+
+function stationsInBounds(grid: Map<string, Station[]>, south: number, west: number, north: number, east: number) {
+  const matches: Station[] = [];
+  const minLat = Math.floor(south / STATION_GRID_CELL);
+  const maxLat = Math.floor(north / STATION_GRID_CELL);
+  const minLon = Math.floor(west / STATION_GRID_CELL);
+  const maxLon = Math.floor(east / STATION_GRID_CELL);
+  for (let lat = minLat; lat <= maxLat; lat += 1) {
+    for (let lon = minLon; lon <= maxLon; lon += 1) {
+      for (const station of grid.get(`${lat}:${lon}`) || []) {
+        if (station.lat >= south && station.lat <= north && station.lon >= west && station.lon <= east) matches.push(station);
+      }
+    }
+  }
+  return matches;
+}
+
+function getStraightTrainRoute(data: TrainLiveData): [number, number][] {
+  const stops = data.timeline
+    .filter((stop) => Number.isFinite(stop.lat) && Number.isFinite(stop.lon))
+    .map((stop) => ({ stationCode: stop.stationCode, point: [stop.lat!, stop.lon!] as [number, number] }));
+
+  if (data.start && stops[0]?.stationCode !== data.start.stationCode) {
+    stops.unshift({ stationCode: data.start.stationCode, point: [data.start.lat, data.start.lon] });
+  }
+  if (data.end && stops.at(-1)?.stationCode !== data.end.stationCode) {
+    stops.push({ stationCode: data.end.stationCode, point: [data.end.lat, data.end.lon] });
+  }
+
+  return stops.reduce<[number, number][]>((route, stop) => {
+    const previous = route.at(-1);
+    if (!previous || previous[0] !== stop.point[0] || previous[1] !== stop.point[1]) route.push(stop.point);
+    return route;
+  }, []);
+}
+
 function useRailAtlasAccess(scriptReady: boolean) {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
@@ -201,8 +259,14 @@ function useRailAtlasAccess(scriptReady: boolean) {
   useEffect(() => {
     let disposed = false;
     let requesting = false;
+    let challengeRunning = false;
     let widgetId: string | null = null;
     let renewalTimer: number | undefined;
+    let sessionExpiresAt = 0;
+
+    const isLocalDevelopment = process.env.NODE_ENV !== "production"
+      && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+    const turnstileEnabled = Boolean(siteKey) && !isLocalDevelopment;
 
     const startChallenge = () => {
       if (!widgetId || !window.turnstile) return;
@@ -213,48 +277,70 @@ function useRailAtlasAccess(scriptReady: boolean) {
     const requestAccess = async (turnstileToken?: string) => {
       if (requesting || disposed) return;
       requesting = true;
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 8000);
       try {
         const response = await fetch("/api/rail-atlas/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(turnstileToken ? { turnstileToken } : {}),
           cache: "no-store",
+          signal: controller.signal,
         });
         const payload = await response.json() as { success?: boolean; error?: string };
         if (!response.ok || !payload.success) throw new Error(payload.error || "Rail Atlas security check failed.");
         if (disposed) return;
         setError("");
         setReady(true);
+        sessionExpiresAt = Date.now() + 5 * 60 * 1000;
         window.clearTimeout(renewalTimer);
-        renewalTimer = window.setTimeout(() => {
-          if (disposed) return;
-          setReady(false);
-          if (siteKey) startChallenge();
-          else void requestAccess();
-        }, 4 * 60 * 1000);
+        renewalTimer = window.setTimeout(renewAccess, 4 * 60 * 1000);
       } catch (reason) {
         if (!disposed) {
           setReady(false);
-          setError(reason instanceof Error ? reason.message : "Rail Atlas security check failed.");
+          setError(controller.signal.aborted ? "Rail Atlas session refresh timed out. Please retry." : reason instanceof Error ? reason.message : "Rail Atlas security check failed.");
         }
       } finally {
+        window.clearTimeout(timeout);
         requesting = false;
+        challengeRunning = false;
       }
     };
 
-    const isLocalDevelopment = process.env.NODE_ENV !== "production"
-      && ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
-    if (!siteKey || isLocalDevelopment) {
+    const renewAccess = () => {
+      if (disposed) return;
+      setReady(false);
+      if (turnstileEnabled) {
+        if (challengeRunning) return;
+        challengeRunning = true;
+        startChallenge();
+      } else {
+        void requestAccess();
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && Date.now() >= sessionExpiresAt - 60_000) renewAccess();
+    };
+    const onSessionExpired = () => renewAccess();
+    const turnstile = window.turnstile;
+    const container = containerRef.current;
+    if (turnstileEnabled && (!scriptReady || !container || !turnstile)) return;
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("rail-atlas:session-expired", onSessionExpired);
+
+    if (!turnstileEnabled) {
       void requestAccess();
       return () => {
         disposed = true;
         window.clearTimeout(renewalTimer);
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+        window.removeEventListener("rail-atlas:session-expired", onSessionExpired);
       };
     }
 
-    if (!scriptReady || !containerRef.current || !window.turnstile) return;
-    widgetId = window.turnstile.render(containerRef.current, {
-      sitekey: siteKey,
+    widgetId = turnstile!.render(container!, {
+      sitekey: siteKey!,
       action: "rail_atlas_access",
       size: "invisible",
       execution: "execute",
@@ -267,6 +353,8 @@ function useRailAtlasAccess(scriptReady: boolean) {
     return () => {
       disposed = true;
       window.clearTimeout(renewalTimer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("rail-atlas:session-expired", onSessionExpired);
       if (widgetId && window.turnstile) window.turnstile.remove(widgetId);
     };
   }, [scriptReady, siteKey]);
@@ -298,6 +386,7 @@ function useStationBoard(station: Station | null, accessReady: boolean) {
         cache: "no-store",
         signal: controller.signal,
       });
+      renewRailAtlasSessionOnUnauthorized(response);
       const payload = await response.json() as StationBoardResponse;
       if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error || "Upcoming trains are unavailable.");
       return payload.data;
@@ -353,6 +442,7 @@ function useGlobalSearch(query: string, accessReady: boolean) {
       setError("");
       fetch(`/api/rail-atlas/search?q=${encodeURIComponent(value)}`, { signal: controller.signal, cache: "no-store" })
         .then(async (response) => {
+          renewRailAtlasSessionOnUnauthorized(response);
           const payload = await response.json() as GlobalSearchResponse;
           if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error || "Search is unavailable.");
           return payload.data;
@@ -386,40 +476,116 @@ function useGlobalSearch(query: string, accessReady: boolean) {
 
 function useTrainLive(selection: TrainSelection | null, accessReady: boolean) {
   const [data, setData] = useState<TrainLiveData | null>(null);
+  const [dataKey, setDataKey] = useState("");
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const [refresh, setRefresh] = useState(0);
+  const [refreshError, setRefreshError] = useState("");
+  const [refreshRequest, setRefreshRequest] = useState(0);
+  const trainNo = selection?.trainNo ?? "";
+  const date = selection?.date ?? "";
+  const selectionKey = `${trainNo}:${date}`;
+  const latestDataRef = useRef<{ key: string; data: TrainLiveData | null }>({ key: "", data: null });
+  latestDataRef.current = { key: dataKey, data };
 
   useEffect(() => {
-    if (!selection || !accessReady) return;
-    const controller = new AbortController();
-    queueMicrotask(() => {
-      if (controller.signal.aborted) return;
+    if (!trainNo) {
       setData(null);
+      setDataKey("");
+      setLoading(false);
+      setRefreshing(false);
       setError("");
-      setLoading(true);
-    });
-    const params = new URLSearchParams({ trainNo: selection.trainNo });
-    if (selection.date) params.set("date", selection.date);
-    fetch(`/api/rail-atlas/train-live?${params}`, { signal: controller.signal, cache: "no-store" })
-      .then(async (response) => {
+      setRefreshError("");
+      return;
+    }
+    if (!accessReady) {
+      setLoading(!(latestDataRef.current.key === selectionKey && latestDataRef.current.data));
+      return;
+    }
+
+    let disposed = false;
+    let inFlight = false;
+    let pollTimer = 0;
+    let activeController: AbortController | null = null;
+    const hasCurrentData = () => latestDataRef.current.key === selectionKey && Boolean(latestDataRef.current.data);
+    setLoading(!hasCurrentData());
+    setRefreshing(hasCurrentData());
+    setError("");
+    setRefreshError("");
+
+    const fetchLatest = async () => {
+      if (disposed || inFlight || document.visibilityState !== "visible") return;
+      inFlight = true;
+      activeController = new AbortController();
+      const controller = activeController;
+      const timeout = window.setTimeout(() => controller.abort(), 15_000);
+      if (hasCurrentData()) setRefreshing(true);
+      try {
+        const params = new URLSearchParams({ trainNo });
+        if (date) params.set("date", date);
+        const response = await fetch(`/api/rail-atlas/train-live?${params}`, { signal: controller.signal, cache: "no-store" });
+        renewRailAtlasSessionOnUnauthorized(response);
         const payload = await response.json() as TrainLiveResponse;
         if (!response.ok || !payload.success || !payload.data) throw new Error(payload.error || "Live train data is unavailable.");
-        return payload.data;
-      })
-      .then((result) => {
-        if (!controller.signal.aborted) setData(result);
-      })
-      .catch((reason) => {
-        if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Live train data is unavailable.");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, [accessReady, refresh, selection]);
+        if (disposed) return;
+        setData(payload.data);
+        setDataKey(selectionKey);
+        latestDataRef.current = { key: selectionKey, data: payload.data };
+        setError("");
+        setRefreshError("");
+      } catch (reason) {
+        if (!disposed && !controller.signal.aborted) {
+          const message = reason instanceof Error ? reason.message : "Live train data is unavailable.";
+          if (hasCurrentData()) setRefreshError(message);
+          else setError(message);
+        } else if (!disposed && controller.signal.aborted) {
+          const message = "Live train refresh timed out. Check your connection and retry.";
+          if (hasCurrentData()) setRefreshError(message);
+          else setError(message);
+        }
+      } finally {
+        window.clearTimeout(timeout);
+        if (activeController === controller) activeController = null;
+        inFlight = false;
+        if (!disposed) {
+          setLoading(false);
+          setRefreshing(false);
+          pollTimer = window.setTimeout(() => { void fetchLatest(); }, 60_000);
+        }
+      }
+    };
 
-  return { data, loading, error, retry: () => setRefresh((value) => value + 1) };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        window.clearTimeout(pollTimer);
+        void fetchLatest();
+      }
+    };
+    const onPageShow = () => {
+      void fetchLatest();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pageshow", onPageShow);
+    void fetchLatest();
+
+    return () => {
+      disposed = true;
+      window.clearTimeout(pollTimer);
+      activeController?.abort();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, [accessReady, date, refreshRequest, selectionKey, trainNo]);
+
+  const currentData = dataKey === selectionKey ? data : null;
+  return {
+    data: currentData,
+    loading: Boolean(trainNo) && !currentData && (loading || accessReady),
+    refreshing: Boolean(trainNo) && Boolean(currentData) && refreshing,
+    error: currentData ? "" : error,
+    refreshError: currentData ? refreshError : "",
+    retry: () => setRefreshRequest((value) => value + 1),
+  };
 }
 
 function StationDetailsPanel({
@@ -517,17 +683,19 @@ function StationDetailsPanel({
   );
 }
 
-function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }: {
+function TrainDetailsPanel({ selection, data, loading, refreshing, error, refreshError, onClose, onRetry }: {
   selection: TrainSelection;
   data: TrainLiveData | null;
   loading: boolean;
+  refreshing: boolean;
   error: string;
+  refreshError: string;
   onClose: () => void;
   onRetry: () => void;
 }) {
   const progress = data?.progress;
   const scheduleRef = useRef<HTMLDivElement>(null);
-  const scheduleGroups = useMemo(() => groupTrainSchedule(data?.timeline || []), [data]);
+  const scheduleGroups = useMemo(() => groupTrainSchedule(data?.timeline || []), [data?.timeline]);
   const isFullyCancelled = Boolean(data?.statusNote && /\bcancel(?:led|lation)?\b/i.test(data.statusNote));
   const cancellationNote = useMemo(() => {
     if (isFullyCancelled) return "This train is completely cancelled today. No stations will be served.";
@@ -555,7 +723,7 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
       }));
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [currentSegmentKey, data]);
+  }, [currentSegmentKey, data?.timeline.length, data?.currentPosition?.stationCode]);
 
   const toggleSegment = (key: string) => {
     setExpandedSegments((current) => {
@@ -576,12 +744,12 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
             <p className="mt-1 text-xs text-slate-500">{data?.start?.stationCode && data?.end?.stationCode ? `${data.start.stationCode} → ${data.end.stationCode} · ` : ""}{data?.date || selection.date || "today"}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <button type="button" onClick={onRetry} disabled={loading} className="flex h-11 items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-wait disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label="Refresh live train details"><RefreshCw size={16} className={loading ? "animate-spin" : ""} aria-hidden="true" /><span>Refresh</span></button>
+            <button type="button" onClick={onRetry} disabled={loading || refreshing} className="flex h-11 items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-wait disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label="Refresh live train details"><RefreshCw size={16} className={loading || refreshing ? "animate-spin" : ""} aria-hidden="true" /><span>Refresh</span></button>
             <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label="Close live train details"><X size={19} /></button>
           </div>
         </div>
 
-        {!loading && !error && data ? <>
+        {data ? <>
           <div className={`mt-3 flex items-start gap-2 rounded-xl border p-3 ${isFullyCancelled ? "border-red-200 bg-red-50" : "border-blue-100 bg-blue-50"}`}>
             <span className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg text-white ${isFullyCancelled ? "bg-red-600" : "bg-blue-700"}`}><Navigation size={15} aria-hidden="true" /></span>
             <div className="min-w-0"><p className={`truncate text-sm font-bold ${isFullyCancelled ? "text-red-900" : "text-slate-900"}`}>{isFullyCancelled ? "Service cancelled" : data.currentPosition ? `${data.currentPosition.stationName} (${data.currentPosition.stationCode})` : "Position unavailable"}</p><p className={`mt-0.5 line-clamp-2 text-[11px] leading-4 ${isFullyCancelled ? "text-red-800" : "text-slate-600"}`}>{data.statusNote}</p></div>
@@ -598,10 +766,11 @@ function TrainDetailsPanel({ selection, data, loading, error, onClose, onRetry }
         </> : null}
       </header>
 
-      {loading ? <div className="grid flex-1 place-items-center p-6 text-center"><div><RefreshCw className="mx-auto animate-spin text-blue-700" size={22} aria-hidden="true" /><p className="mt-3 text-sm text-slate-600">Building the live schedule…</p></div></div> : null}
+      {loading && !data ? <div className="grid flex-1 place-items-center p-6 text-center"><div><RefreshCw className="mx-auto animate-spin text-blue-700" size={22} aria-hidden="true" /><p className="mt-3 text-sm text-slate-600">Building the live schedule…</p></div></div> : null}
       {error ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p>{error}</p><button type="button" onClick={onRetry} className="mt-3 min-h-11 rounded-lg bg-red-800 px-3 py-2 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-800">Try again</button></div> : null}
 
-      {!loading && !error && data ? <div className="flex min-h-0 flex-1 flex-col">
+      {data ? <div className="flex min-h-0 flex-1 flex-col">
+        {refreshError ? <p role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-[11px] text-amber-900">Refresh failed. Showing the last update.</p> : null}
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2.5">
           <div><h3 className="text-xs font-black tracking-[0.08em] text-slate-900 uppercase">Route schedule</h3><p className="mt-0.5 text-[11px] font-medium text-slate-500">{scheduleGroups.length} stops · {data.totalDistanceKm ?? "—"} km</p></div>
         </div>
@@ -670,6 +839,8 @@ export function RailAtlas() {
   const [stations, setStations] = useState<Station[]>([]);
   const [selected, setSelected] = useState<Station | null>(null);
   const [selectedTrain, setSelectedTrain] = useState<TrainSelection | null>(null);
+  const selectedTrainActiveRef = useRef(false);
+  selectedTrainActiveRef.current = Boolean(selectedTrain);
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   const [showStations, setShowStations] = useState(true);
@@ -681,6 +852,7 @@ export function RailAtlas() {
   const stationBoard = useStationBoard(selected, atlasAccess.ready);
   const globalSearch = useGlobalSearch(query, atlasAccess.ready);
   const trainLive = useTrainLive(selectedTrain, atlasAccess.ready);
+  const stationGrid = useMemo(() => indexStations(stations), [stations]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -742,6 +914,25 @@ export function RailAtlas() {
   }, []);
 
   useEffect(() => {
+    if (!mapReady) return;
+    let frame = 0;
+    const invalidateWhenVisible = () => {
+      if (document.visibilityState === "hidden") return;
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => mapRef.current?.invalidateSize({ pan: false, debounceMoveend: true }));
+    };
+    document.addEventListener("visibilitychange", invalidateWhenVisible);
+    window.addEventListener("pageshow", invalidateWhenVisible);
+    window.addEventListener("orientationchange", invalidateWhenVisible);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener("visibilitychange", invalidateWhenVisible);
+      window.removeEventListener("pageshow", invalidateWhenVisible);
+      window.removeEventListener("orientationchange", invalidateWhenVisible);
+    };
+  }, [mapReady]);
+
+  useEffect(() => {
     if (!layersOpen) return;
     const closeOnOutsideClick = (event: PointerEvent) => {
       if (!controlsRef.current?.contains(event.target as Node)) setLayersOpen(false);
@@ -761,74 +952,153 @@ export function RailAtlas() {
 
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
-    if (!showTracks || selectedTrain) {
+    if (!showTracks) {
       railwayLayerRef.current?.removeFrom(mapRef.current);
+      railwayLayerRef.current = null;
       return;
     }
     if (railwayLayerRef.current) {
-      railwayLayerRef.current.addTo(mapRef.current);
+      if (!selectedTrainActiveRef.current) railwayLayerRef.current.addTo(mapRef.current);
       return;
     }
     const controller = new AbortController();
+    let disposed = false;
+    let layer: LayerGroup | null = null;
+    let idleHandle: number | null = null;
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    let idleScheduled = false;
     Promise.all([
       fetch("/data/india-railways.json", { signal: controller.signal }).then((response) =>
         response.ok ? response.json() : Promise.reject(new Error("Railway network data unavailable"))
       ) as Promise<{ lines: [number, number][][] }>,
       import("leaflet"),
     ]).then(([data, L]) => {
-      if (controller.signal.aborted || !mapRef.current) return;
-      railwayLayerRef.current = L.polyline(data.lines, {
-        pane: "railwayLines",
-        renderer: L.canvas({ pane: "railwayLines", padding: 0.5, tolerance: 2 }),
-        color: "#155f96",
-        weight: 1.7,
-        opacity: 0.75,
-        interactive: false,
-      }).addTo(mapRef.current);
+      if (disposed || controller.signal.aborted || !mapRef.current) return;
+      const renderer = L.canvas({ pane: "railwayLines", padding: 0.5, tolerance: 2 });
+      layer = L.layerGroup();
+      if (!selectedTrainActiveRef.current) layer.addTo(mapRef.current);
+      railwayLayerRef.current = layer;
+      let cursor = 0;
+      const renderBatch = (deadline?: IdleDeadline) => {
+        idleScheduled = false;
+        if (disposed || !layer) return;
+        let batchCount = 0;
+        while (cursor < data.lines.length && batchCount < 1000 && (!deadline || deadline.timeRemaining() > 3 || batchCount === 0)) {
+          const next = data.lines.slice(cursor, cursor + 100);
+          cursor += next.length;
+          batchCount += next.length;
+          if (next.length) layer.addLayer(L.polyline(next, {
+            pane: "railwayLines",
+            renderer,
+            color: "#155f96",
+            weight: 1.7,
+            opacity: 0.75,
+            interactive: false,
+          }));
+        }
+        if (cursor >= data.lines.length || disposed) return;
+        if ("requestIdleCallback" in window) {
+          idleScheduled = true;
+          idleHandle = window.requestIdleCallback(renderBatch, { timeout: 300 });
+        } else {
+          timeoutHandle = setTimeout(() => renderBatch(), 0);
+        }
+      };
+      if ("requestIdleCallback" in window) {
+        idleScheduled = true;
+        idleHandle = window.requestIdleCallback(renderBatch, { timeout: 300 });
+      } else {
+        timeoutHandle = setTimeout(() => renderBatch(), 0);
+      }
     }).catch((reason) => {
-      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Railway network data unavailable");
+      if (!disposed && !controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Railway network data unavailable");
     });
-    return () => controller.abort();
-  }, [mapReady, selectedTrain, showTracks]);
+    return () => {
+      disposed = true;
+      controller.abort();
+      if (idleScheduled && idleHandle !== null && "cancelIdleCallback" in window) window.cancelIdleCallback(idleHandle);
+      if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+      if (layer) {
+        layer.remove();
+        if (railwayLayerRef.current === layer) railwayLayerRef.current = null;
+      }
+    };
+  }, [mapReady, showTracks]);
 
   useEffect(() => {
-    if (!mapReady || !mapRef.current || stations.length === 0) return;
-    stationLayerRef.current?.removeFrom(mapRef.current);
-    stationLayerRef.current = null;
-    if (!showStations || selectedTrain) {
+    const map = mapRef.current;
+    const layer = railwayLayerRef.current;
+    if (!map || !layer) return;
+    if (selectedTrain || !showTracks) layer.removeFrom(map);
+    else layer.addTo(map);
+  }, [selectedTrain, showTracks, mapReady]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current) return;
+    if (!showStations || selectedTrain || stations.length === 0) {
+      stationLayerRef.current?.removeFrom(mapRef.current);
+      stationLayerRef.current = null;
+      stationMarkersRef.current = [];
       return;
     }
+    const map = mapRef.current;
     let cancelled = false;
+    let cleanupVisibleStations: (() => void) | undefined;
     import("leaflet").then((L) => {
-      if (cancelled || !mapRef.current) return;
-      stationLayerRef.current?.removeFrom(mapRef.current);
-      const renderer = L.canvas({ pane: "stationMarkers", padding: 0.4, tolerance: 9 });
-      const layer = L.layerGroup();
-      stationMarkersRef.current = stations.map((station) =>
-        L.circleMarker([station.lat, station.lon], {
-          pane: "stationMarkers",
-          renderer,
-          radius: getStationMarkerRadius(mapRef.current?.getZoom() || 5),
-          weight: 1.15,
-          color: "#ffffff",
-          fillColor: "#d97706",
-          fillOpacity: 0.92,
-          opacity: 1,
-          interactive: true,
-          bubblingMouseEvents: false,
-        })
-          .on("click", () => {
+      if (cancelled || mapRef.current !== map) return;
+      const renderer = L.canvas({ pane: "stationMarkers", padding: 0.2, tolerance: 9 });
+      const layer = L.layerGroup().addTo(map);
+      const markers = new Map<string, CircleMarker>();
+      stationLayerRef.current = layer;
+
+      const syncVisibleStations = () => {
+        const bounds = map.getBounds().pad(0.08);
+        const candidates = stationsInBounds(stationGrid, bounds.getSouth(), bounds.getWest(), bounds.getNorth(), bounds.getEast());
+        const visibleCodes = new Set(candidates.map((station) => station.code));
+        for (const [code, marker] of markers) {
+          if (visibleCodes.has(code)) continue;
+          layer.removeLayer(marker);
+          markers.delete(code);
+        }
+        for (const station of candidates) {
+          if (markers.has(station.code)) continue;
+          const marker = L.circleMarker([station.lat, station.lon], {
+            pane: "stationMarkers",
+            renderer,
+            radius: getStationMarkerRadius(map.getZoom()),
+            weight: 1.15,
+            color: "#ffffff",
+            fillColor: "#d97706",
+            fillOpacity: 0.92,
+            opacity: 1,
+            interactive: true,
+            bubblingMouseEvents: false,
+          }).on("click", () => {
             setSelectedTrain(null);
             setSelected(station);
-          })
-          .addTo(layer)
-      );
-      stationLayerRef.current = layer.addTo(mapRef.current);
+          }).addTo(layer);
+          markers.set(station.code, marker);
+        }
+        stationMarkersRef.current = [...markers.values()];
+      };
+
+      syncVisibleStations();
+      map.on("moveend zoomend", syncVisibleStations);
+      cleanupVisibleStations = () => {
+        map.off("moveend zoomend", syncVisibleStations);
+        layer.removeFrom(map);
+        markers.clear();
+        stationMarkersRef.current = [];
+        if (stationLayerRef.current === layer) stationLayerRef.current = null;
+      };
     }).catch(() => {
       if (!cancelled) setError("Station markers unavailable");
     });
-    return () => { cancelled = true; };
-  }, [mapReady, selectedTrain, showStations, stations]);
+    return () => {
+      cancelled = true;
+      cleanupVisibleStations?.();
+    };
+  }, [mapReady, selectedTrain, showStations, stations, stationGrid]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !showStations || stations.length === 0) return;
@@ -838,11 +1108,20 @@ export function RailAtlas() {
     import("leaflet").then((L) => {
       if (cancelled || mapRef.current !== map) return;
       let hoverTooltip: ReturnType<typeof L.tooltip> | null = null;
-      const findNearest = (event: LeafletMouseEvent) => {
-        const clickPoint = map.latLngToContainerPoint(event.latlng);
+      const findNearest = (event: LeafletMouseEvent, tolerance: number) => {
+        const clickPoint = event.containerPoint;
+        const cornerA = map.containerPointToLatLng(clickPoint.subtract([tolerance, tolerance]));
+        const cornerB = map.containerPointToLatLng(clickPoint.add([tolerance, tolerance]));
+        const candidates = stationsInBounds(
+          stationGrid,
+          Math.min(cornerA.lat, cornerB.lat),
+          Math.min(cornerA.lng, cornerB.lng),
+          Math.max(cornerA.lat, cornerB.lat),
+          Math.max(cornerA.lng, cornerB.lng),
+        );
         let nearest: Station | null = null;
-        let nearestDistance = 12;
-        for (const station of stations) {
+        let nearestDistance = tolerance;
+        for (const station of candidates) {
           const stationPoint = map.latLngToContainerPoint([station.lat, station.lon]);
           const distance = clickPoint.distanceTo(stationPoint);
           if (distance < nearestDistance) {
@@ -852,23 +1131,31 @@ export function RailAtlas() {
         }
         return nearest;
       };
+      let moveFrame = 0;
+      let latestMove: LeafletMouseEvent | null = null;
       const handleMapMove = (event: LeafletMouseEvent) => {
-        const nearest = findNearest(event);
-        map.getContainer().style.cursor = nearest ? "pointer" : "";
-        if (!nearest) {
-          if (hoverTooltip) {
-            map.removeLayer(hoverTooltip);
-            hoverTooltip = null;
+        latestMove = event;
+        if (moveFrame) return;
+        moveFrame = window.requestAnimationFrame(() => {
+          moveFrame = 0;
+          if (!latestMove) return;
+          const nearest = findNearest(latestMove, 16);
+          map.getContainer().style.cursor = nearest ? "pointer" : "";
+          if (!nearest) {
+            if (hoverTooltip) {
+              map.removeLayer(hoverTooltip);
+              hoverTooltip = null;
+            }
+            return;
           }
-          return;
-        }
-        if (!hoverTooltip) hoverTooltip = L.tooltip({ direction: "top", offset: [0, -10], opacity: 0.96 });
-        hoverTooltip.setContent(nearest.code).setLatLng([nearest.lat, nearest.lon]);
-        if (!map.hasLayer(hoverTooltip)) hoverTooltip.addTo(map);
+          if (!hoverTooltip) hoverTooltip = L.tooltip({ direction: "top", offset: [0, -10], opacity: 0.96 });
+          hoverTooltip.setContent(nearest.code).setLatLng([nearest.lat, nearest.lon]);
+          if (!map.hasLayer(hoverTooltip)) hoverTooltip.addTo(map);
+        });
       };
       const handleMapClick = (event: LeafletMouseEvent) => {
         if (selectedTrain) return;
-        const nearest = findNearest(event);
+        const nearest = findNearest(event, 22);
         if (nearest) setSelected(nearest);
       };
       map.on("mousemove", handleMapMove);
@@ -885,6 +1172,7 @@ export function RailAtlas() {
         map.off("mousemove", handleMapMove);
         map.off("click", handleMapClick);
         map.off("mouseout", handleMapOut);
+        if (moveFrame) window.cancelAnimationFrame(moveFrame);
         map.getContainer().style.cursor = "";
         if (hoverTooltip) map.removeLayer(hoverTooltip);
       };
@@ -893,7 +1181,7 @@ export function RailAtlas() {
       cancelled = true;
       cleanupInteraction?.();
     };
-  }, [mapReady, selectedTrain, showStations, stations]);
+  }, [mapReady, selectedTrain, showStations, stations, stationGrid]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
@@ -933,10 +1221,11 @@ export function RailAtlas() {
     import("leaflet").then((L) => {
       if (cancelled || !mapRef.current || !trainLive.data) return;
       const data = trainLive.data;
+      const route = getStraightTrainRoute(data);
       const isFullyCancelled = Boolean(data.statusNote && /\bcancel(?:led|lation)?\b/i.test(data.statusNote));
       const layers: Layer[] = [];
-      if (data.route.length > 1) {
-        layers.push(L.polyline(data.route, { pane: "activeTrain", color: isFullyCancelled ? "#94a3b8" : "#2563eb", weight: 4, opacity: isFullyCancelled ? 0.7 : 0.9, dashArray: isFullyCancelled ? "7 7" : undefined, interactive: false }));
+      if (route.length > 1) {
+        layers.push(L.polyline(route, { pane: "activeTrain", color: isFullyCancelled ? "#94a3b8" : "#2563eb", weight: 4, opacity: isFullyCancelled ? 0.7 : 0.9, dashArray: isFullyCancelled ? "7 7" : undefined, interactive: false }));
       }
       data.timeline
         .filter((stop) => stop.type !== "intermediate" && Number.isFinite(stop.lat) && Number.isFinite(stop.lon))
@@ -966,7 +1255,7 @@ export function RailAtlas() {
         layers.push(L.marker([data.currentPosition.lat, data.currentPosition.lon], { pane: "activeTrain", icon, interactive: false, zIndexOffset: 1000 }).bindTooltip(`${data.trainNo} · ${data.currentPosition.stationCode}`, { permanent: true, direction: "top", offset: [0, -20] }));
       }
       trainLayerRef.current = L.layerGroup(layers).addTo(mapRef.current);
-      if (data.route.length > 1) mapRef.current.fitBounds(L.latLngBounds(data.route), { padding: [40, 40], maxZoom: 9, animate: true });
+      if (route.length > 1) mapRef.current.fitBounds(L.latLngBounds(route), { padding: [40, 40], maxZoom: 9, animate: true });
     }).catch(() => {
       if (!cancelled) setError("Live train route could not be displayed");
     });
@@ -1052,7 +1341,7 @@ export function RailAtlas() {
       </div>
 
       {selected ? <StationDetailsPanel station={selected} board={stationBoard.board} hours={stationBoard.hours} loading={stationBoard.loading} error={stationBoard.error} onClose={() => setSelected(null)} onRetry={stationBoard.retry} onSelectTrain={(train) => chooseTrain({ trainNo: train.trainNo, trainName: train.trainName, date: train.runDate })} /> : null}
-      {selectedTrain ? <TrainDetailsPanel selection={selectedTrain} data={trainLive.data} loading={trainLive.loading} error={trainLive.error} onClose={() => setSelectedTrain(null)} onRetry={trainLive.retry} /> : null}
+      {selectedTrain ? <TrainDetailsPanel selection={selectedTrain} data={trainLive.data} loading={trainLive.loading} refreshing={trainLive.refreshing} error={trainLive.error} refreshError={trainLive.refreshError} onClose={() => setSelectedTrain(null)} onRetry={trainLive.retry} /> : null}
 
       {atlasAccess.error ? <div role="alert" className="absolute right-3 bottom-3 left-3 z-[1100] mx-auto max-w-lg rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-800 shadow-lg"><p>{atlasAccess.error}</p><button type="button" onClick={() => window.location.reload()} className="mt-2 min-h-9 cursor-pointer rounded-lg bg-red-800 px-3 py-1.5 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-800">Retry security check</button></div> : null}
       {error ? <div role="alert" className="absolute right-3 bottom-3 left-3 z-[1000] mx-auto max-w-lg rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg">{error}. Run npm run update:station-data if the station file is missing.</div> : null}

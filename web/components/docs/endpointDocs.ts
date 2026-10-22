@@ -99,8 +99,8 @@ if (result.success) {
     response: `{
   "success": true,
   "data": {
-    "trainInfo": { "train_no": "12345", "train_name": "SARAIGHAT EXP", "from_stn_name": "Howrah Jn", "from_stn_code": "HWH", "to_stn_name": "Guwahati", "to_stn_code": "GHY", "from_time": "16:05", "to_time": "09:40", "travel_time": "17:35 hrs", "running_days": "1111111", "type": "SUPERFAST", "train_id": "1891" },
-    "route": [{ "stnCode": "HWH", "stnName": "Howrah Jn", "arrival": "--", "departure": "16:05", "halt": "0 min", "haltMinutes": 0, "distance": "0", "day": "1", "platform": 15, "coordinates": { "latitude": 22.5835032884945, "longitude": 88.3422660827637 } }]
+    "trainInfo": { "train_no": "12345", "train_name": "SARAIGHAT EXP", "from_stn_name": "HOWRAH JN", "from_stn_code": "HWH", "to_stn_name": "GUWAHATI", "to_stn_code": "GHY", "from_time": "16:05", "to_time": "09:40", "travel_time": "17:35 hrs", "running_days": "1111111", "type": "SUPERFAST", "train_name_hindi": "हव्ह् घ्य् सरैघत् इएक्सप्रेस्स्", "type_code": "SUF", "total_distance": 998, "destination_day": 2, "classes": ["1A", "2A", "3A", "SL", "GEN", "PWD"], "pantry_type": "PC" },
+    "route": [{ "stnCode": "HWH", "stnName": "HOWRAH JN", "arrival": "--", "departure": "16:05", "halt": "0 min", "haltMinutes": 0, "distance": "0", "day": "1", "platform": 15, "coordinates": { "latitude": 22.584058, "longitude": 88.340979 }, "stationNameHindi": "हावड़ा जं", "division": "HWH", "daysOfArrival": "DAILY", "directionChangeCount": 0 }]
   }
 }`,
   },

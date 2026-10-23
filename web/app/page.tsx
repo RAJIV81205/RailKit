@@ -186,7 +186,7 @@ export default async function LandingPage() {
     publisher: { "@id": orgId },
     offers: [
       { "@type": "Offer", name: "Free", price: "0", priceCurrency: "INR" },
-      { "@type": "Offer", name: "Pro", price: "49", priceCurrency: "INR", url: absoluteUrl("/pricing") },
+      { "@type": "Offer", name: "Pro", price: "59", priceCurrency: "INR", url: absoluteUrl("/pricing") },
     ],
   };
   const breadcrumbSchema = {

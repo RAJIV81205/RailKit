@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ChevronRight, LogOut, Menu, X } from "lucide-react";
+import { ChevronRight, Menu, X } from "lucide-react";
 import { useSidebar } from "./SidebarProvider";
 
 type VerifiedUser = {
@@ -250,22 +250,13 @@ export function Header() {
               {!loading && (
                 <div className="flex items-center gap-2">
                   {user ? (
-                    <>
-                      <Link
-                        href="/dashboard"
-                        className="inline-flex items-center gap-[5px] rounded-full border border-black/12 bg-transparent px-4 py-[7px] font-site-sans text-[13px] text-black no-underline transition-colors hover:bg-[#f5f5f5]"
-                      >
-                        Dashboard
-                        <ChevronRight size={13} />
-                      </Link>
-                      <button
-                        onClick={handleLogout}
-                        className="inline-flex cursor-pointer items-center gap-[5px] rounded-lg border-0 bg-transparent px-2.5 py-[7px] text-[13px] text-[#9ca3af] transition-colors hover:bg-black/4 hover:text-black"
-                        aria-label="Sign out"
-                      >
-                        <LogOut size={13} />
-                      </button>
-                    </>
+                    <Link
+                      href="/dashboard"
+                      className="inline-flex items-center gap-[5px] rounded-full border border-black/12 bg-transparent px-4 py-[7px] font-site-sans text-[13px] text-black no-underline transition-colors hover:bg-[#f5f5f5]"
+                    >
+                      Dashboard
+                      <ChevronRight size={13} />
+                    </Link>
                   ) : (
                     <Link
                       href="/auth"

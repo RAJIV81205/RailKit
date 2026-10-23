@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/db";
 import User from "@/lib/db/models/User";
 import Order from "@/lib/db/models/Order";
+import LimitTopup from "@/lib/db/models/LimitTopup";
 import {
 	getAuthCookieName,
 	getAuthTokenFromCookies,
@@ -44,26 +45,43 @@ export async function GET() {
 			return unauthorizedResponse("unauthorized: invalid user");
 		}
 
-		const orders = await Order.find({ userId: user._id })
-			.sort({ createdAt: -1 })
-			.lean();
+		const [planOrders, topups] = await Promise.all([
+			Order.find({ userId: user._id }).lean(),
+			LimitTopup.find({ userId: user._id }).lean(),
+		]);
+		const orders = [
+			...planOrders.map((order) => ({
+				_id: order._id.toString(),
+				orderId: order.orderId,
+				kind: "plan" as const,
+				planType: order.planType,
+				orderKind: order.orderKind,
+				billingInterval: order.billingInterval ?? null,
+				entitlementVersion: order.entitlementVersion ?? null,
+				amount: order.amount,
+				currency: order.currency,
+				status: order.status,
+				credited: order.credited,
+				createdAt: order.createdAt,
+			})),
+			...topups.map((topup) => ({
+				_id: topup._id.toString(),
+				orderId: topup.orderId,
+				kind: "topup" as const,
+				extraLimit: topup.extraLimit,
+				amount: topup.amount,
+				currency: topup.currency,
+				status: topup.status,
+				credited: topup.credited,
+				createdAt: topup.createdAt,
+			})),
+		].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
 		return NextResponse.json(
 			{
 				success: true,
 				message: "orders fetched",
-				orders: orders.map((order) => ({
-					_id: order._id.toString(),
-					orderId: order.orderId,
-					planType: order.planType,
-					billingInterval: order.billingInterval ?? null,
-					entitlementVersion: order.entitlementVersion ?? null,
-					amount: order.amount,
-					currency: order.currency,
-					status: order.status,
-					credited: order.credited,
-					createdAt: order.createdAt,
-				})),
+				orders,
 			},
 			{ status: 200 }
 		);

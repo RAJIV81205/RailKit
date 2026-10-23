@@ -58,12 +58,24 @@ type DbUser = {
 type Order = {
   _id: string;
   orderId: string;
+  kind: "plan" | "topup";
+  planType?: string;
+  orderKind?: "purchase" | "upgrade";
+  extraLimit?: number;
   amount: number;
   currency: string;
   status: string;
   credited: boolean;
   createdAt?: string;
 };
+
+function getOrderItemLabel(order: Order) {
+  if (order.kind === "topup") {
+    return `${(order.extraLimit ?? 0).toLocaleString("en-IN")} extra requests`;
+  }
+  const plan = order.planType === "advance" ? "Advance" : order.planType === "pro" ? "Pro" : "Plan";
+  return order.orderKind === "upgrade" ? `${plan} upgrade` : `${plan} plan`;
+}
 
 type VerifyUserResponse = {
   success: boolean;
@@ -553,7 +565,7 @@ function OrderModal({ order, onClose }: { order: Order; onClose: () => void }) {
       >
         <div className="mb-6 flex items-center justify-between">
           <span className="font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] text-base font-bold text-black">
-            Order Details
+            Payment Details
           </span>
           <button
             type="button"
@@ -566,6 +578,7 @@ function OrderModal({ order, onClose }: { order: Order; onClose: () => void }) {
         </div>
         {[
           ["Order ID", order.orderId],
+          ["Item", getOrderItemLabel(order)],
           ["Amount", `₹${order.amount.toFixed(2)} ${order.currency}`],
           ["Status", order.status],
           ["Credited", order.credited ? "Yes" : "No"],
@@ -811,6 +824,7 @@ export default function DashboardPage() {
         const data = await response.json();
         if (!response.ok || !data?.success)
           throw new Error(data?.message || "Unable to verify payment");
+        void mutateOrders();
         if (!data?.paid) {
           setLimitPurchaseMessage(
             "Payment is still pending. Please retry in a moment.",
@@ -840,7 +854,7 @@ export default function DashboardPage() {
         setLimitPurchaseLoading(false);
       }
     },
-    [mutateUser],
+    [mutateUser, mutateOrders],
   );
 
   const startLimitTopupPayment = async () => {
@@ -859,6 +873,7 @@ export default function DashboardPage() {
         | undefined;
       if (!response.ok || !order?.orderId || !order?.paymentSessionId)
         throw new Error(data?.message || "Unable to create payment order");
+      void mutateOrders();
       await loadCashfreeSdk();
       if (!window.Cashfree)
         throw new Error(
@@ -1131,7 +1146,7 @@ export default function DashboardPage() {
     <div className="grid grid-cols-2 gap-2.5 max-[480px]:grid-cols-1">
       {[
         {
-          label: "Paid Orders",
+          label: "Paid Payments",
           value: paidOrders.length,
           color: "#16a34a",
         },
@@ -1258,7 +1273,7 @@ export default function DashboardPage() {
     },
     {
       id: "orders",
-      label: "Orders",
+      label: "Order History",
       icon: <IconReceipt />,
       badge: orders.length > 0 ? String(orders.length) : undefined,
     },
@@ -2554,7 +2569,7 @@ export default function DashboardPage() {
               <div className="overflow-hidden rounded-2xl border border-[#ebebeb] bg-white max-[480px]:rounded-[13px]">
                 <div className="flex items-center justify-between border-b border-[#f3f4f6] bg-[#fafafa] px-5 py-3.5 max-[768px]:flex-wrap max-[768px]:gap-2 max-[480px]:px-3.5 max-[480px]:py-3">
                   <span className="text-sm font-bold text-[#111]">
-                    All orders ·{" "}
+                    All payments ·{" "}
                     <span className="text-[#16a34a]">
                       {paidOrders.length} paid
                     </span>
@@ -2567,11 +2582,21 @@ export default function DashboardPage() {
                   </span>
                 </div>
                 <div className="w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
-                  <table className={dashboardTableClass}>
+                  <table className={`${dashboardTableClass} table-fixed min-w-[900px] max-[640px]:!min-w-0`}>
+                    <colgroup>
+                      <col className="w-[27%]" />
+                      <col className="w-[16%]" />
+                      <col className="w-[12%]" />
+                      <col className="w-[11%]" />
+                      <col className="w-[11%]" />
+                      <col className="w-[10%]" />
+                      <col className="w-[13%]" />
+                    </colgroup>
                     <thead>
                       <tr className="border-b border-[#f3f4f6] bg-[#fafafa]">
                         {[
                           "Order ID",
+                          "Item",
                           "Amount",
                           "Status",
                           "Credited",
@@ -2591,10 +2616,10 @@ export default function DashboardPage() {
                       {orders.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={6}
+                            colSpan={7}
                             className="p-12 text-center text-xs text-[#d1d5db] max-[640px]:block max-[640px]:px-4 max-[640px]:py-7 max-[640px]:before:hidden"
                           >
-                            No orders found. Subscribe to a plan to get started.
+                            No payments found yet.
                           </td>
                         </tr>
                       ) : (
@@ -2605,9 +2630,14 @@ export default function DashboardPage() {
                           >
                             <td
                               data-label="Order ID"
-                              className="px-4 py-[13px] text-[11px] text-[#9ca3af]"
+                              className="min-w-0 px-4 py-[13px] text-[11px] text-[#9ca3af]"
                             >
-                              {o.orderId}
+                              <span className="block max-w-[220px] min-w-0 truncate max-[640px]:max-w-none max-[640px]:overflow-visible max-[640px]:whitespace-normal max-[640px]:[overflow-wrap:anywhere]" title={o.orderId}>
+                                {o.orderId}
+                              </span>
+                            </td>
+                            <td data-label="Item" className="px-4 py-[13px] text-[11px] font-semibold text-[#374151]">
+                              {getOrderItemLabel(o)}
                             </td>
                             <td data-label="Amount" className="px-4 py-[13px]">
                               <span className="text-[13px] font-bold text-[#16a34a]">

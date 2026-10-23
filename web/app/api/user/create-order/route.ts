@@ -21,7 +21,10 @@ import {
   reserveUpgradeCheckout,
   reservePlanCheckout,
 } from "@/lib/payments/checkout";
-import { getAdvanceUpgradeQuote, UpgradeQuoteError } from "@/lib/billing/upgrade";
+import {
+  getAdvanceUpgradeQuote,
+  UpgradeQuoteError,
+} from "@/lib/billing/upgrade";
 
 function makeOrderId(userId: string) {
   return `order_${userId.slice(-8)}_${randomUUID().replace(/-/g, "")}`;
@@ -113,7 +116,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const planConfig = !isUpgrade && billingInterval ? getPaidPlanRuntime(body.planType as "pro" | "advance", billingInterval) : null;
+    const planConfig =
+      !isUpgrade && billingInterval
+        ? getPaidPlanRuntime(
+            body.planType as "pro" | "advance",
+            billingInterval,
+          )
+        : null;
     if (!isUpgrade && !planConfig) {
       return NextResponse.json(
         { success: false, message: "plan config not found" },
@@ -127,37 +136,63 @@ export async function POST(request: Request) {
         upgradeQuote = getAdvanceUpgradeQuote(user, now);
         const quoteExpiresAt = Date.parse(String(body.quoteExpiresAt || ""));
         if (
-          !Number.isFinite(quoteExpiresAt) || quoteExpiresAt <= now.getTime() ||
+          !Number.isFinite(quoteExpiresAt) ||
+          quoteExpiresAt <= now.getTime() ||
           quoteExpiresAt > now.getTime() + 5 * 60 * 1000 ||
           Number(body.quoteAmount) !== upgradeQuote.amount
         ) {
-          return NextResponse.json({ success: false, message: "your upgrade quote expired or changed; refresh it before checkout" }, { status: 409 });
+          return NextResponse.json(
+            {
+              success: false,
+              message:
+                "your upgrade quote expired or changed; refresh it before checkout",
+            },
+            { status: 409 },
+          );
         }
         billingInterval = upgradeQuote.billingInterval;
       } catch (error) {
-        const code = error instanceof UpgradeQuoteError ? error.code : "INELIGIBLE";
-        return NextResponse.json({ success: false, message: code === "EXPIRED" ? "your Pro plan has expired" : "only an active Pro plan can be upgraded" }, { status: 409 });
+        const code =
+          error instanceof UpgradeQuoteError ? error.code : "INELIGIBLE";
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              code === "EXPIRED"
+                ? "your Pro plan has expired"
+                : "only an active Pro plan can be upgraded",
+          },
+          { status: 409 },
+        );
       }
     }
-    const planType = isUpgrade ? "advance" : body.planType as "pro" | "advance";
+    const planType = isUpgrade
+      ? "advance"
+      : (body.planType as "pro" | "advance");
     const amount = upgradeQuote?.amount ?? planConfig!.amount;
     const orderId = makeOrderId(user._id.toString());
     const checkoutExpiresAt = new Date(now.getTime() + 30 * 60 * 1000);
     let reservation: Awaited<ReturnType<typeof reservePlanCheckout>>;
 
     try {
-      reservation = isUpgrade ? await reserveUpgradeCheckout({
-        userId: user._id.toString(), orderId, amount, currency: "INR", quote: upgradeQuote!,
-      }) : await reservePlanCheckout({
-        userId: user._id.toString(),
-        orderId,
-        planType,
-        billingInterval: billingInterval!,
-        termMonths: planConfig!.termMonths,
-        monthlyLimit: planConfig!.limit,
-        amount,
-        currency: "INR",
-      });
+      reservation = isUpgrade
+        ? await reserveUpgradeCheckout({
+            userId: user._id.toString(),
+            orderId,
+            amount,
+            currency: "INR",
+            quote: upgradeQuote!,
+          })
+        : await reservePlanCheckout({
+            userId: user._id.toString(),
+            orderId,
+            planType,
+            billingInterval: billingInterval!,
+            termMonths: planConfig!.termMonths,
+            monthlyLimit: planConfig!.limit,
+            amount,
+            currency: "INR",
+          });
     } catch (error) {
       const code = error instanceof CheckoutReservationError ? error.code : "";
       if (code === "ACTIVE_PLAN") {
@@ -169,8 +204,23 @@ export async function POST(request: Request) {
           { status: 409 },
         );
       }
-      if (code === "UPGRADE_INELIGIBLE") return NextResponse.json({ success: false, message: "your Pro plan changed or expired; refresh the quote" }, { status: 409 });
-      if (code === "UPGRADE_CHECKOUT_PENDING") return NextResponse.json({ success: false, message: "an upgrade payment is already pending; finish it or wait for it to expire" }, { status: 409 });
+      if (code === "UPGRADE_INELIGIBLE")
+        return NextResponse.json(
+          {
+            success: false,
+            message: "your Pro plan changed or expired; refresh the quote",
+          },
+          { status: 409 },
+        );
+      if (code === "UPGRADE_CHECKOUT_PENDING")
+        return NextResponse.json(
+          {
+            success: false,
+            message:
+              "an upgrade payment is already pending; finish it or wait for it to expire",
+          },
+          { status: 409 },
+        );
       if (code === "RATE_LIMITED") {
         return NextResponse.json(
           {
@@ -203,7 +253,9 @@ export async function POST(request: Request) {
         notify_url: getWebhookUrl(),
       },
       order_expiry_time: checkoutExpiresAt.toISOString(),
-      order_note: isUpgrade ? "Pro to Advance upgrade for railkit" : `${planType} ${billingInterval} plan for railkit`,
+      order_note: isUpgrade
+        ? "Pro to Advance upgrade for railkit"
+        : `${planType} ${billingInterval} plan for railkit`,
       order_tags: {
         plan_type: planType,
         billing_interval: billingInterval!,

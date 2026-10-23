@@ -46,6 +46,13 @@ type CreatedPaymentOrder = {
   cashfreeMode?: CashfreeCheckoutMode;
 };
 type UpgradeQuote = { amount: number; creditAmount: number; billingInterval: "month"; monthlyLimit: number; termEndsAt: string; expiresAt: string };
+type PaymentProgress = {
+  phase: "creating" | "checkout" | "verifying" | "resolved";
+  title: string;
+  detail: string;
+  orderId?: string;
+  outcome?: "success" | "failed" | "cancelled" | "review";
+};
 
 declare global {
   interface Window {
@@ -386,6 +393,84 @@ function PaymentModal({
   );
 }
 
+function PaymentProgressOverlay({ progress }: { progress: PaymentProgress }) {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const loading = progress.phase !== "resolved";
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, []);
+
+  useEffect(() => {
+    if (progress.phase === "checkout") return;
+    const background = [document.querySelector("header"), document.querySelector("main")].filter(
+      (element): element is HTMLElement => element !== null,
+    );
+    const alreadyInert = background.map((element) => element.hasAttribute("inert"));
+    background.forEach((element) => element.setAttribute("inert", ""));
+    return () => background.forEach((element, index) => {
+      if (!alreadyInert[index]) element.removeAttribute("inert");
+    });
+  }, [progress.phase]);
+
+  useEffect(() => {
+    if (progress.phase === "checkout") return;
+    overlayRef.current?.focus();
+    const keepFocus = (event: KeyboardEvent) => {
+      if (event.key === "Tab" || event.key === "Escape") {
+        event.preventDefault();
+        overlayRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", keepFocus);
+    return () => document.removeEventListener("keydown", keepFocus);
+  }, [progress.phase]);
+
+  return (
+    <div
+      ref={overlayRef}
+      role="dialog"
+      aria-modal={progress.phase === "checkout" ? undefined : true}
+      aria-labelledby="payment-progress-title"
+      aria-describedby="payment-progress-detail"
+      aria-busy={loading}
+      tabIndex={-1}
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 px-4 py-6 backdrop-blur-[6px] outline-none sm:px-6"
+    >
+      <div className="max-h-[calc(100dvh-3rem)] w-full max-w-md overflow-y-auto rounded-[28px] border border-black/10 bg-white/95 px-6 py-10 text-center shadow-[0_24px_80px_rgba(0,0,0,0.18)] sm:px-10" aria-live="polite" aria-atomic="true">
+        <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-black text-white shadow-[0_14px_35px_rgba(0,0,0,0.14)]">
+          {loading ? (
+            <Loader2 className="size-8 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          ) : progress.outcome === "success" ? (
+            <CheckCircle2 className="size-8" aria-hidden="true" />
+          ) : (
+            <AlertCircle className="size-8" aria-hidden="true" />
+          )}
+        </div>
+        <p className="mt-8 text-xs font-medium tracking-[0.18em] text-[#9ca3af] uppercase">
+          {loading ? "Secure payment" : "Order update"}
+        </p>
+        <h2 id="payment-progress-title" className="mt-3 text-4xl text-black sm:text-5xl" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
+          {progress.title}
+        </h2>
+        <p id="payment-progress-detail" className="mx-auto mt-4 max-w-sm text-sm leading-7 text-[#6F6F6F]">
+          {progress.detail}
+        </p>
+        {progress.orderId && <p className="mt-6 text-xs text-[#9ca3af]">Order ID: {progress.orderId}</p>}
+        {loading && (
+          <div className="mx-auto mt-9 flex items-center justify-center gap-2" aria-hidden="true">
+            <span className="size-1.5 rounded-full bg-black" />
+            <span className="size-1.5 rounded-full bg-black/20" />
+            <span className="size-1.5 rounded-full bg-black/20" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main page content ────────────────────────────────────────────────────────
 
 function PricingPageContent({
@@ -406,6 +491,10 @@ function PricingPageContent({
   const [billingInterval, setBillingInterval] = useState<"month" | "year">("month");
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [upgradeQuote, setUpgradeQuote] = useState<UpgradeQuote | null>(null);
+  const [paymentProgress, setPaymentProgress] = useState<PaymentProgress | null>(null);
+  const verificationRunRef = useRef(0);
+  const completionTimerRef = useRef<number | null>(null);
+  const startedReturnOrderRef = useRef<string | null>(null);
 
   const timeLeft = useCountdown(initialOfferEndsAt);
   const missingByPlan = computeMissingByPlan(initialPlans);
@@ -418,25 +507,101 @@ function PricingPageContent({
   }, []);
   const dismissNotice = useCallback(() => setNotice(null), []);
 
-  const verifyPayment = useCallback(async (orderId: string, paidPlanType?: PaidPlanType) => {
-    showNotice("info", "Verifying payment status…");
-    const response = await fetch(`/api/user/get-order?orderId=${encodeURIComponent(orderId)}`, { method: "POST", cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to verify payment status");
-    if (data?.order?.credited) {
-      showNotice("success", "Payment successful! Your plan is now active.");
-      if (paidPlanType) setAuthState({ status: "authenticated", plan: paidPlanType, billingInterval: paidPlanType === "pro" ? billingInterval : null });
-      const url = new URL(window.location.href);
-      url.searchParams.delete("order_id");
-      url.searchParams.delete("payment_return");
-      router.replace(url.pathname + url.search, { scroll: false });
-      return;
+  const finishPayment = useCallback((
+    outcome: NonNullable<PaymentProgress["outcome"]>,
+    title: string,
+    detail: string,
+    orderId?: string,
+    planType?: PaidPlanType,
+    interval?: "month" | "year" | null,
+  ) => {
+    setPaymentProgress({ phase: "resolved", outcome, title, detail, orderId });
+    if (outcome === "success" && planType) {
+      setAuthState({ status: "authenticated", plan: planType, billingInterval: interval ?? null });
     }
-    if (data?.order?.requiresSupport) { showNotice("error", "Payment was received, but activation needs support. Please contact us with your order ID."); return; }
-    if (data?.order?.paymentStatus === "FAILED") { showNotice("error", "Payment failed. Please try again or contact support."); return; }
-    if (data?.order?.paymentStatus === "USER_DROPPED") { showNotice("info", "Payment was cancelled. You can try again anytime."); return; }
-    showNotice("info", "Payment is still processing — please check back shortly.");
-  }, [showNotice, router, billingInterval]);
+    if (completionTimerRef.current !== null) window.clearTimeout(completionTimerRef.current);
+    completionTimerRef.current = window.setTimeout(() => {
+      setPaymentProgress(null);
+      showNotice(outcome === "success" ? "success" : outcome === "cancelled" ? "info" : "error", detail);
+      if (orderId) {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has("order_id") || url.searchParams.has("payment_return")) {
+          url.searchParams.delete("order_id");
+          url.searchParams.delete("payment_return");
+          router.replace(url.pathname + url.search, { scroll: false });
+        }
+      }
+      completionTimerRef.current = null;
+    }, outcome === "review" ? 6000 : 3500);
+  }, [router, showNotice]);
+
+  const verifyPayment = useCallback(async (orderId: string) => {
+    const run = ++verificationRunRef.current;
+    let attempts = 0;
+    while (verificationRunRef.current === run) {
+      setPaymentProgress({
+        phase: "verifying",
+        title: "Verifying your order",
+        detail: attempts < 6
+          ? "Cashfree checkout has closed. Waiting for confirmed order status from our server. Please keep this page open."
+          : "Your order is still being checked. This page will update when we receive a final result.",
+        orderId,
+      });
+      try {
+        const response = await fetch(`/api/user/get-order?orderId=${encodeURIComponent(orderId)}`, {
+          method: "POST",
+          cache: "no-store",
+        });
+        const data = await response.json();
+        if (!response.ok || !data?.order?.orderId) {
+          throw new Error(data?.message || "Order status unavailable");
+        }
+        if (verificationRunRef.current !== run) return;
+
+        const order = data.order as {
+          credited?: boolean;
+          requiresSupport?: boolean;
+          paymentStatus?: string;
+          status?: string;
+          planType?: PaidPlanType;
+          billingInterval?: "month" | "year" | null;
+        };
+        const paymentStatus = order.paymentStatus?.toUpperCase();
+        const orderStatus = order.status?.toLowerCase();
+        if (order.credited) {
+          finishPayment("success", "Payment confirmed", "Payment successful. Your plan is now active.", orderId, order.planType, order.billingInterval);
+          return;
+        }
+        if (order.requiresSupport) {
+          finishPayment("review", "Payment needs review", `Payment received, but activation needs support. Please contact us with order ID ${orderId}.`, orderId);
+          return;
+        }
+        if (paymentStatus === "USER_DROPPED" || orderStatus === "cancelled") {
+          finishPayment("cancelled", "Payment cancelled", "No payment was completed. You can try again anytime.", orderId);
+          return;
+        }
+        if (paymentStatus === "FAILED" || orderStatus === "failed" || orderStatus === "expired") {
+          finishPayment("failed", "Payment unsuccessful", "Payment failed or expired. No plan was activated.", orderId);
+          return;
+        }
+      } catch {
+        if (verificationRunRef.current !== run) return;
+        setPaymentProgress({
+          phase: "verifying",
+          title: "Still checking your order",
+          detail: "Order status is temporarily unavailable. Retrying with the server; please keep this page open.",
+          orderId,
+        });
+      }
+      attempts += 1;
+      await new Promise<void>((resolve) => window.setTimeout(resolve, attempts < 12 ? 2000 : 5000));
+    }
+  }, [finishPayment]);
+
+  useEffect(() => () => {
+    verificationRunRef.current += 1;
+    if (completionTimerRef.current !== null) window.clearTimeout(completionTimerRef.current);
+  }, []);
 
   // Auth check
   useEffect(() => {
@@ -460,14 +625,10 @@ function PricingPageContent({
   useEffect(() => {
     if (!isPaymentReturn || !orderIdFromQuery) return;
     if (authState.status === "loading" || authState.status === "unauthenticated") return;
-    let cancelled = false;
-    const handleReturn = async () => {
-      try { if (!cancelled) await verifyPayment(orderIdFromQuery); }
-      catch (error: unknown) { if (!cancelled) showNotice("error", getErrorMessage(error, "Unable to verify payment.")); }
-    };
-    handleReturn();
-    return () => { cancelled = true; };
-  }, [isPaymentReturn, orderIdFromQuery, authState.status, verifyPayment, showNotice]);
+    if (startedReturnOrderRef.current === orderIdFromQuery) return;
+    startedReturnOrderRef.current = orderIdFromQuery;
+    void verifyPayment(orderIdFromQuery);
+  }, [isPaymentReturn, orderIdFromQuery, authState.status, verifyPayment]);
 
   const openPaymentModal = async (planType: PaidPlanType | "free", upgrade = false) => {
     if (planType === "free") return;
@@ -491,8 +652,10 @@ function PricingPageContent({
   };
 
   const startPayment = async () => {
-    if (!selectedPlan) return;
+    if (!selectedPlan || paymentProgress) return;
     setIsCreatingOrder(true);
+    setShowPaymentModal(false);
+    setPaymentProgress({ phase: "creating", title: "Preparing checkout", detail: "Opening your secure payment checkout. Please keep this page open." });
     dismissNotice();
     try {
       const response = await fetch("/api/user/create-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(upgradeQuote ? { orderKind: "upgrade", quoteAmount: upgradeQuote.amount, quoteExpiresAt: upgradeQuote.expiresAt } : { planType: selectedPlan, billingInterval }) });
@@ -501,14 +664,12 @@ function PricingPageContent({
       if (!response.ok || !order?.orderId || !order?.paymentSessionId) throw new Error(data?.message || "Unable to create order. Please try again.");
       await loadCashfreeSdk();
       if (!window.Cashfree) throw new Error("Cashfree checkout failed to load. Please refresh and try again.");
-      setShowPaymentModal(false);
-      showNotice("info", "Opening secure payment popup…");
+      setPaymentProgress({ phase: "checkout", title: "Complete your payment", detail: "Use the Cashfree checkout window. We will verify your order after it closes.", orderId: order.orderId });
       const cashfree = window.Cashfree({ mode: data?.cashfreeMode === "sandbox" ? "sandbox" : "production" });
       try { await cashfree.checkout({ paymentSessionId: order.paymentSessionId, redirectTarget: "_modal" }); } catch { /* modal close */ }
-      await verifyPayment(order.orderId, order.planType);
+      await verifyPayment(order.orderId);
     } catch (error: unknown) {
-      setShowPaymentModal(false);
-      showNotice("error", getErrorMessage(error, "Something went wrong. Please try again."));
+      finishPayment("failed", "Checkout unavailable", getErrorMessage(error, "Something went wrong. Please try again."));
     } finally { setIsCreatingOrder(false); }
   };
 
@@ -816,6 +977,8 @@ function PricingPageContent({
           onCancel={() => { if (!isCreatingOrder) { setShowPaymentModal(false); setSelectedPlan(null); } }}
         />
       )}
+
+      {paymentProgress && <PaymentProgressOverlay progress={paymentProgress} />}
 
     </div>
   );

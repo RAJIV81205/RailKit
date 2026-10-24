@@ -1,6 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import Link from "next/link";
 import Script from "next/script";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -181,8 +182,8 @@ function renewRailAtlasSessionOnUnauthorized(response: Response) {
 }
 
 const INDIA_MAP_BOUNDS: [[number, number], [number, number]] = [
-  [6, 68],
-  [38, 98],
+  [6.754256, 68.186249],
+  [37.077615, 97.415161],
 ];
 
 function getStationMarkerRadius(zoom: number) {
@@ -871,12 +872,17 @@ export function RailAtlas() {
   useEffect(() => {
     if (!mapNodeRef.current || mapRef.current) return;
     let disposed = false;
-    import("leaflet").then((L) => {
+    import("leaflet").then(async (L) => {
       if (disposed || !mapNodeRef.current) return;
+      const [bridge, maplibre] = await Promise.all([
+        import("@maplibre/maplibre-gl-leaflet"),
+        import("maplibre-gl"),
+      ]);
+      maplibre.setWorkerUrl(new URL("maplibre-gl/dist/maplibre-gl-worker.mjs", import.meta.url).toString());
       const map = L.map(mapNodeRef.current, {
         center: [22.9, 79.2],
         zoom: 5,
-        minZoom: 5,
+        minZoom: 3,
         maxZoom: 18,
         maxBounds: INDIA_MAP_BOUNDS,
         maxBoundsViscosity: 1,
@@ -897,12 +903,54 @@ export function RailAtlas() {
         const radius = getStationMarkerRadius(map.getZoom());
         stationMarkersRef.current.forEach((marker) => marker.setRadius(radius));
       });
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 18,
+      L.control.attribution({ prefix: false }).addTo(map);
+      map.attributionControl.addAttribution('<a href="https://openfreemap.org">OpenFreeMap</a> · © <a href="https://openmaptiles.org/">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> · India outline: <a href="https://github.com/AbhinavSwami28/india-official-geojson">MIT GeoJSON</a> · Kashmir source: <a href="https://github.com/india-in-data/kashmir">india-in-data</a>');
+      const darkBasemap = bridge.maplibreGL({
+        style: "https://tiles.openfreemap.org/styles/dark",
       }).addTo(map);
+      const glMap = darkBasemap.getMaplibreMap();
+      glMap.once("load", () => {
+        const countryBoundaryLayer = "boundary_country_z5-";
+        if (glMap.getLayer(countryBoundaryLayer)) {
+          // Replace disputed tile boundaries with the India boundary data used only here.
+          glMap.setFilter(countryBoundaryLayer, [
+            "all",
+            ["==", ["get", "admin_level"], 2],
+            ["!", ["has", "claimed_by"]],
+          ]);
+        }
+        glMap.addSource("railkit-india-boundaries", {
+          type: "geojson",
+          data: `${window.location.origin}/data/india-boundaries.geojson`,
+        });
+        const insertBefore = glMap.getLayer(countryBoundaryLayer) ? countryBoundaryLayer : undefined;
+        glMap.addLayer({
+          id: "railkit-india-boundary-fill",
+          type: "fill",
+          source: "railkit-india-boundaries",
+          paint: {
+            "fill-color": "#233956",
+            "fill-opacity": 0.12,
+          },
+        }, insertBefore);
+        glMap.addLayer({
+          id: "railkit-india-boundary-line",
+          type: "line",
+          source: "railkit-india-boundaries",
+          layout: {
+            "line-cap": "round",
+            "line-join": "round",
+          },
+          paint: {
+            "line-color": "#d1d5db",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 3, 0.8, 8, 1.4, 14, 2.1],
+            "line-opacity": 0.45,
+          },
+        }, insertBefore);
+      });
       mapRef.current = map;
       setMapReady(true);
+      map.fitBounds(INDIA_MAP_BOUNDS, { padding: [24, 24], animate: false });
     }).catch(() => {
       if (!disposed) setError("Map library unavailable");
     });

@@ -13,6 +13,7 @@
     "cleanup-audit-logs:dry-run": "npx tsx scripts/cleanupAuditLogs.ts --dry-run"
   },
   "dependencies": {
+    "@maplibre/maplibre-gl-leaflet": "^0.1.4",
     "@react-pdf/renderer": "^4.5.1",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/react-syntax-highlighter": "^15.5.13",
@@ -26,6 +27,7 @@
     "jsonwebtoken": "^9.0.3",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.556.0",
+    "maplibre-gl": "^6.15.0",
     "mongoose": "^9.7.2",
     "next": "^16.4.1",
     "railkit": "^6.0.2",

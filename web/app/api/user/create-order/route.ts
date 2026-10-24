@@ -96,6 +96,10 @@ export async function POST(request: Request) {
       quoteExpiresAt?: string;
     };
     const isUpgrade = body.orderKind === "upgrade";
+    const isRenewal = body.orderKind === "renewal";
+    if (body.orderKind && !["purchase", "upgrade", "renewal"].includes(body.orderKind)) {
+      return NextResponse.json({ success: false, message: "invalid order kind" }, { status: 400 });
+    }
     if (!isUpgrade && !isPaidPlanType(body.planType)) {
       return NextResponse.json(
         { success: false, message: "invalid plan type" },
@@ -192,6 +196,7 @@ export async function POST(request: Request) {
             monthlyLimit: planConfig!.limit,
             amount,
             currency: "INR",
+            orderKind: isRenewal ? "renewal" : "purchase",
           });
     } catch (error) {
       const code = error instanceof CheckoutReservationError ? error.code : "";
@@ -221,6 +226,8 @@ export async function POST(request: Request) {
           },
           { status: 409 },
         );
+      if (code === "RENEWAL_PENDING")
+        return NextResponse.json({ success: false, message: "a renewal is already scheduled or its payment is pending" }, { status: 409 });
       if (code === "RATE_LIMITED") {
         return NextResponse.json(
           {
@@ -255,11 +262,11 @@ export async function POST(request: Request) {
       order_expiry_time: checkoutExpiresAt.toISOString(),
       order_note: isUpgrade
         ? "Pro to Advance upgrade for railkit"
-        : `${planType} ${billingInterval} plan for railkit`,
+        : `${planType} ${billingInterval} ${isRenewal ? "renewal" : "plan"} for railkit`,
       order_tags: {
         plan_type: planType,
         billing_interval: billingInterval!,
-        order_kind: isUpgrade ? "upgrade" : "purchase",
+        order_kind: isUpgrade ? "upgrade" : isRenewal ? "renewal" : "purchase",
       },
     };
 

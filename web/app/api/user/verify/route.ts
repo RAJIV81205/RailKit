@@ -137,6 +137,11 @@ export async function GET(request: Request) {
           plan: user.plan,
           billingDate: user.billingDate,
           expirationDate: user.expirationDate,
+          upcomingPlan: user.upcomingPlan?.orderId ? {
+            orderId: user.upcomingPlan.orderId,
+            planType: user.upcomingPlan.planType,
+            startsAt: user.upcomingPlan.startsAt,
+          } : null,
           entitlementVersion: user.entitlementVersion ?? null,
           billingInterval: user.billingInterval ?? null,
           baseLimit: user.baseLimit ?? null,

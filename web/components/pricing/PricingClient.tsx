@@ -33,7 +33,7 @@ type Notice = { id: number; kind: NoticeKind; text: string } | null;
 type AuthState =
   | { status: "loading" }
   | { status: "unauthenticated" }
-  | { status: "authenticated"; plan: "free" | PaidPlanType; billingInterval?: "month" | "year" | null };
+  | { status: "authenticated"; plan: "free" | PaidPlanType; billingInterval?: "month" | "year" | null; expirationDate?: string | null; upcomingPlan?: { orderId: string } | null };
 type TimeLeft = { days: number; hours: number; minutes: number; seconds: number; expired: boolean };
 type CashfreeCheckoutMode = "sandbox" | "production";
 type CashfreeCheckoutClient = {
@@ -280,7 +280,7 @@ function useCountdown(offerEndsAt: string | null): TimeLeft {
 // ─── Payment modal ────────────────────────────────────────────────────────────
 
 function PaymentModal({
-  selectedPlan, billingInterval, isCreatingOrder, onConfirm, onCancel, upgradeQuote,
+  selectedPlan, billingInterval, isCreatingOrder, onConfirm, onCancel, upgradeQuote, renewalEndsAt, renewalPrice,
 }: {
   selectedPlan: PaidPlanType;
   billingInterval: "month" | "year";
@@ -288,6 +288,8 @@ function PaymentModal({
   onConfirm: () => void;
   onCancel: () => void;
   upgradeQuote?: UpgradeQuote | null;
+  renewalEndsAt?: string | null;
+  renewalPrice?: string;
 }) {
   const modalRef = useRef<HTMLDivElement>(null);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
@@ -328,7 +330,20 @@ function PaymentModal({
         className="w-full max-w-md overflow-y-auto rounded-3xl border border-black/8 bg-white p-8 shadow-2xl"
         style={{ maxHeight: "90dvh" }}
         onClick={(e) => e.stopPropagation()}>
-        {upgradeQuote ? (
+        {renewalEndsAt ? (
+          <>
+            <div className="mb-6 rounded-2xl border border-black/8 bg-gradient-to-br from-[#f5f5f5] via-white to-[#fafafa] p-5">
+              <div className="flex items-center gap-3">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-black text-white"><CalendarDays className="size-5" aria-hidden /></span>
+                <div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#777]">Plan renewal</p>
+                  <h3 id="modal-title" className="text-2xl text-[#111827]" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>{selectedPlan === "advance" ? "Advance" : "Pro"} continues</h3></div>
+              </div>
+              <div className="mt-5 border-t border-black/8 pt-4"><p className="text-xs text-[#6F6F6F]">Pay today</p><p className="text-4xl font-semibold tracking-tight text-[#111827]">{renewalPrice}</p><p className="mt-1 text-xs text-[#6F6F6F]">One-time {billingInterval === "year" ? "annual" : "monthly"} renewal</p></div>
+            </div>
+            <div className="rounded-2xl border border-black/6 bg-[#fafafa] p-4"><p className="text-xs text-[#6F6F6F]">Next term starts</p><p className="mt-1 text-lg font-semibold text-[#111827]">{new Date(renewalEndsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p></div>
+            <p className="mt-4 text-xs leading-5 text-[#6F6F6F]">Your current plan stays active until expiry. New request allowance begins when renewal activates.</p>
+          </>
+        ) : upgradeQuote ? (
           <>
             <div className="relative mb-6 overflow-hidden rounded-2xl border border-black/8 bg-gradient-to-br from-[#f5f5f5] via-white to-[#fafafa] p-5">
               <div aria-hidden className="pointer-events-none absolute -right-8 -top-10 size-28 rounded-full bg-black/[0.035] blur-2xl animate-pulse motion-reduce:animate-none" />
@@ -381,7 +396,7 @@ function PaymentModal({
           <button type="button" ref={confirmBtnRef} onClick={onConfirm} disabled={isCreatingOrder}
             className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60 motion-reduce:transform-none ${upgradeQuote ? "bg-[#0a0a0a] shadow-lg shadow-black/10 hover:bg-neutral-800" : "bg-black hover:bg-neutral-800"}`}>
             {isCreatingOrder && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-            {isCreatingOrder ? "Opening Checkout…" : upgradeQuote ? `Pay ${formatINR(upgradeQuote.amount)} and upgrade` : "Proceed to Payment"}
+            {isCreatingOrder ? "Opening Checkout…" : upgradeQuote ? `Pay ${formatINR(upgradeQuote.amount)} and upgrade` : renewalEndsAt ? "Pay and schedule renewal" : "Proceed to Payment"}
           </button>
           <button type="button" onClick={onCancel} disabled={isCreatingOrder}
             className="rounded-full border border-black/10 px-6 py-3.5 text-sm text-[#6F6F6F] transition hover:bg-gray-50 disabled:opacity-50">
@@ -491,6 +506,7 @@ function PricingPageContent({
   const [billingInterval, setBillingInterval] = useState<"month" | "year">("month");
   const [isCreatingOrder, setIsCreatingOrder] = useState(false);
   const [upgradeQuote, setUpgradeQuote] = useState<UpgradeQuote | null>(null);
+  const [isRenewal, setIsRenewal] = useState(false);
   const [paymentProgress, setPaymentProgress] = useState<PaymentProgress | null>(null);
   const verificationRunRef = useRef(0);
   const completionTimerRef = useRef<number | null>(null);
@@ -514,10 +530,17 @@ function PricingPageContent({
     orderId?: string,
     planType?: PaidPlanType,
     interval?: "month" | "year" | null,
+    orderKind?: "purchase" | "upgrade" | "renewal",
+    renewalScheduled?: boolean,
   ) => {
     setPaymentProgress({ phase: "resolved", outcome, title, detail, orderId });
-    if (outcome === "success" && planType) {
+    if (outcome === "success" && planType && (orderKind !== "renewal" || !renewalScheduled)) {
       setAuthState({ status: "authenticated", plan: planType, billingInterval: interval ?? null });
+    }
+    if (outcome === "success" && orderKind === "renewal" && orderId && renewalScheduled) {
+      setAuthState((current) => current.status === "authenticated"
+        ? { ...current, upcomingPlan: { orderId } }
+        : current);
     }
     if (completionTimerRef.current !== null) window.clearTimeout(completionTimerRef.current);
     completionTimerRef.current = window.setTimeout(() => {
@@ -565,11 +588,13 @@ function PricingPageContent({
           status?: string;
           planType?: PaidPlanType;
           billingInterval?: "month" | "year" | null;
+          orderKind?: "purchase" | "upgrade" | "renewal";
+          renewalScheduled?: boolean;
         };
         const paymentStatus = order.paymentStatus?.toUpperCase();
         const orderStatus = order.status?.toLowerCase();
         if (order.credited) {
-          finishPayment("success", "Payment confirmed", "Payment successful. Your plan is now active.", orderId, order.planType, order.billingInterval);
+          finishPayment("success", "Payment confirmed", order.orderKind === "renewal" && order.renewalScheduled ? "Renewal scheduled. Your next term starts when current plan expires." : "Payment successful. Your plan is now active.", orderId, order.planType, order.billingInterval, order.orderKind, order.renewalScheduled);
           return;
         }
         if (order.requiresSupport) {
@@ -614,7 +639,7 @@ function PricingPageContent({
         const data = await res.json();
         if (!data?.success) { setAuthState({ status: "unauthenticated" }); return; }
         const plan = normalizePlan(String(data?.user?.plan || ""));
-        setAuthState({ status: "authenticated", plan: plan ?? "free", billingInterval: data?.user?.billingInterval ?? null });
+        setAuthState({ status: "authenticated", plan: plan ?? "free", billingInterval: data?.user?.billingInterval ?? null, expirationDate: data?.user?.expirationDate ?? (data?.user?.billingDate ? new Date(new Date(data.user.billingDate).getTime() + 30 * 86400000).toISOString() : null), upcomingPlan: data?.user?.upcomingPlan ?? null });
       } catch { if (!cancelled) setAuthState({ status: "unauthenticated" }); }
     };
     verifyAuth();
@@ -630,13 +655,14 @@ function PricingPageContent({
     void verifyPayment(orderIdFromQuery);
   }, [isPaymentReturn, orderIdFromQuery, authState.status, verifyPayment]);
 
-  const openPaymentModal = async (planType: PaidPlanType | "free", upgrade = false) => {
+  const openPaymentModal = async (planType: PaidPlanType | "free", upgrade = false, renewal = false) => {
     if (planType === "free") return;
     if (!initialBillingV2Enabled) { showNotice("info", "New billing plans are temporarily unavailable."); return; }
     if (authState.status === "loading") { showNotice("info", "Please wait while we check your login status."); return; }
     if (authState.status === "unauthenticated") { router.push("/auth?redirect=/pricing"); return; }
     setSelectedPlan(planType);
     setUpgradeQuote(null);
+    setIsRenewal(renewal);
     if (upgrade) {
       try {
         const response = await fetch("/api/user/upgrade-quote", { cache: "no-store" });
@@ -658,7 +684,7 @@ function PricingPageContent({
     setPaymentProgress({ phase: "creating", title: "Preparing checkout", detail: "Opening your secure payment checkout. Please keep this page open." });
     dismissNotice();
     try {
-      const response = await fetch("/api/user/create-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(upgradeQuote ? { orderKind: "upgrade", quoteAmount: upgradeQuote.amount, quoteExpiresAt: upgradeQuote.expiresAt } : { planType: selectedPlan, billingInterval }) });
+      const response = await fetch("/api/user/create-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(upgradeQuote ? { orderKind: "upgrade", quoteAmount: upgradeQuote.amount, quoteExpiresAt: upgradeQuote.expiresAt } : { orderKind: isRenewal ? "renewal" : "purchase", planType: selectedPlan, billingInterval }) });
       const data = await response.json();
       const order = data?.order as CreatedPaymentOrder | undefined;
       if (!response.ok || !order?.orderId || !order?.paymentSessionId) throw new Error(data?.message || "Unable to create order. Please try again.");
@@ -678,6 +704,10 @@ function PricingPageContent({
     const isAuthed = authState.status === "authenticated";
     const currentPlan = isAuthed ? (authState as { plan: "free" | PaidPlanType }).plan : null;
     if (!initialBillingV2Enabled && plan.planType !== "free") return { label: "Coming soon", disabled: true, action: () => {} };
+    if (isAuthed && authState.upcomingPlan?.orderId && plan.planType !== "free") return { label: plan.planType === currentPlan ? "Renewal scheduled" : "Current plan active", disabled: true, action: () => {} };
+    if (isAuthed && currentPlan === plan.planType && currentPlan !== "free") {
+      return { label: "Renew plan", disabled: false, action: () => { void openPaymentModal(plan.planType as PaidPlanType, false, true); } };
+    }
     if (isAuthed && currentPlan === "pro" && authState.status === "authenticated" && authState.billingInterval !== "year" && plan.planType === "advance") return { label: "Upgrade to Advance", disabled: false, action: () => { void openPaymentModal("advance", true); } };
     if (isAuthed && currentPlan && currentPlan !== "free") return { label: "Current plan active", disabled: true, action: () => {} };
     if (plan.planType === "free") return { label: plan.buttonText, disabled: false, action: () => router.push("/auth?redirect=/pricing") };
@@ -973,6 +1003,8 @@ function PricingPageContent({
           billingInterval={billingInterval}
           isCreatingOrder={isCreatingOrder}
           upgradeQuote={upgradeQuote}
+          renewalEndsAt={isRenewal && authState.status === "authenticated" ? authState.expirationDate : null}
+          renewalPrice={billingInterval === "year" ? initialPlans.find((plan) => plan.planType === selectedPlan)?.annualPrice : initialPlans.find((plan) => plan.planType === selectedPlan)?.price}
           onConfirm={startPayment}
           onCancel={() => { if (!isCreatingOrder) { setShowPaymentModal(false); setSelectedPlan(null); } }}
         />

@@ -15,6 +15,7 @@ type User = Pick<
   | "addonLimit"
   | "quotaPeriodStart"
   | "quotaPeriodEnd"
+  | "upcomingPlan"
 >;
 
 const BILLING_CYCLE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -102,6 +103,7 @@ export function syncV2Entitlement(user: User, now = new Date()) {
     effectiveExpirationDate &&
     effectiveExpirationDate.getTime() <= now.getTime()
   ) {
+    if (activateUpcomingPlan(user, now)) return { changed: true, expired: false };
     user.plan = "free";
     user.limit = 50;
     user.usage = 0;
@@ -148,6 +150,18 @@ export function syncV2Entitlement(user: User, now = new Date()) {
   }
 
   return { changed, expired: false };
+}
+
+export function activateUpcomingPlan(user: User, now = new Date()) {
+  const upcoming = user.upcomingPlan;
+  if (!upcoming?.orderId || !upcoming.planType || !upcoming.billingInterval ||
+      !upcoming.startsAt || upcoming.startsAt.getTime() > now.getTime() ||
+      typeof upcoming.monthlyLimit !== "number" || !Number.isFinite(upcoming.monthlyLimit) || upcoming.monthlyLimit <= 0) return false;
+  grantV2Plan(user, upcoming.planType, upcoming.billingInterval, now);
+  user.baseLimit = upcoming.monthlyLimit;
+  user.limit = upcoming.monthlyLimit;
+  user.upcomingPlan = undefined;
+  return true;
 }
 
 export { addMonths };

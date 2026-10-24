@@ -62,6 +62,7 @@ export async function GET() {
 				currency: order.currency,
 				status: order.status,
 				credited: order.credited,
+				entitlementStartsAt: order.entitlementStartsAt ?? null,
 				createdAt: order.createdAt,
 			})),
 			...topups.map((topup) => ({

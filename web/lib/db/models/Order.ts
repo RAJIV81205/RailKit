@@ -35,7 +35,7 @@ const orderSchema = new mongoose.Schema(
       enum: ["pro", "advance"],
       required: true,
     },
-    orderKind: { type: String, enum: ["purchase", "upgrade"], default: "purchase", required: true },
+    orderKind: { type: String, enum: ["purchase", "upgrade", "renewal"], default: "purchase", required: true },
     upgradeSnapshot: {
       fromPlan: { type: String, enum: ["pro", "advance"], default: null },
       interval: { type: String, enum: ["month", "year"], default: null },

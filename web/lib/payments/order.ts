@@ -7,6 +7,8 @@ import {
   getEffectiveExpirationDate,
   grantV2Plan,
   syncV2Entitlement,
+  addMonths,
+  activateUpcomingPlan,
 } from "@/lib/billing/entitlements";
 import { getEffectiveUpgradeTermStart } from "@/lib/billing/upgrade";
 import {
@@ -140,7 +142,7 @@ export async function applyOrderPaymentState(
         const snapshotInterval = snapshot?.interval ?? order.billingInterval ?? "month";
         const currentTermStart = currentExpiration ? getEffectiveUpgradeTermStart(user, currentExpiration) : null;
         if (
-          !snapshot || snapshotInterval !== "month" || order.billingInterval !== "month" || user.plan !== "pro" || !currentExpiration ||
+          !snapshot || snapshotInterval !== "month" || order.billingInterval !== "month" || user.plan !== "pro" || user.upcomingPlan?.orderId || !currentExpiration ||
           currentExpiration.getTime() <= now.getTime() ||
           currentExpiration.getTime() !== snapshot.termEndsAt?.getTime() ||
           currentTermStart?.getTime() !== snapshot.termStartsAt?.getTime()
@@ -161,6 +163,32 @@ export async function applyOrderPaymentState(
         user.expirationDate = snapshot.termEndsAt;
         order.entitlementStartsAt = snapshot.termStartsAt;
         order.entitlementEndsAt = snapshot.termEndsAt;
+      } else if (order.orderKind === "renewal") {
+        const sameTerm = hasActivePaidPlan && currentExpiration?.getTime() === order.entitlementStartsAt?.getTime() &&
+          (user.plan === "pro" ? "pro" : "advance") === order.planType;
+        const expiredOriginalTerm = order.entitlementStartsAt && order.entitlementStartsAt.getTime() <= now.getTime() &&
+          (user.plan === "free" || (currentExpiration?.getTime() === order.entitlementStartsAt.getTime() &&
+            (user.plan === "pro" ? "pro" : "advance") === order.planType));
+        if ((!sameTerm && !expiredOriginalTerm) || user.upcomingPlan?.orderId ||
+            !order.entitlementStartsAt ||
+            order.entitlementVersion !== 2 || !order.billingInterval ||
+            !order.monthlyLimit || !getPaidPlanRuntime(order.planType, order.billingInterval)) {
+          order.note = "Renewal payment received after the entitlement changed or expired; manual review required.";
+          await order.save({ session });
+          result = { found: true, paid: true, credited: false, fulfillmentBlocked: true };
+          return;
+        }
+        user.upcomingPlan = {
+          orderId: order.orderId,
+          planType: order.planType,
+          billingInterval: order.billingInterval,
+          monthlyLimit: order.monthlyLimit,
+          startsAt: order.entitlementStartsAt,
+        };
+        order.entitlementEndsAt = order.billingInterval === "year"
+          ? addMonths(order.entitlementStartsAt, 12)
+          : new Date(order.entitlementStartsAt.getTime() + 30 * 86400000);
+        if (expiredOriginalTerm) activateUpcomingPlan(user, now);
       } else if (hasActivePaidPlan) {
         order.note = "Payment received while another paid entitlement was active; manual review required.";
         await order.save({ session });
@@ -168,7 +196,7 @@ export async function applyOrderPaymentState(
         return;
       }
 
-      if (order.orderKind !== "upgrade" && order.entitlementVersion === 2 && order.billingInterval) {
+      if (order.orderKind === "purchase" && order.entitlementVersion === 2 && order.billingInterval) {
         const entitlement = grantV2Plan(user, order.planType, order.billingInterval, now);
         const purchasedLimit = order.monthlyLimit;
         if (typeof purchasedLimit !== "number" || !Number.isFinite(purchasedLimit)) {
@@ -179,7 +207,7 @@ export async function applyOrderPaymentState(
         user.entitlementStartsAt = entitlement.startsAt;
         order.entitlementStartsAt = entitlement.startsAt;
         order.entitlementEndsAt = entitlement.endsAt;
-      } else if (order.orderKind !== "upgrade") {
+      } else if (order.orderKind === "purchase") {
         const planConfig = getPaidPlanRuntime(order.planType);
         if (!planConfig) throw new Error(`Unsupported paid plan type: ${order.planType}`);
         user.plan = planConfig.userPlan;

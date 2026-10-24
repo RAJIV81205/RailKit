@@ -107,6 +107,9 @@ async function getOrder(request: Request, shouldSync: boolean) {
     }
 
     const latestOrder = await Order.findById(order._id).lean();
+    const renewalScheduled = latestOrder?.orderKind === "renewal" && latestOrder.credited
+      ? Boolean((await User.findById(user._id).select("upcomingPlan.orderId").lean())?.upcomingPlan?.orderId === latestOrder.orderId)
+      : false;
 
     return NextResponse.json(
       {
@@ -115,6 +118,8 @@ async function getOrder(request: Request, shouldSync: boolean) {
         order: {
           orderId: latestOrder?.orderId,
           planType: latestOrder?.planType,
+          orderKind: latestOrder?.orderKind,
+          renewalScheduled,
           entitlementVersion: latestOrder?.entitlementVersion ?? null,
           billingInterval: latestOrder?.billingInterval ?? null,
           termMonths: latestOrder?.termMonths ?? null,

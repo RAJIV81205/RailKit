@@ -58,6 +58,13 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
     entitlementStartsAt: { type: Date, default: null },
+    upcomingPlan: {
+      orderId: { type: String, default: null },
+      planType: { type: String, enum: ["pro", "advance"], default: null },
+      billingInterval: { type: String, enum: ["month", "year"], default: null },
+      monthlyLimit: { type: Number, default: null },
+      startsAt: { type: Date, default: null },
+    },
 
     // Null/1 = legacy entitlement behavior. 2 = interval-aware entitlement.
     entitlementVersion: {
@@ -129,7 +136,7 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
   },
-  { timestamps: true },
+  { timestamps: true, optimisticConcurrency: true },
 );
 
 userSchema.virtual("isBanned").get(function () {

@@ -13,7 +13,8 @@ export type CheckoutReservationErrorCode =
   | "ACTIVE_PLAN"
   | "RATE_LIMITED"
   | "UPGRADE_INELIGIBLE"
-  | "UPGRADE_CHECKOUT_PENDING";
+  | "UPGRADE_CHECKOUT_PENDING"
+  | "RENEWAL_PENDING";
 
 export class CheckoutReservationError extends Error {
   constructor(public readonly code: CheckoutReservationErrorCode) {
@@ -30,6 +31,7 @@ type ReservePlanCheckoutInput = {
   monthlyLimit: number;
   amount: number;
   currency: string;
+  orderKind?: "purchase" | "renewal";
 };
 
 type ReserveUpgradeCheckoutInput = {
@@ -66,6 +68,7 @@ export async function reserveUpgradeCheckout(
       const user = await User.findById(input.userId).session(session).lean();
       if (!user?.active || user.status === "banned" || user.plan !== "pro")
         throw new CheckoutReservationError("UPGRADE_INELIGIBLE");
+      if (user.upcomingPlan?.orderId) throw new CheckoutReservationError("RENEWAL_PENDING");
       const expiration = getEffectiveExpirationDate(user);
       if (
         !expiration ||
@@ -161,7 +164,14 @@ export async function reservePlanCheckout(
       const user = await User.findById(input.userId).session(session).lean();
       if (!user?.active) throw new CheckoutReservationError("USER_NOT_ACTIVE");
       const expiration = getEffectiveExpirationDate(user);
+      const isRenewal = input.orderKind === "renewal";
+      if (user.upcomingPlan?.orderId) throw new CheckoutReservationError("RENEWAL_PENDING");
+      if (isRenewal && (user.plan === "free" || !expiration || expiration.getTime() <= now.getTime() ||
+          (user.plan === "pro" ? "pro" : "advance") !== input.planType)) {
+        throw new CheckoutReservationError("ACTIVE_PLAN");
+      }
       if (
+        !isRenewal &&
         user.plan !== "free" &&
         expiration &&
         expiration.getTime() > now.getTime()
@@ -188,6 +198,10 @@ export async function reservePlanCheckout(
       if (recentOrderCount >= MAX_ORDERS_PER_TEN_MINUTES) {
         throw new CheckoutReservationError("RATE_LIMITED");
       }
+      if (isRenewal && await Order.exists({
+        userId: user._id, orderKind: "renewal", credited: false,
+        status: { $in: ["created", "active"] }, createdAt: { $gt: staleBefore },
+      }).session(session)) throw new CheckoutReservationError("RENEWAL_PENDING");
 
       const order = new Order({
         userId: user._id,
@@ -195,10 +209,12 @@ export async function reservePlanCheckout(
         cfOrderId: null,
         paymentSessionId: null,
         planType: input.planType,
+        orderKind: input.orderKind ?? "purchase",
         entitlementVersion: 2,
         billingInterval: input.billingInterval,
         termMonths: input.termMonths,
         monthlyLimit: input.monthlyLimit,
+        entitlementStartsAt: isRenewal ? expiration : null,
         amount: input.amount,
         currency: input.currency,
         status: "created",

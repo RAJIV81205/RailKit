@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db/db";
 import User from "@/lib/db/models/User";
 import { sendBillingExpiredEmail } from "@/lib/services/email";
-import { syncV2Entitlement } from "@/lib/billing/entitlements";
+import { activateUpcomingPlan, syncV2Entitlement } from "@/lib/billing/entitlements";
 
 /**
  * Daily cron job to check and update user plans based on billing dates.
@@ -128,6 +128,12 @@ export async function POST(req: Request) {
         new Date(user.billingDate).getTime() <= thirtyDaysAgo.getTime();
 
       let shouldSendBillingExpiredEmail = false;
+
+      if ((hasExpiredExpiration || hasExpiredBilling) &&
+          (user.plan === "pro" || user.plan === "enterprise") &&
+          activateUpcomingPlan(user, now)) {
+        return user.save();
+      }
 
       // Step 1: Clear expired manual expiry
       if (hasExpiredExpiration) {

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import useSWR from "swr";
-import { ArrowRight, KeyRound, LockKeyhole } from "lucide-react";
+import { ArrowRight, CalendarDays, KeyRound, LockKeyhole } from "lucide-react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import {
@@ -53,6 +53,7 @@ type DbUser = {
   quotaPeriodStart?: string | null;
   quotaPeriodEnd?: string | null;
   expirationDate?: string | null;
+  upcomingPlan?: { orderId: string; planType: string; startsAt: string } | null;
 };
 
 type Order = {
@@ -60,7 +61,7 @@ type Order = {
   orderId: string;
   kind: "plan" | "topup";
   planType?: string;
-  orderKind?: "purchase" | "upgrade";
+  orderKind?: "purchase" | "upgrade" | "renewal";
   extraLimit?: number;
   amount: number;
   currency: string;
@@ -74,7 +75,7 @@ function getOrderItemLabel(order: Order) {
     return `${(order.extraLimit ?? 0).toLocaleString("en-IN")} extra requests`;
   }
   const plan = order.planType === "advance" ? "Advance" : order.planType === "pro" ? "Pro" : "Plan";
-  return order.orderKind === "upgrade" ? `${plan} upgrade` : `${plan} plan`;
+  return order.orderKind === "upgrade" ? `${plan} upgrade` : order.orderKind === "renewal" ? `${plan} renewal` : `${plan} plan`;
 }
 
 type VerifyUserResponse = {
@@ -673,6 +674,7 @@ export default function DashboardPage() {
     string | null
   >(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
+  const [renewalReminderDismissed, setRenewalReminderDismissed] = useState(false);
   const [topupSelection, setTopupSelection] = useState(1);
   const [apiCodeLanguage, setApiCodeLanguage] =
     useState<ApiCodeLanguage>("javascript");
@@ -768,6 +770,13 @@ export default function DashboardPage() {
   const hasActiveExpirationOverride =
     Number.isFinite(activeExpirationTimestamp) &&
     activeExpirationTimestamp > Date.now();
+  const renewalReminderExpiry = dbUser?.plan !== "free"
+    ? (dbUser?.expirationDate ? new Date(dbUser.expirationDate).getTime()
+      : dbUser?.billingDate ? new Date(dbUser.billingDate).getTime() + 30 * 86400000 : NaN)
+    : NaN;
+  const showRenewalReminder = !renewalReminderDismissed && !dbUser?.upcomingPlan?.orderId &&
+    Number.isFinite(renewalReminderExpiry) && renewalReminderExpiry > Date.now() &&
+    renewalReminderExpiry - Date.now() <= 7 * 86400000;
 
   useEffect(() => {
     if (!userError) {
@@ -1281,6 +1290,17 @@ export default function DashboardPage() {
 
   return (
     <>
+      {showRenewalReminder && (
+        <div role="dialog" aria-modal="true" aria-labelledby="renewal-reminder-title" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-black/10 bg-white p-7 shadow-2xl">
+            <div className="mb-5 flex size-11 items-center justify-center rounded-xl bg-black text-white"><CalendarDays className="size-5" aria-hidden /></div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#777]">Plan expiry</p>
+            <h2 id="renewal-reminder-title" className="mt-1 text-2xl font-semibold text-[#111827]">Keep your plan running</h2>
+            <p className="mt-3 text-sm leading-6 text-[#6b7280]">Your plan ends {new Date(renewalReminderExpiry).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}. Renew now to start your next term when this one ends.</p>
+            <div className="mt-6 flex flex-col gap-2"><button type="button" onClick={() => router.push("/pricing")} className="min-h-12 rounded-full bg-black px-5 text-sm font-semibold text-white hover:bg-neutral-800">Renew plan</button><button type="button" onClick={() => setRenewalReminderDismissed(true)} className="min-h-11 rounded-full border border-black/10 text-sm text-[#6b7280] hover:bg-gray-50">Remind me later</button></div>
+          </div>
+        </div>
+      )}
       {confirmRegenerateKey && (
         <RegenerateKeyDialog pending={regeneratingKey} error={regenerateError} onCancel={() => setConfirmRegenerateKey(false)} onConfirm={regenerateApiKey} />
       )}
@@ -1657,6 +1677,12 @@ export default function DashboardPage() {
                           {" "}Unused extra requests stay until plan expiry.
                         </p>
                       </div>
+                    )}
+
+                    {dbUser.upcomingPlan?.orderId && (
+                      <p className="mt-4 rounded-xl border border-[#d1fae5] bg-[#ecfdf5] px-3 py-2.5 text-xs font-medium text-[#065f46]">
+                        Renewal scheduled. Your next term starts when this plan ends.
+                      </p>
                     )}
 
                     {!isAnnual && paymentSummary}

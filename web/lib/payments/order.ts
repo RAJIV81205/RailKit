@@ -188,7 +188,10 @@ export async function applyOrderPaymentState(
         order.entitlementEndsAt = order.billingInterval === "year"
           ? addMonths(order.entitlementStartsAt, 12)
           : new Date(order.entitlementStartsAt.getTime() + 30 * 86400000);
-        if (expiredOriginalTerm) activateUpcomingPlan(user, now);
+        if (expiredOriginalTerm) {
+          activateUpcomingPlan(user, now);
+          syncV2Entitlement(user, now);
+        }
       } else if (hasActivePaidPlan) {
         order.note = "Payment received while another paid entitlement was active; manual review required.";
         await order.save({ session });

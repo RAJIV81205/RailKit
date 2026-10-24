@@ -1296,7 +1296,7 @@ export default function DashboardPage() {
             <div className="mb-5 flex size-11 items-center justify-center rounded-xl bg-black text-white"><CalendarDays className="size-5" aria-hidden /></div>
             <p className="text-xs font-semibold uppercase tracking-widest text-[#777]">Plan expiry</p>
             <h2 id="renewal-reminder-title" className="mt-1 text-2xl font-semibold text-[#111827]">Keep your plan running</h2>
-            <p className="mt-3 text-sm leading-6 text-[#6b7280]">Your plan ends {new Date(renewalReminderExpiry).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}. Renew now to start your next term when this one ends.</p>
+            <p className="mt-3 text-sm leading-6 text-[#6b7280]">Your plan ends {new Date(renewalReminderExpiry).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })} IST. Renew now to start your next term when this one ends.</p>
             <div className="mt-6 flex flex-col gap-2"><button type="button" onClick={() => router.push("/pricing")} className="min-h-12 rounded-full bg-black px-5 text-sm font-semibold text-white hover:bg-neutral-800">Renew plan</button><button type="button" onClick={() => setRenewalReminderDismissed(true)} className="min-h-11 rounded-full border border-black/10 text-sm text-[#6b7280] hover:bg-gray-50">Remind me later</button></div>
           </div>
         </div>

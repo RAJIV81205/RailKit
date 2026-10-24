@@ -74,7 +74,7 @@ const welcomeTemplateHtml = (user: IUser, order: IOrder): string => {
   const monthlyLimit = order.monthlyLimit ?? user.limit;
 
   if (order.orderKind === "renewal") {
-    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>RailKit renewal scheduled</title></head><body style="font-family:Arial,sans-serif;background:#f4f4f5;padding:32px;color:#18181b"><main style="max-width:560px;margin:auto;background:white;border:1px solid #e4e4e7;border-radius:16px;padding:32px"><h1>Renewal scheduled</h1><p>Hi ${firstName}, your ${capitalize(order.planType)} ${intervalLabel.toLowerCase()} renewal is paid. Your current plan continues until ${formatDate(billingDate)}. The next term starts when it expires, with ${monthlyLimit.toLocaleString("en-IN")} requests per month.</p><p>Order ${order.orderId}. Your invoice is attached.</p><p>RailKit</p></main></body></html>`;
+    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>RailKit renewal scheduled</title></head><body style="font-family:Arial,sans-serif;background:#f4f4f5;padding:32px;color:#18181b"><main style="max-width:560px;margin:auto;background:white;border:1px solid #e4e4e7;border-radius:16px;padding:32px"><h1>Renewal scheduled</h1><p>Hi ${firstName}, your ${capitalize(order.planType)} ${intervalLabel.toLowerCase()} renewal is paid. Your current plan continues until ${billingDate.toLocaleString("en-IN", { day: "numeric", month: "long", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })} IST. The next term starts when it expires, with ${monthlyLimit.toLocaleString("en-IN")} requests per month.</p><p>Order ${order.orderId}. Your invoice is attached.</p><p>RailKit</p></main></body></html>`;
   }
 
   return `

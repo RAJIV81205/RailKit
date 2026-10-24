@@ -77,7 +77,7 @@ export function getEffectiveExpirationDate(
   return null;
 }
 
-export function syncV2Entitlement(user: User, now = new Date()) {
+export function syncV2Entitlement(user: User, now = new Date()): { changed: boolean; expired: boolean } {
   if (user.entitlementVersion !== 2) return { changed: false, expired: false };
 
   // Free accounts have no term expiry. They still use monthly quota periods
@@ -103,7 +103,10 @@ export function syncV2Entitlement(user: User, now = new Date()) {
     effectiveExpirationDate &&
     effectiveExpirationDate.getTime() <= now.getTime()
   ) {
-    if (activateUpcomingPlan(user, now)) return { changed: true, expired: false };
+    if (activateUpcomingPlan(user, now)) {
+      const catchup = syncV2Entitlement(user, now);
+      return { changed: true, expired: catchup.expired };
+    }
     user.plan = "free";
     user.limit = 50;
     user.usage = 0;
@@ -157,7 +160,8 @@ export function activateUpcomingPlan(user: User, now = new Date()) {
   if (!upcoming?.orderId || !upcoming.planType || !upcoming.billingInterval ||
       !upcoming.startsAt || upcoming.startsAt.getTime() > now.getTime() ||
       typeof upcoming.monthlyLimit !== "number" || !Number.isFinite(upcoming.monthlyLimit) || upcoming.monthlyLimit <= 0) return false;
-  grantV2Plan(user, upcoming.planType, upcoming.billingInterval, now);
+  // Keep the next term contiguous with the previous one, down to the millisecond.
+  grantV2Plan(user, upcoming.planType, upcoming.billingInterval, upcoming.startsAt);
   user.baseLimit = upcoming.monthlyLimit;
   user.limit = upcoming.monthlyLimit;
   user.upcomingPlan = undefined;

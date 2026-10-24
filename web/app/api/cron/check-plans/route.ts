@@ -132,6 +132,7 @@ export async function POST(req: Request) {
       if ((hasExpiredExpiration || hasExpiredBilling) &&
           (user.plan === "pro" || user.plan === "enterprise") &&
           activateUpcomingPlan(user, now)) {
+        syncV2Entitlement(user, now);
         return user.save();
       }
 

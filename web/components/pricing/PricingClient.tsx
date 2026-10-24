@@ -340,7 +340,7 @@ function PaymentModal({
               </div>
               <div className="mt-5 border-t border-black/8 pt-4"><p className="text-xs text-[#6F6F6F]">Pay today</p><p className="text-4xl font-semibold tracking-tight text-[#111827]">{renewalPrice}</p><p className="mt-1 text-xs text-[#6F6F6F]">One-time {billingInterval === "year" ? "annual" : "monthly"} renewal</p></div>
             </div>
-            <div className="rounded-2xl border border-black/6 bg-[#fafafa] p-4"><p className="text-xs text-[#6F6F6F]">Next term starts</p><p className="mt-1 text-lg font-semibold text-[#111827]">{new Date(renewalEndsAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p></div>
+            <div className="rounded-2xl border border-black/6 bg-[#fafafa] p-4"><p className="text-xs text-[#6F6F6F]">Next term starts</p><p className="mt-1 text-lg font-semibold text-[#111827]">{new Date(renewalEndsAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })} IST</p></div>
             <p className="mt-4 text-xs leading-5 text-[#6F6F6F]">Your current plan stays active until expiry. New request allowance begins when renewal activates.</p>
           </>
         ) : upgradeQuote ? (

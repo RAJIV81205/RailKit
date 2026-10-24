@@ -187,10 +187,7 @@ const INDIA_MAP_BOUNDS: [[number, number], [number, number]] = [
 ];
 
 function getStationMarkerRadius(zoom: number) {
-  if (zoom >= 13) return 7;
-  if (zoom >= 10) return 5.5;
-  if (zoom >= 7) return 4;
-  return 2.25;
+  return 1.2;
 }
 
 function isMappedStation(station: StationRecord): station is Station {
@@ -835,7 +832,6 @@ export function RailAtlas() {
   const stationLayerRef = useRef<LayerGroup | null>(null);
   const selectedLayerRef = useRef<LayerGroup | null>(null);
   const trainLayerRef = useRef<LayerGroup | null>(null);
-  const stationMarkersRef = useRef<CircleMarker[]>([]);
   const [mapReady, setMapReady] = useState(false);
   const [stations, setStations] = useState<Station[]>([]);
   const [selected, setSelected] = useState<Station | null>(null);
@@ -847,6 +843,7 @@ export function RailAtlas() {
   const [showStations, setShowStations] = useState(true);
   const [showTracks, setShowTracks] = useState(true);
   const [mapZoom, setMapZoom] = useState(5);
+  const [minMapZoom, setMinMapZoom] = useState(3);
   const [layersOpen, setLayersOpen] = useState(false);
   const [turnstileScriptReady, setTurnstileScriptReady] = useState(false);
   const atlasAccess = useRailAtlasAccess(turnstileScriptReady);
@@ -889,6 +886,9 @@ export function RailAtlas() {
         preferCanvas: true,
         zoomControl: false,
       });
+      const indiaBoundsZoom = map.getBoundsZoom(INDIA_MAP_BOUNDS, false, L.point(24, 24));
+      map.setMinZoom(indiaBoundsZoom);
+      setMinMapZoom(indiaBoundsZoom);
       const railwayPane = map.createPane("railwayLines");
       railwayPane.style.zIndex = "410";
       railwayPane.style.pointerEvents = "none";
@@ -899,9 +899,12 @@ export function RailAtlas() {
       selectedStationPane.style.zIndex = "470";
       selectedStationPane.style.pointerEvents = "none";
       map.on("zoomend", () => {
-        setMapZoom(map.getZoom());
-        const radius = getStationMarkerRadius(map.getZoom());
-        stationMarkersRef.current.forEach((marker) => marker.setRadius(radius));
+        const zoom = map.getZoom();
+        setMapZoom(zoom);
+        const radius = getStationMarkerRadius(zoom);
+        stationLayerRef.current?.eachLayer((layer) => {
+          if ("setRadius" in layer && typeof layer.setRadius === "function") layer.setRadius(radius);
+        });
       });
       L.control.attribution({ prefix: false }).addTo(map);
       map.attributionControl.addAttribution('<a href="https://openfreemap.org">OpenFreeMap</a> · © <a href="https://openmaptiles.org/">OpenMapTiles</a> · © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> · India outline: <a href="https://github.com/AbhinavSwami28/india-official-geojson">MIT GeoJSON</a> · Kashmir source: <a href="https://github.com/india-in-data/kashmir">india-in-data</a>');
@@ -964,15 +967,27 @@ export function RailAtlas() {
   useEffect(() => {
     if (!mapReady) return;
     let frame = 0;
+    let cancelled = false;
     const invalidateWhenVisible = () => {
       if (document.visibilityState === "hidden") return;
       window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => mapRef.current?.invalidateSize({ pan: false, debounceMoveend: true }));
+      frame = window.requestAnimationFrame(() => {
+        const map = mapRef.current;
+        if (!map) return;
+        map.invalidateSize({ pan: false, debounceMoveend: true });
+        import("leaflet").then((L) => {
+          if (cancelled || mapRef.current !== map) return;
+          const indiaBoundsZoom = map.getBoundsZoom(INDIA_MAP_BOUNDS, false, L.point(24, 24));
+          map.setMinZoom(indiaBoundsZoom);
+          setMinMapZoom(indiaBoundsZoom);
+        });
+      });
     };
     document.addEventListener("visibilitychange", invalidateWhenVisible);
     window.addEventListener("pageshow", invalidateWhenVisible);
     window.addEventListener("orientationchange", invalidateWhenVisible);
     return () => {
+      cancelled = true;
       window.cancelAnimationFrame(frame);
       document.removeEventListener("visibilitychange", invalidateWhenVisible);
       window.removeEventListener("pageshow", invalidateWhenVisible);
@@ -1086,7 +1101,6 @@ export function RailAtlas() {
     if (!showStations || selectedTrain || stations.length === 0) {
       stationLayerRef.current?.removeFrom(mapRef.current);
       stationLayerRef.current = null;
-      stationMarkersRef.current = [];
       return;
     }
     const map = mapRef.current;
@@ -1097,6 +1111,7 @@ export function RailAtlas() {
       const renderer = L.canvas({ pane: "stationMarkers", padding: 0.2, tolerance: 9 });
       const layer = L.layerGroup().addTo(map);
       const markers = new Map<string, CircleMarker>();
+      let syncFrame = 0;
       stationLayerRef.current = layer;
 
       const syncVisibleStations = () => {
@@ -1114,29 +1129,32 @@ export function RailAtlas() {
             pane: "stationMarkers",
             renderer,
             radius: getStationMarkerRadius(map.getZoom()),
-            weight: 1.15,
-            color: "#ffffff",
-            fillColor: "#d97706",
-            fillOpacity: 0.92,
-            opacity: 1,
-            interactive: true,
+            weight: 0.8,
+            color: "#475569",
+            fillColor: "#cbd5e1",
+            fillOpacity: 0.76,
+            opacity: 0.72,
+            interactive: false,
             bubblingMouseEvents: false,
-          }).on("click", () => {
-            setSelectedTrain(null);
-            setSelected(station);
           }).addTo(layer);
           markers.set(station.code, marker);
         }
-        stationMarkersRef.current = [...markers.values()];
+      };
+      const scheduleVisibleStationSync = () => {
+        if (syncFrame) return;
+        syncFrame = window.requestAnimationFrame(() => {
+          syncFrame = 0;
+          syncVisibleStations();
+        });
       };
 
       syncVisibleStations();
-      map.on("moveend zoomend", syncVisibleStations);
+      map.on("moveend zoomend", scheduleVisibleStationSync);
       cleanupVisibleStations = () => {
-        map.off("moveend zoomend", syncVisibleStations);
+        map.off("moveend zoomend", scheduleVisibleStationSync);
+        if (syncFrame) window.cancelAnimationFrame(syncFrame);
         layer.removeFrom(map);
         markers.clear();
-        stationMarkersRef.current = [];
         if (stationLayerRef.current === layer) stationLayerRef.current = null;
       };
     }).catch(() => {
@@ -1243,8 +1261,8 @@ export function RailAtlas() {
       selectedLayerRef.current?.removeFrom(mapRef.current);
       const ring = L.circleMarker([selected.lat, selected.lon], {
         pane: "selectedStation",
-        radius: 13,
-        weight: 3,
+        radius: 7,
+        weight: 1.5,
         color: "#ffffff",
         fillColor: "#1769aa",
         fillOpacity: 0.95,
@@ -1369,7 +1387,7 @@ export function RailAtlas() {
       <div ref={controlsRef} className="absolute bottom-16 left-3 z-[900]" aria-label="Map controls">
         <div className="flex w-14 flex-col gap-2 rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur">
           <button type="button" onClick={() => mapRef.current?.zoomIn()} disabled={!mapReady || mapZoom >= 18} aria-label="Zoom in" title="Zoom in" className="grid size-11 cursor-pointer place-items-center rounded-xl text-slate-800 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><Plus size={20} strokeWidth={2} aria-hidden="true" /></button>
-          <button type="button" onClick={() => mapRef.current?.zoomOut()} disabled={!mapReady || mapZoom <= 5} aria-label="Zoom out" title="Zoom out" className="grid size-11 cursor-pointer place-items-center rounded-xl text-slate-800 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><Minus size={20} strokeWidth={2} aria-hidden="true" /></button>
+          <button type="button" onClick={() => mapRef.current?.zoomOut()} disabled={!mapReady || mapZoom <= minMapZoom + 0.01} aria-label="Zoom out" title="Zoom out" className="grid size-11 cursor-pointer place-items-center rounded-xl text-slate-800 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><Minus size={20} strokeWidth={2} aria-hidden="true" /></button>
           <span className="mx-2 border-t border-slate-200" aria-hidden="true" />
           <button ref={layersButtonRef} type="button" onClick={() => setLayersOpen((open) => !open)} aria-label="Map layers" aria-expanded={layersOpen} aria-controls={layersOpen ? "rail-atlas-layer-options" : undefined} title="Map layers" className={`grid size-11 cursor-pointer place-items-center rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${layersOpen ? "bg-blue-700 text-white" : "text-slate-800 hover:bg-blue-50 hover:text-blue-700"}`}><Layers3 size={19} strokeWidth={1.8} aria-hidden="true" /></button>
           <span className="mx-2 border-t border-slate-200" aria-hidden="true" />

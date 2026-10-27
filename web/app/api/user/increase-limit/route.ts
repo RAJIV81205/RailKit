@@ -338,27 +338,32 @@ export async function PUT(request: Request) {
     const latestPayment = successPayment || payments[0];
     const paymentStatus = latestPayment?.payment_status || "PENDING";
     if (paymentStatus.toUpperCase() !== "SUCCESS") {
-      await LimitTopup.updateOne(
-        {
-          _id: existingTopup._id,
-          credited: false,
-          paymentStatus: { $ne: "SUCCESS" },
-          status: { $ne: "paid" },
-        },
-        {
-          $set: {
-            status: normalizeNonSuccessfulOrderStatus(cfOrderStatus || paymentStatus),
-            paymentStatus: paymentStatus.toUpperCase(),
-            cashfreeOrderStatus: cfOrderStatus || null,
+      const status = normalizeNonSuccessfulOrderStatus(cfOrderStatus || paymentStatus);
+      if (existingTopup.status !== status || existingTopup.paymentStatus !== paymentStatus.toUpperCase() || existingTopup.cashfreeOrderStatus !== (cfOrderStatus || null)) {
+        await LimitTopup.updateOne(
+          {
+            _id: existingTopup._id,
+            credited: false,
+            paymentStatus: { $ne: "SUCCESS" },
+            status: { $ne: "paid" },
           },
-        },
-      );
+          {
+            $set: {
+              status,
+              paymentStatus: paymentStatus.toUpperCase(),
+              cashfreeOrderStatus: cfOrderStatus || null,
+            },
+          },
+        );
+      }
       return NextResponse.json(
         {
           success: true,
           message: "payment is not completed yet",
           credited: false,
           paid: false,
+          status,
+          paymentStatus: paymentStatus.toUpperCase(),
         },
         { status: 200 }
       );

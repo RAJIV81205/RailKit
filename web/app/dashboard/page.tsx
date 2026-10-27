@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import useSWR from "swr";
-import { ArrowRight, CalendarDays, KeyRound, LockKeyhole } from "lucide-react";
+import { ArrowRight, CalendarDays, CircleAlert, Gauge, KeyRound, Loader2, LockKeyhole, Plus, X } from "lucide-react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { nightOwl } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import {
@@ -655,6 +655,112 @@ function RegenerateKeyDialog({ pending, error, onCancel, onConfirm }: {
   );
 }
 
+function TopupReviewDialog({ currentLimit, extraLimit, price, expiresAt, isAnnual, onCancel, onConfirm }: {
+  currentLimit: number;
+  extraLimit: number;
+  price: number;
+  expiresAt: number;
+  isAnnual: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const [animatedLimit, setAnimatedLimit] = useState(currentLimit);
+  const newLimit = currentLimit + extraLimit;
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    confirmRef.current?.focus();
+    return () => dialog?.close();
+  }, []);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setAnimatedLimit(newLimit);
+      return;
+    }
+    let frame = 0;
+    let start: number | null = null;
+    const animate = (time: number) => {
+      start ??= time;
+      const progress = Math.min((time - start) / 900, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setAnimatedLimit(Math.round(currentLimit + extraLimit * eased));
+      if (progress < 1) frame = window.requestAnimationFrame(animate);
+    };
+    frame = window.requestAnimationFrame(animate);
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentLimit, extraLimit, newLimit]);
+
+  const expiryDate = Number.isFinite(expiresAt) ? new Date(expiresAt) : null;
+  const expiresLabel = expiryDate
+    ? expiryDate.toLocaleString("en-IN", {
+        day: "numeric", month: "short", year: "numeric",
+        hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata",
+      })
+    : "Current plan expiry";
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="topup-review-title"
+      aria-describedby="topup-review-note"
+      onCancel={(event) => { event.preventDefault(); onCancel(); }}
+      onClick={(event) => { if (event.target === dialogRef.current) onCancel(); }}
+      className="fixed inset-0 m-auto max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-[460px] overscroll-contain overflow-y-auto rounded-[24px] border border-[#e5e7eb] bg-white p-0 font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] text-[#111827] shadow-[0_24px_80px_rgba(0,0,0,0.16)] backdrop:bg-black/40 backdrop:backdrop-blur-sm"
+    >
+      <div className="bg-[#f8f8f8] px-6 pb-6 pt-6 max-[360px]:px-4 sm:px-7">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex size-11 items-center justify-center rounded-[13px] border border-[#e0e7ff] bg-[#eef2ff] text-[#4f46e5]"><Plus className="size-5" strokeWidth={1.75} aria-hidden="true" /></div>
+          <button type="button" onClick={onCancel} aria-label="Close top-up review" className="flex size-11 cursor-pointer items-center justify-center rounded-xl text-[#9ca3af] transition-colors hover:bg-[#e9e9e9] hover:text-[#374151] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111827]"><X className="size-5" aria-hidden="true" /></button>
+        </div>
+        <p className="mt-5 text-[11px] font-semibold uppercase tracking-[0.15em] text-[#6b7280]">Request top-up</p>
+        <h2 id="topup-review-title" className="mt-1 text-[25px] font-bold tracking-tight text-[#111827]">More room for requests</h2>
+        <p className="mt-2 text-[13px] leading-5 text-[#6b7280]">Review what gets added to your current plan.</p>
+      </div>
+
+      <div className="px-6 pb-6 pt-5 max-[360px]:px-4 sm:px-7">
+        <div className="rounded-2xl border border-[#e5e7eb] bg-[#fafafa] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[12px] text-[#6b7280]"><span className="flex items-center gap-2"><Gauge className="size-4 shrink-0 text-[#9ca3af]" strokeWidth={1.75} aria-hidden="true" />Current limit</span><span className="font-semibold tabular-nums text-[#374151]">{currentLimit.toLocaleString("en-IN")}</span></div>
+          <div className="my-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[12px] text-[#4f46e5]"><span className="flex items-center gap-2"><Plus className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />Top-up added</span><span className="font-bold tabular-nums">+{extraLimit.toLocaleString("en-IN")}</span></div>
+          <div className="h-2 overflow-hidden rounded-full bg-[#e5e7eb]" aria-hidden="true"><div className="h-full origin-left rounded-full bg-[#4f46e5]" style={{ transform: `scaleX(${Math.max(0, Math.min(1, (animatedLimit - currentLimit) / extraLimit))})` }} /></div>
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-2 border-t border-[#e5e7eb] pt-3"><span className="text-[12px] font-semibold text-[#374151]">New total limit</span><span className="text-[25px] font-extrabold leading-none tabular-nums text-[#111827]" aria-label={`${newLimit.toLocaleString("en-IN")} requests`}>{animatedLimit.toLocaleString("en-IN")}</span></div>
+        </div>
+
+        <div className="mt-3 flex items-center gap-3 rounded-xl border border-[#e5e7eb] bg-[#fafafa] p-4 max-[360px]:p-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-[10px] border border-[#e0e7ff] bg-white text-[#4f46e5]"><CalendarDays className="size-5" strokeWidth={1.75} aria-hidden="true" /></div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#9ca3af]">Top-up expires</p>
+            <p className="mt-1 break-words text-[15px] font-bold leading-6 text-[#111827]">{expiresLabel}</p>
+          </div>
+        </div>
+
+        <div id="topup-review-note" className="mt-3 flex items-start gap-2.5 rounded-xl border border-[#fde68a] bg-[#fffbeb] px-3.5 py-3 text-[12px] leading-[1.6] text-[#92400e]"><CircleAlert className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" /><p>{isAnnual ? "Top-up requests stay available across monthly resets during this annual term. " : ""}Unused top-up requests expire with your current plan. They do not carry into a renewed plan.</p></div>
+        <button ref={confirmRef} type="button" onClick={onConfirm} className="mt-5 flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#4f46e5] px-4 py-3 text-center text-[13px] font-bold text-white transition-colors hover:bg-[#4338ca] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4f46e5]">Pay ₹{price.toLocaleString("en-IN")} and add requests <ArrowRight className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" /></button>
+        <button type="button" onClick={onCancel} className="mt-2 flex min-h-11 w-full cursor-pointer items-center justify-center rounded-xl border border-[#e5e7eb] bg-white text-[13px] font-medium text-[#6b7280] transition-colors hover:bg-[#f9fafb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#111827]">Cancel</button>
+        <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[10px] text-[#9ca3af]"><LockKeyhole className="size-3" strokeWidth={1.75} aria-hidden="true" />Payments securely processed by Cashfree.</p>
+      </div>
+    </dialog>
+  );
+}
+
+function TopupPaymentOverlay({ phase }: { phase: "creating" | "checkout" | "verifying" }) {
+  const title = phase === "creating" ? "Preparing checkout" : phase === "checkout" ? "Complete payment" : "Verifying payment";
+  const detail = phase === "creating" ? "Creating your secure payment order." : phase === "checkout" ? "Use the Cashfree payment window. This dashboard stays locked until checkout closes." : "Checking payment result and updating your request limit. Please keep this page open.";
+  return (
+    <div role="status" aria-live="polite" aria-busy="true" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 px-4 font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-[22px] border border-[#e5e7eb] bg-white px-6 py-8 text-center shadow-[0_24px_80px_rgba(0,0,0,0.16)]">
+        <div className="mx-auto flex size-14 items-center justify-center rounded-2xl border border-[#e0e7ff] bg-[#eef2ff] text-[#4f46e5]"><Loader2 className="size-7 animate-spin motion-reduce:animate-none" aria-hidden="true" /></div>
+        <h2 className="mt-5 text-xl font-bold tracking-tight text-[#111827]">{title}</h2>
+        <p className="mt-2 text-[13px] leading-6 text-[#6b7280]">{detail}</p>
+        <div className="mx-auto mt-5 h-1 w-24 overflow-hidden rounded-full bg-[#e5e7eb]" aria-hidden="true"><div className="h-full w-1/2 rounded-full bg-[#4f46e5] motion-safe:animate-pulse" /></div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const router = useRouter();
@@ -667,6 +773,9 @@ export default function DashboardPage() {
   const [regenerateError, setRegenerateError] = useState<string | null>(null);
   const [keyVisible, setKeyVisible] = useState(false);
   const [limitPurchaseLoading, setLimitPurchaseLoading] = useState(false);
+  const [topupPaymentPhase, setTopupPaymentPhase] = useState<"creating" | "checkout" | "verifying" | null>(null);
+  const [showTopupReview, setShowTopupReview] = useState(false);
+  const topupCheckoutRef = useRef(false);
   const [limitPurchaseMessage, setLimitPurchaseMessage] = useState<
     string | null
   >(null);
@@ -822,35 +931,50 @@ export default function DashboardPage() {
 
   const verifyLimitTopup = useCallback(
     async (orderId: string) => {
+      topupCheckoutRef.current = true;
       setLimitPurchaseLoading(true);
+      setTopupPaymentPhase("verifying");
       setLimitPurchaseMessage("Verifying payment...");
       try {
-        const response = await fetch("/api/user/increase-limit", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderId }),
-        });
-        const data = await response.json();
-        if (!response.ok || !data?.success)
-          throw new Error(data?.message || "Unable to verify payment");
+        for (let attempt = 0; attempt < 18; attempt += 1) {
+          const response = await fetch("/api/user/increase-limit", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderId }),
+          });
+          const data = await response.json();
+          if (!response.ok || !data?.success)
+            throw new Error(data?.message || "Unable to verify payment");
+          if (data?.paid) {
+            void mutateOrders();
+            if (data?.requiresSupport) {
+              setLimitPurchaseMessage(
+                `Payment received, but top-up needs review because plan expired. Contact support with order ID ${orderId}.`,
+              );
+              return;
+            }
+            setLimitPurchaseMessage(
+              `Limit increased by ${Number(data.extraLimit || 0).toLocaleString("en-IN")} requests.`,
+            );
+            await mutateUser();
+            return;
+          }
+          const paymentStatus = String(data?.paymentStatus || "").toUpperCase();
+          const status = String(data?.status || "").toLowerCase();
+          if (paymentStatus === "USER_DROPPED" || status === "cancelled") {
+            setLimitPurchaseMessage("Payment cancelled. No requests were added.");
+            void mutateOrders();
+            return;
+          }
+          if (paymentStatus === "FAILED" || status === "failed" || status === "expired") {
+            setLimitPurchaseMessage("Payment failed or expired. No requests were added.");
+            void mutateOrders();
+            return;
+          }
+          if (attempt < 17) await new Promise<void>((resolve) => window.setTimeout(resolve, 2000));
+        }
+        setLimitPurchaseMessage(`Payment is still pending. Check Order History or contact support with order ID ${orderId}.`);
         void mutateOrders();
-        if (!data?.paid) {
-          setLimitPurchaseMessage(
-            "Payment is still pending. Please retry in a moment.",
-          );
-          return data;
-        }
-        if (data?.requiresSupport) {
-          setLimitPurchaseMessage(
-            "Payment was received, but the plan expired before activation. Please contact support with your order ID.",
-          );
-          return data;
-        }
-        setLimitPurchaseMessage(
-          `Limit increased by ${Number(data.extraLimit || 0).toLocaleString("en-IN")} requests.`,
-        );
-        await mutateUser();
-        return data;
       } catch (error: unknown) {
         setLimitPurchaseMessage(
           getErrorMessage(
@@ -861,14 +985,19 @@ export default function DashboardPage() {
         throw error;
       } finally {
         setLimitPurchaseLoading(false);
+        setTopupPaymentPhase(null);
+        topupCheckoutRef.current = false;
       }
     },
     [mutateUser, mutateOrders],
   );
 
   const startLimitTopupPayment = async () => {
-    if (limitPurchaseLoading) return;
+    if (topupCheckoutRef.current || limitPurchaseLoading) return;
+    topupCheckoutRef.current = true;
+    setShowTopupReview(false);
     setLimitPurchaseLoading(true);
+    setTopupPaymentPhase("creating");
     setLimitPurchaseMessage(null);
     try {
       const response = await fetch("/api/user/increase-limit", {
@@ -889,6 +1018,7 @@ export default function DashboardPage() {
           "Cashfree checkout failed to load. Please refresh and try again.",
         );
       setLimitPurchaseMessage("Opening secure payment popup...");
+      setTopupPaymentPhase("checkout");
       const cashfree = window.Cashfree({
         mode: data?.cashfreeMode === "sandbox" ? "sandbox" : "production",
       });
@@ -909,6 +1039,8 @@ export default function DashboardPage() {
         ),
       );
       setLimitPurchaseLoading(false);
+      setTopupPaymentPhase(null);
+      topupCheckoutRef.current = false;
     }
   };
 
@@ -925,6 +1057,19 @@ export default function DashboardPage() {
     setVerifiedReturnOrderId(orderId);
     verifyLimitTopup(orderId).catch(() => {});
   }, [verifiedReturnOrderId, verifyLimitTopup]);
+
+  useEffect(() => {
+    if (!topupPaymentPhase) return;
+    const previousOverflow = document.body.style.overflow;
+    const header = document.querySelector<HTMLElement>("header");
+    const headerWasInert = header?.hasAttribute("inert") ?? false;
+    document.body.style.overflow = "hidden";
+    header?.setAttribute("inert", "");
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      if (!headerWasInert) header?.removeAttribute("inert");
+    };
+  }, [topupPaymentPhase]);
 
   const onLogout = async () => {
     try {
@@ -1192,46 +1337,6 @@ export default function DashboardPage() {
   const topupExpirationTimestamp = canBuyLimitTopup
     ? billingDates?.termEnd ?? NaN
     : NaN;
-  const billingDaysMatch = planTimer.display.match(/^(\d+)d\b/);
-  const topupDaysLeft = billingDaysMatch
-    ? Number(billingDaysMatch[1])
-    : /^\d+h\b/.test(planTimer.display) || planTimer.display === "Expired"
-      ? 0
-      : null;
-  const topupExpiryDate = Number.isFinite(topupExpirationTimestamp)
-    ? new Date(topupExpirationTimestamp).toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
-    : "current plan expiry";
-  const topupValidityTone =
-    topupDaysLeft === null || topupDaysLeft > 7
-      ? {
-          box: "border-[#e2e8f0] bg-[#f8fafc]",
-          icon: "text-[#64748b]",
-          text: "text-[#64748b]",
-        }
-      : topupDaysLeft >= 3
-        ? {
-            box: "border-[#fde68a] bg-[#fffbeb]",
-            icon: "text-[#d97706]",
-            text: "text-[#a16207]",
-          }
-        : {
-            box: "border-[#fed7aa] bg-[#fff7ed]",
-            icon: "text-[#ea580c]",
-            text: "text-[#c2410c]",
-          };
-  const topupValidityMessage = !canBuyLimitTopup
-    ? "Extra requests are available on paid plans. Upgrade your plan to add requests."
-    : isAnnual
-    ? `Unused top-up requests carry over between monthly cycles and expire with your annual plan on ${topupExpiryDate}.`
-    : topupDaysLeft === null || topupDaysLeft > 7
-      ? Number.isFinite(topupExpirationTimestamp)
-        ? `Expires with your current plan on ${topupExpiryDate} · Unused requests do not carry forward.`
-        : "Expires with your current plan · Unused requests do not carry forward."
-      : `${topupDaysLeft === 0 ? "Plan expires today" : `Plan expires in ${topupDaysLeft} ${topupDaysLeft === 1 ? "day" : "days"}`} · This top-up will expire on ${topupExpiryDate} · Unused requests do not carry forward.`;
   const topupMessageIsError = Boolean(
     limitPurchaseMessage && /(failed|error|unable)/i.test(limitPurchaseMessage),
   );
@@ -1307,8 +1412,20 @@ export default function DashboardPage() {
       {viewOrder && (
         <OrderModal order={viewOrder} onClose={() => setViewOrder(null)} />
       )}
+      {showTopupReview && canBuyLimitTopup && (
+        <TopupReviewDialog
+          currentLimit={dbUser.limit}
+          extraLimit={selectedTopup.requests}
+          price={selectedTopup.price}
+          expiresAt={topupExpirationTimestamp}
+          isAnnual={isAnnual}
+          onCancel={() => setShowTopupReview(false)}
+          onConfirm={() => { void startLimitTopupPayment(); }}
+        />
+      )}
+      {topupPaymentPhase && <TopupPaymentOverlay phase={topupPaymentPhase} />}
 
-      <div className="min-h-screen bg-[#f8f8f8] pt-[60px] font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] max-[768px]:overflow-x-hidden [&_*]:box-border [&_*]:font-[inherit] [&::-webkit-scrollbar]:size-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-[#e0e0e0] [&::-webkit-scrollbar-track]:bg-transparent">
+      <div inert={Boolean(topupPaymentPhase)} className="min-h-screen bg-[#f8f8f8] pt-[60px] font-[var(--font-noto),'Noto_Sans',system-ui,sans-serif] max-[768px]:overflow-x-hidden [&_*]:box-border [&_*]:font-[inherit] [&::-webkit-scrollbar]:size-1 [&::-webkit-scrollbar-thumb]:rounded [&::-webkit-scrollbar-thumb]:bg-[#e0e0e0] [&::-webkit-scrollbar-track]:bg-transparent">
         <div className="mx-auto flex min-h-[calc(100vh-60px)] max-w-7xl items-start gap-3.5 px-5 pt-5 pb-8 max-[768px]:px-3 max-[768px]:pt-3 max-[768px]:pb-7 max-[480px]:px-2 max-[480px]:pt-2 max-[480px]:pb-6">
           {/* ── Left Sidebar ─────────────────────────────────────────────── */}
           <aside
@@ -1706,22 +1823,8 @@ export default function DashboardPage() {
                       <p className={canBuyLimitTopup ? "text-[10px] font-bold tracking-[0.08em] text-[#c0c0c0] uppercase" : "text-sm font-bold text-[#111827]"}>
                         {canBuyLimitTopup ? "ADD EXTRA REQUESTS" : "Buy extra requests here"}
                       </p>
-                      {!canBuyLimitTopup ? (
+                      {!canBuyLimitTopup && (
                         <p id="topup-preview-help" className="w-full text-xs leading-relaxed text-[#6b7280]">Select a pack below. You can buy it here after upgrading to a paid plan.</p>
-                      ) : (
-                      <p className="text-[11px] leading-normal text-[#9ca3af]">
-                        {usageLeft.toLocaleString("en-IN")} left
-                        {topupDaysLeft !== null && (
-                          <>
-                            {" "}
-                            · {topupDaysLeft}{" "}
-                            {topupDaysLeft === 1 ? "day" : "days"} left
-                          </>
-                        )}
-                        {Number.isFinite(topupExpirationTimestamp) && (
-                          <> · Expires {topupExpiryDate}</>
-                        )}
-                      </p>
                       )}
                     </div>
                     <div className="mb-3 grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2.5">
@@ -1754,39 +1857,21 @@ export default function DashboardPage() {
                     {!canBuyLimitTopup && (
                       <button type="button" disabled className="flex min-h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-[#e5e7eb] bg-[#f3f4f6] px-3 py-3 text-[13px] font-semibold text-[#6b7280]" aria-describedby="topup-purchase-requirement">
                         <LockKeyhole aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.75} />
-                        Buy {selectedTopup.requests.toLocaleString("en-IN")} requests — ₹{selectedTopup.price.toLocaleString("en-IN")}
+                        Buy {selectedTopup.requests.toLocaleString("en-IN")} requests
                       </button>
                     )}
                     {canBuyLimitTopup && (
                       <>
-                        <div
-                          className={`${topupValidityTone.box} mb-3 flex items-start gap-[7px] rounded-[9px] border px-3 py-2.5`}
-                        >
-                          <span
-                            aria-hidden="true"
-                            className={`${topupValidityTone.icon} shrink-0 text-[13px] leading-normal`}
-                          >
-                            {topupDaysLeft !== null && topupDaysLeft <= 7 ? "⚠" : "ⓘ"}
-                          </span>
-                          <p
-                            className={`${topupValidityTone.text} min-w-0 text-[11px] leading-normal [overflow-wrap:anywhere]`}
-                          >
-                            {topupValidityMessage}
-                          </p>
-                        </div>
                         <button
                           type="button"
-                          onClick={startLimitTopupPayment}
+                          onClick={() => setShowTopupReview(true)}
                           disabled={limitPurchaseLoading || !canBuyLimitTopup}
                           className={`w-full rounded-xl border-none p-[13px] text-[13px] font-bold tracking-[0.01em] transition-colors duration-150 ${limitPurchaseLoading ? "cursor-wait bg-[#e5e7eb] text-[#9ca3af]" : "cursor-pointer bg-[#4f46e5] text-white"}`}
                         >
                           {limitPurchaseLoading
                             ? "Processing..."
-                            : `Add ${selectedTopup.requests.toLocaleString("en-IN")} Requests — ₹${selectedTopup.price.toLocaleString("en-IN")} →`}
+                            : `Add ${selectedTopup.requests.toLocaleString("en-IN")} Requests →`}
                         </button>
-                        <p className="mt-[7px] text-center text-[10px] leading-[1.4] text-[#9ca3af]">
-                          Payments securely processed by Cashfree.
-                        </p>
                         {limitPurchaseMessage && (
                           <p
                             role="status"

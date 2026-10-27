@@ -1,6 +1,6 @@
 {
-  "updatedAtIST": "03/10/2026, 11:16:01",
-  "totalStations": 9215,
+  "updatedAtIST": "27/10/2026, 20:07:22",
+  "totalStations": 9234,
   "stations": [
     {
       "code": "AA",
@@ -1349,8 +1349,8 @@
     {
       "code": "AMNR",
       "name": "AMMANUR",
-      "lat": 10.5912,
-      "lon": 79.6409
+      "lat": 10.591265,
+      "lon": 79.640923
     },
     {
       "code": "AMO",
@@ -1387,6 +1387,12 @@
       "name": "AMMUGUDA",
       "lat": 17.486829,
       "lon": 78.527005
+    },
+    {
+      "code": "AMR",
+      "name": "ARMORI",
+      "lat": 0,
+      "lon": 0
     },
     {
       "code": "AMRA",
@@ -1549,6 +1555,12 @@
       "name": "ANGADGERI HALT",
       "lat": 16.451644,
       "lon": 75.845661
+    },
+    {
+      "code": "ANGU",
+      "name": "ANAGODU",
+      "lat": 0,
+      "lon": 0
     },
     {
       "code": "ANH",
@@ -2079,6 +2091,12 @@
       "lon": 86.3136
     },
     {
+      "code": "ASBS",
+      "name": "AMAR SHAHID BHALE SULTAN",
+      "lat": null,
+      "lon": null
+    },
+    {
       "code": "ASCE",
       "name": "ATHSARAI",
       "lat": 25.6822,
@@ -2207,8 +2225,8 @@
     {
       "code": "ATB",
       "name": "ALATTAMBADI",
-      "lat": 10.5787,
-      "lon": 79.6407
+      "lat": 10.578778,
+      "lon": 79.640751
     },
     {
       "code": "ATC",
@@ -10389,6 +10407,12 @@
       "lon": 82.35
     },
     {
+      "code": "CHRT",
+      "name": "CHURHAT",
+      "lat": 0,
+      "lon": 0
+    },
+    {
       "code": "CHRU",
       "name": "CHAMRUA",
       "lat": 28.796546,
@@ -11943,6 +11967,12 @@
       "lon": 72.8185
     },
     {
+      "code": "CYZ",
+      "name": "CHIPYANA BUZURG",
+      "lat": 28.628227,
+      "lon": 77.459596
+    },
+    {
       "code": "D",
       "name": "DEULA",
       "lat": 22.214424,
@@ -12763,6 +12793,12 @@
       "name": "DIGHA",
       "lat": 21.6227,
       "lon": 87.508
+    },
+    {
+      "code": "DGHC",
+      "name": "DEOGHAR LINK CABIN",
+      "lat": 0,
+      "lon": 0
     },
     {
       "code": "DGHL",
@@ -14973,6 +15009,12 @@
       "lon": 77.6996
     },
     {
+      "code": "DVNR",
+      "name": "DEVENDRA NAGAR",
+      "lat": 0,
+      "lon": 0
+    },
+    {
       "code": "DVR",
       "name": "DORAVARICHATTRAM",
       "lat": 13.781402,
@@ -17121,6 +17163,12 @@
       "lon": 87.8047
     },
     {
+      "code": "GMC",
+      "name": "KANPUR GOODS MARSHAL",
+      "lat": 26.452132,
+      "lon": 80.3394
+    },
+    {
       "code": "GMD",
       "name": "GURAMKHEDI",
       "lat": 22.6814,
@@ -18303,6 +18351,12 @@
       "lon": 86.142
     },
     {
+      "code": "GUGD",
+      "name": "GURU GORAKHNATH DHAM",
+      "lat": 26.262092,
+      "lon": 81.51907
+    },
+    {
       "code": "GUH",
       "name": "GULDHAR",
       "lat": 28.703462,
@@ -18751,6 +18805,12 @@
       "name": "HABRA",
       "lat": 22.8408,
       "lon": 88.6577
+    },
+    {
+      "code": "HBAU",
+      "name": "HEBBALU",
+      "lat": 0,
+      "lon": 0
     },
     {
       "code": "HBB",
@@ -20745,6 +20805,12 @@
       "lon": 87.519493
     },
     {
+      "code": "JAIC",
+      "name": "JAIS CITY",
+      "lat": null,
+      "lon": null
+    },
+    {
       "code": "JAIS",
       "name": "JAIS",
       "lat": 26.262,
@@ -22067,8 +22133,8 @@
     {
       "code": "JOKT",
       "name": "JOKATTE",
-      "lat": null,
-      "lon": null
+      "lat": 12.95959,
+      "lon": 74.853096
     },
     {
       "code": "JOL",
@@ -29332,9 +29398,9 @@
     },
     {
       "code": "LDE",
-      "name": "LOKDHIKHERA",
-      "lat": 21.5827,
-      "lon": 78.856
+      "name": "LODHIKHERA",
+      "lat": 21.582743,
+      "lon": 78.856087
     },
     {
       "code": "LDH",
@@ -30483,6 +30549,12 @@
       "lon": 79.9999
     },
     {
+      "code": "MABM",
+      "name": "MAA AHORWA BHAWANI DHAM",
+      "lat": 26.531946,
+      "lon": 81.502118
+    },
+    {
       "code": "MABN",
       "name": "MABAN",
       "lat": 24.641556,
@@ -30773,8 +30845,8 @@
     {
       "code": "MARD",
       "name": "MAVUR ROAD",
-      "lat": 10.6533,
-      "lon": 79.6362
+      "lat": 10.653354,
+      "lon": 79.636288
     },
     {
       "code": "MAS",
@@ -30820,9 +30892,9 @@
     },
     {
       "code": "MAX",
-      "name": "MANGUDI",
-      "lat": 10.7026,
-      "lon": 79.6277
+      "name": "MANGUDI HALT",
+      "lat": 10.702611,
+      "lon": 79.627705
     },
     {
       "code": "MAY",
@@ -30937,6 +31009,12 @@
       "name": "MANUBOLU",
       "lat": 14.2267,
       "lon": 79.8773
+    },
+    {
+      "code": "MBLP",
+      "name": "MAHARAJA BIJLI PASI",
+      "lat": 26.460431,
+      "lon": 81.632881
     },
     {
       "code": "MBM",
@@ -32491,6 +32569,12 @@
       "name": "MAKUDI",
       "lat": 19.5927,
       "lon": 79.4484
+    },
+    {
+      "code": "MKDM",
+      "name": "MAA KALIKAN DHAM",
+      "lat": 26.122151,
+      "lon": 81.83836
     },
     {
       "code": "MKDN",
@@ -34637,8 +34721,8 @@
     {
       "code": "MTT",
       "name": "MUTUPET",
-      "lat": 10.399,
-      "lon": 79.4929
+      "lat": 10.399014,
+      "lon": 79.49295
     },
     {
       "code": "MTU",
@@ -35657,8 +35741,8 @@
     {
       "code": "NBQ",
       "name": "NEW BONGAIGAON",
-      "lat": 26.4744,
-      "lon": 90.536
+      "lat": 26.474415,
+      "lon": 90.536098
     },
     {
       "code": "NBQY",
@@ -38507,8 +38591,8 @@
     {
       "code": "PADL",
       "name": "PADIL",
-      "lat": 12.8747,
-      "lon": 74.8948
+      "lat": 12.874731,
+      "lon": 74.894829
     },
     {
       "code": "PADN",
@@ -38716,9 +38800,9 @@
     },
     {
       "code": "PAVP",
-      "name": "PEDDA AVUTAPALE",
-      "lat": 16.5625,
-      "lon": 80.8394
+      "name": "PEDDA AVUTAPALLE",
+      "lat": 16.562575,
+      "lon": 80.839462
     },
     {
       "code": "PAW",
@@ -39577,6 +39661,12 @@
       "name": "PIRTHIGANJ",
       "lat": 25.8618,
       "lon": 82.0072
+    },
+    {
+      "code": "PHWI",
+      "name": "PHULWARI",
+      "lat": 0,
+      "lon": 0
     },
     {
       "code": "PHWR",
@@ -42934,7 +43024,7 @@
     },
     {
       "code": "RJAK",
-      "name": "RAJ NAGAR K HALT",
+      "name": "RAJNAGAR",
       "lat": 24.897025,
       "lon": 79.878845
     },
@@ -44379,6 +44469,12 @@
       "lon": 69.726448
     },
     {
+      "code": "RWT",
+      "name": "ROWGHAT",
+      "lat": 19.859273,
+      "lon": 81.148506
+    },
+    {
       "code": "RWTB",
       "name": "ROWTA BAGAN",
       "lat": 26.7371,
@@ -45523,6 +45619,12 @@
       "name": "SEHAL",
       "lat": 28.9181,
       "lon": 78.8222
+    },
+    {
+      "code": "SEX",
+      "name": "SERONI ROAD",
+      "lat": 25.943536,
+      "lon": 76.884041
     },
     {
       "code": "SEY",
@@ -49719,6 +49821,12 @@
       "lon": 82.7697
     },
     {
+      "code": "SWPS",
+      "name": "SWAMI PARAMHANS",
+      "lat": 26.226988,
+      "lon": 81.620436
+    },
+    {
       "code": "SWR",
       "name": "SONUA",
       "lat": 22.5766,
@@ -50739,6 +50847,12 @@
       "lon": 81.9171
     },
     {
+      "code": "THWM",
+      "name": "TAPESHWARNATH DHAM",
+      "lat": 26.244772,
+      "lon": 81.415901
+    },
+    {
       "code": "THX",
       "name": "TOVALAI",
       "lat": 8.227885,
@@ -51641,8 +51755,8 @@
     {
       "code": "TNK",
       "name": "TIRUNELLIKAVAL",
-      "lat": 10.6051,
-      "lon": 79.64
+      "lat": 10.605101,
+      "lon": 79.640064
     },
     {
       "code": "TNKU",
@@ -52925,8 +53039,8 @@
     {
       "code": "ULL",
       "name": "ULLAL",
-      "lat": 12.7916,
-      "lon": 74.855
+      "lat": 12.79163,
+      "lon": 74.855089
     },
     {
       "code": "ULM",

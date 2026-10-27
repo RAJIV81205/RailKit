@@ -25,6 +25,7 @@ import {
 
 import type { PricingPlan, PaidPlanType, PricingFeature } from "../../lib/constants";
 import { TOPUP_OPTIONS, formatINR } from "../../lib/constants";
+import { addMonths } from "../../lib/billing/entitlements";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,10 @@ function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return fallback;
+}
+
+function formatRenewalDate(date: Date): string {
+  return date.toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" });
 }
 
 function pad(n: number): string {
@@ -280,7 +285,7 @@ function useCountdown(offerEndsAt: string | null): TimeLeft {
 // ─── Payment modal ────────────────────────────────────────────────────────────
 
 function PaymentModal({
-  selectedPlan, billingInterval, isCreatingOrder, onConfirm, onCancel, upgradeQuote, renewalEndsAt, renewalPrice,
+  selectedPlan, billingInterval, isCreatingOrder, onConfirm, onCancel, upgradeQuote, renewalStartsAt, renewalPrice,
 }: {
   selectedPlan: PaidPlanType;
   billingInterval: "month" | "year";
@@ -288,11 +293,17 @@ function PaymentModal({
   onConfirm: () => void;
   onCancel: () => void;
   upgradeQuote?: UpgradeQuote | null;
-  renewalEndsAt?: string | null;
+  renewalStartsAt?: string | null;
   renewalPrice?: string;
 }) {
   const modalRef = useRef<HTMLDivElement>(null);
   const confirmBtnRef = useRef<HTMLButtonElement>(null);
+  const renewalStart = renewalStartsAt ? new Date(renewalStartsAt) : null;
+  const renewalEnd = renewalStart && Number.isFinite(renewalStart.getTime())
+    ? billingInterval === "year"
+      ? addMonths(renewalStart, 12)
+      : new Date(renewalStart.getTime() + 30 * 24 * 60 * 60 * 1000)
+    : null;
 
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
@@ -330,7 +341,7 @@ function PaymentModal({
         className="w-full max-w-md overflow-y-auto rounded-3xl border border-black/8 bg-white p-8 shadow-2xl"
         style={{ maxHeight: "90dvh" }}
         onClick={(e) => e.stopPropagation()}>
-        {renewalEndsAt ? (
+        {renewalEnd && renewalStart ? (
           <>
             <div className="mb-6 rounded-2xl border border-black/8 bg-gradient-to-br from-[#f5f5f5] via-white to-[#fafafa] p-5">
               <div className="flex items-center gap-3">
@@ -340,8 +351,11 @@ function PaymentModal({
               </div>
               <div className="mt-5 border-t border-black/8 pt-4"><p className="text-xs text-[#6F6F6F]">Pay today</p><p className="text-4xl font-semibold tracking-tight text-[#111827]">{renewalPrice}</p><p className="mt-1 text-xs text-[#6F6F6F]">One-time {billingInterval === "year" ? "annual" : "monthly"} renewal</p></div>
             </div>
-            <div className="rounded-2xl border border-black/6 bg-[#fafafa] p-4"><p className="text-xs text-[#6F6F6F]">Next term starts</p><p className="mt-1 text-lg font-semibold text-[#111827]">{new Date(renewalEndsAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })} IST</p></div>
-            <p className="mt-4 text-xs leading-5 text-[#6F6F6F]">Your current plan stays active until expiry. New request allowance begins when renewal activates.</p>
+            <div className="rounded-2xl border border-black/6 bg-[#fafafa] p-4">
+              <div><p className="text-xs text-[#6F6F6F]">Next term starts</p><p className="mt-1 text-lg font-semibold text-[#111827]">{formatRenewalDate(renewalStart)}</p></div>
+              <div className="mt-4 border-t border-black/8 pt-4"><p className="text-xs text-[#6F6F6F]">New expiration date · {billingInterval === "year" ? "12 months later" : "30 days later"}</p><p className="mt-1 text-lg font-semibold text-[#111827]">{formatRenewalDate(renewalEnd)}</p></div>
+            </div>
+            <p className="mt-4 text-xs leading-5 text-[#6F6F6F]">Your current plan stays active until expiry. New request allowance begins when renewal activates. Any unused top-up requests are removed from your balance when the current plan ends.</p>
           </>
         ) : upgradeQuote ? (
           <>
@@ -396,7 +410,7 @@ function PaymentModal({
           <button type="button" ref={confirmBtnRef} onClick={onConfirm} disabled={isCreatingOrder}
             className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60 motion-reduce:transform-none ${upgradeQuote ? "bg-[#0a0a0a] shadow-lg shadow-black/10 hover:bg-neutral-800" : "bg-black hover:bg-neutral-800"}`}>
             {isCreatingOrder && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-            {isCreatingOrder ? "Opening Checkout…" : upgradeQuote ? `Pay ${formatINR(upgradeQuote.amount)} and upgrade` : renewalEndsAt ? "Pay and schedule renewal" : "Proceed to Payment"}
+            {isCreatingOrder ? "Opening Checkout…" : upgradeQuote ? `Pay ${formatINR(upgradeQuote.amount)} and upgrade` : renewalEnd ? "Pay and schedule renewal" : "Proceed to Payment"}
           </button>
           <button type="button" onClick={onCancel} disabled={isCreatingOrder}
             className="rounded-full border border-black/10 px-6 py-3.5 text-sm text-[#6F6F6F] transition hover:bg-gray-50 disabled:opacity-50">
@@ -1003,7 +1017,7 @@ function PricingPageContent({
           billingInterval={billingInterval}
           isCreatingOrder={isCreatingOrder}
           upgradeQuote={upgradeQuote}
-          renewalEndsAt={isRenewal && authState.status === "authenticated" ? authState.expirationDate : null}
+          renewalStartsAt={isRenewal && authState.status === "authenticated" ? authState.expirationDate : null}
           renewalPrice={billingInterval === "year" ? initialPlans.find((plan) => plan.planType === selectedPlan)?.annualPrice : initialPlans.find((plan) => plan.planType === selectedPlan)?.price}
           onConfirm={startPayment}
           onCancel={() => { if (!isCreatingOrder) { setShowPaymentModal(false); setSelectedPlan(null); } }}

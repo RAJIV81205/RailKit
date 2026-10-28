@@ -6,7 +6,8 @@ import Link from "next/link";
 import Script from "next/script";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CircleMarker, Layer, LayerGroup, Map as LeafletMap, LeafletMouseEvent } from "leaflet";
-import { ChevronDown, Clock3, House, Layers3, Minus, Navigation, Plus, RefreshCw, Search, TrainFront, X } from "lucide-react";
+import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
+import { Check, ChevronDown, Clock3, Focus, House, Layers3, ListFilter, Minus, Navigation, Plus, RefreshCw, Search, TrainFront, X } from "lucide-react";
 
 type Station = {
   code: string;
@@ -68,6 +69,75 @@ type GlobalSearchResponse = {
 };
 
 type TrainSelection = { trainNo: string; trainName: string; date?: string };
+
+type LiveMapTrain = {
+  trainNo: string;
+  journeyDate: string;
+  trainName: string;
+  trainType: string;
+  currentStation: { code: string; name: string; lat?: number; lon?: number };
+  upcomingStation: { code: string | null; name: string | null };
+};
+
+type MappedLiveMapTrain = LiveMapTrain & {
+  currentStation: LiveMapTrain["currentStation"] & { lat: number; lon: number };
+};
+
+function hasMappedPosition(train: LiveMapTrain): train is MappedLiveMapTrain {
+  return Number.isFinite(train.currentStation?.lat) && Number.isFinite(train.currentStation?.lon);
+}
+
+const LIVE_TRAIN_CATEGORIES = [
+  { id: "vandeBharat", label: "Vande Bharat", color: "#fb923c" },
+  { id: "rajdhaniDuronto", label: "Rajdhani / Duronto", color: "#fb7185" },
+  { id: "superfast", label: "Superfast Express", color: "#60a5fa" },
+  { id: "expressMail", label: "Express / Mail", color: "#2dd4bf" },
+  { id: "garibRathHumsafar", label: "Garib Rath / Humsafar", color: "#f87171" },
+  { id: "janShatabdi", label: "Jan Shatabdi", color: "#f472b6" },
+  { id: "suburbanEmu", label: "Suburban / EMU", color: "#4ade80" },
+  { id: "passenger", label: "Passenger", color: "#facc15" },
+  { id: "special", label: "Special Trains", color: "#e879f9" },
+  { id: "other", label: "Other", color: "#cbd5e1" },
+] as const;
+
+type LiveTrainCategory = (typeof LIVE_TRAIN_CATEGORIES)[number]["id"];
+const ALL_LIVE_TRAIN_CATEGORIES = LIVE_TRAIN_CATEGORIES.map((category) => category.id);
+
+function liveTrainCategory(trainType: string): LiveTrainCategory {
+  const type = trainType.toUpperCase();
+  if (type.includes("VANDE BHARAT")) return "vandeBharat";
+  if (/RAJDHANI|DURONTO/.test(type)) return "rajdhaniDuronto";
+  if (/GARIB RATH|HUMSAFAR/.test(type)) return "garibRathHumsafar";
+  if (type.includes("JAN SHATABDI")) return "janShatabdi";
+  if (type.includes("SUPERFAST")) return "superfast";
+  if (/SUBURBAN|MEMU|\bEMU\b|\bDMU\b/.test(type)) return "suburbanEmu";
+  if (type.includes("PASSENGER")) return "passenger";
+  if (/SPECIAL|TRAIN ON DEMAND/.test(type)) return "special";
+  if (/EXPRESS|MAIL/.test(type)) return "expressMail";
+  return "other";
+}
+
+function createLiveTrainIcon(color: string): ImageData {
+  const canvas = document.createElement("canvas");
+  canvas.width = 24;
+  canvas.height = 24;
+  const context = canvas.getContext("2d")!;
+  context.beginPath();
+  context.moveTo(12, 3);
+  context.lineTo(17, 18);
+  context.lineTo(12, 15);
+  context.lineTo(7, 18);
+  context.closePath();
+  context.fillStyle = color;
+  context.fill();
+  return context.getImageData(0, 0, 24, 24);
+}
+
+type LiveMapResponse = {
+  success: boolean;
+  data?: { stale: boolean; lastSweepAt: string | null; count: number; mappedCount: number; trains: LiveMapTrain[] };
+  error?: string;
+};
 
 type TrainTimelineItem = {
   index: number;
@@ -246,6 +316,31 @@ function getStraightTrainRoute(data: TrainLiveData): [number, number][] {
     if (!previous || previous[0] !== stop.point[0] || previous[1] !== stop.point[1]) route.push(stop.point);
     return route;
   }, []);
+}
+
+function focusTrainOnMap(map: LeafletMap, lat: number, lon: number) {
+  const zoom = 8;
+  const point = map.project([lat, lon], zoom);
+  const center = window.innerWidth >= 1024
+    ? map.unproject(point.subtract([Math.min(210, map.getSize().x * 0.2), 0]), zoom)
+    : map.unproject(point.add([0, map.getSize().y * 0.28]), zoom);
+  map.flyTo(center, zoom, { duration: 0.65 });
+}
+
+function focusTrainRouteOnMap(map: LeafletMap, route: [number, number][]) {
+  if (route.length < 2) {
+    if (route.length === 1) focusTrainOnMap(map, route[0][0], route[0][1]);
+    return;
+  }
+  const desktop = window.innerWidth >= 1024;
+  const mobilePanelHeight = desktop ? 0 : Math.round(map.getSize().y * 0.68);
+  map.fitBounds(route, {
+    paddingTopLeft: desktop ? [420, 72] : [28, 48],
+    paddingBottomRight: desktop ? [48, 72] : [28, mobilePanelHeight + 32],
+    maxZoom: 8,
+    animate: true,
+    duration: 0.65,
+  });
 }
 
 function useRailAtlasAccess(scriptReady: boolean) {
@@ -681,30 +776,30 @@ function StationDetailsPanel({
   );
 }
 
-function TrainDetailsPanel({ selection, data, loading, refreshing, error, refreshError, onClose, onRetry }: {
+function TrainDetailsPanel({ selection, data, loading, refreshing, error, refreshError, focusOnly, onClose, onRetry, onFocusTrain }: {
   selection: TrainSelection;
   data: TrainLiveData | null;
   loading: boolean;
   refreshing: boolean;
   error: string;
   refreshError: string;
+  focusOnly: boolean;
   onClose: () => void;
   onRetry: () => void;
+  onFocusTrain: () => void;
 }) {
-  const progress = data?.progress;
   const scheduleRef = useRef<HTMLDivElement>(null);
-  const scheduleGroups = useMemo(() => groupTrainSchedule(data?.timeline || []), [data?.timeline]);
   const isFullyCancelled = Boolean(data?.statusNote && /\bcancel(?:led|lation)?\b/i.test(data.statusNote));
-  const cancellationNote = useMemo(() => {
-    if (isFullyCancelled) return "This train is completely cancelled today. No stations will be served.";
-    const cancelledStops = scheduleGroups.map((group) => group.stop).filter(isCancelledScheduleStop);
-    if (cancelledStops.length === 0) return "";
-    const first = cancelledStops[0];
-    const last = cancelledStops.at(-1)!;
-    if (cancelledStops.length === 1) return `${first.stationName || first.stationCode} is marked cancelled in this schedule.`;
-    return `${cancelledStops.length} stops are marked cancelled from ${first.stationName || first.stationCode} to ${last.stationName || last.stationCode}.`;
-  }, [isFullyCancelled, scheduleGroups]);
-  const currentSegmentKey = useMemo(() => scheduleGroups.find((group) => group.intermediates.some((stop) => stop.status === "current" || stop.stationCode === data?.currentPosition?.stationCode))?.key, [data?.currentPosition?.stationCode, scheduleGroups]);
+  const stops = data?.timeline || [];
+  const scheduleGroups = useMemo(() => groupTrainSchedule(stops), [stops]);
+  const currentStationCode = data?.currentPosition?.stationCode;
+  const currentStop = (currentStationCode ? stops.find((stop) => stop.stationCode === currentStationCode) : undefined)
+    || stops.find((stop) => stop.status === "current");
+  const currentDelay = currentStop?.departure?.delay || currentStop?.arrival?.delay || "";
+  const currentSegmentKey = useMemo(
+    () => scheduleGroups.find((group) => group.intermediates.includes(currentStop!))?.key,
+    [currentStop, scheduleGroups],
+  );
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -715,13 +810,13 @@ function TrainDetailsPanel({ selection, data, loading, refreshing, error, refres
       setExpandedSegments(initialSegments);
       frame = window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
         scheduleRef.current?.querySelector<HTMLElement>('[aria-current="location"]')?.scrollIntoView({
-        block: "center",
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-      });
+          block: "center",
+          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        });
       }));
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [currentSegmentKey, data?.timeline.length, data?.currentPosition?.stationCode]);
+  }, [currentSegmentKey, data?.timeline.length, currentStationCode]);
 
   const toggleSegment = (key: string) => {
     setExpandedSegments((current) => {
@@ -733,91 +828,85 @@ function TrainDetailsPanel({ selection, data, loading, refreshing, error, refres
   };
 
   return (
-    <aside className="absolute right-3 bottom-3 left-3 z-[950] flex h-[78dvh] min-h-80 flex-col overflow-hidden rounded-[22px] border border-slate-200 bg-slate-50 shadow-[0_24px_70px_rgba(15,23,42,0.28)] lg:top-16 lg:left-auto lg:h-auto lg:w-[min(480px,calc(100%-1.5rem))]" aria-label={`${selection.trainName} live train details`}>
-      <header className="border-b border-slate-200 bg-white px-4 pt-4 pb-3 text-slate-900">
+    <aside className="absolute inset-x-0 bottom-0 z-[20000] flex h-[68dvh] min-h-80 flex-col overflow-hidden rounded-t-2xl border-t border-slate-700 bg-[#111827] text-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.45)] lg:inset-y-0 lg:right-auto lg:left-0 lg:h-auto lg:w-[390px] lg:rounded-none lg:border-t-0 lg:border-r" aria-label={`${selection.trainName} live train details`}>
+      <header className="shrink-0 border-b border-slate-700 px-4 pt-3 pb-2">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-center gap-2"><span className="rounded-md bg-blue-700 px-2 py-1 font-site-code text-xs font-black text-white">{selection.trainNo}</span><span className={`flex items-center gap-1.5 text-[10px] font-bold tracking-[0.14em] uppercase ${isFullyCancelled ? "text-red-700" : "text-emerald-700"}`}><i className={`size-1.5 rounded-full ${isFullyCancelled ? "bg-red-600" : "bg-emerald-500"}`} /> {isFullyCancelled ? "Cancelled" : "Live run"}</span></div>
-            <h2 className="mt-2 truncate text-lg font-bold tracking-tight">{data?.trainName || selection.trainName}</h2>
-            <p className="mt-1 text-xs text-slate-500">{data?.start?.stationCode && data?.end?.stationCode ? `${data.start.stationCode} → ${data.end.stationCode} · ` : ""}{data?.date || selection.date || "today"}</p>
+            <h2 className="font-site-code text-base font-bold leading-5 text-white">{selection.trainNo}</h2>
+            <p className="truncate text-xs text-slate-300" title={data?.trainName || selection.trainName}>{data?.trainName || selection.trainName}</p>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <button type="button" onClick={onRetry} disabled={loading || refreshing} className="flex h-11 items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-wait disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label="Refresh live train details"><RefreshCw size={16} className={loading || refreshing ? "animate-spin" : ""} aria-hidden="true" /><span>Refresh</span></button>
-            <button type="button" onClick={onClose} className="grid size-11 place-items-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label="Close live train details"><X size={19} /></button>
-          </div>
+          <button type="button" onClick={onFocusTrain} disabled={!data?.currentPosition && !data?.route?.length} aria-pressed={focusOnly} className={`grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg transition-colors hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 lg:hidden ${focusOnly ? "bg-sky-500/20 text-sky-300" : "text-slate-400"}`} aria-label={focusOnly ? "Show all trains" : "Focus selected train only"} title={focusOnly ? "Show all trains" : "Focus selected train only"}><Focus size={17} aria-hidden="true" /></button>
+          <button type="button" onClick={onClose} className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400" aria-label="Close train details"><X size={18} aria-hidden="true" /></button>
         </div>
-
-        {data ? <>
-          <div className={`mt-3 flex items-start gap-2 rounded-xl border p-3 ${isFullyCancelled ? "border-red-200 bg-red-50" : "border-blue-100 bg-blue-50"}`}>
-            <span className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-lg text-white ${isFullyCancelled ? "bg-red-600" : "bg-blue-700"}`}><Navigation size={15} aria-hidden="true" /></span>
-            <div className="min-w-0"><p className={`truncate text-sm font-bold ${isFullyCancelled ? "text-red-900" : "text-slate-900"}`}>{isFullyCancelled ? "Service cancelled" : data.currentPosition ? `${data.currentPosition.stationName} (${data.currentPosition.stationCode})` : "Position unavailable"}</p><p className={`mt-0.5 line-clamp-2 text-[11px] leading-4 ${isFullyCancelled ? "text-red-800" : "text-slate-600"}`}>{data.statusNote}</p></div>
-          </div>
-          {progress && !isFullyCancelled ? <div className="mt-3">
-            <div className="mb-1.5 flex items-center justify-between text-[11px]"><span className="font-semibold capitalize text-slate-600">{progress.journeyStatus.replace("_", " ")}</span><strong className="text-blue-700">{Math.round(progress.percent)}%</strong></div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Journey progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress.percent)}><div className="h-full rounded-full bg-blue-700" style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }} /></div>
-            <div className="mt-3 grid grid-cols-3 divide-x divide-slate-200 rounded-xl border border-slate-200 bg-slate-50 py-2 text-center">
-              <div><strong className="block font-site-code text-sm text-slate-900">{progress.remainingStations}</strong><span className="text-[10px] text-slate-500">stations left</span></div>
-              <div><strong className="block font-site-code text-sm text-slate-900">{progress.distanceRemainingKm ?? "—"}</strong><span className="text-[10px] text-slate-500">km left</span></div>
-              <div><strong className="block font-site-code text-sm text-slate-900">{data.averageSpeedKmph ?? "—"}</strong><span className="text-[10px] text-slate-500">avg km/h</span></div>
-            </div>
-          </div> : null}
-        </> : null}
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+          <span className="rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-1.5 font-medium text-slate-200">{data?.date || selection.date || "Current run"}</span>
+          {data?.start?.stationCode && data?.end?.stationCode ? <span className="truncate text-slate-400">{data.start.stationCode} → {data.end.stationCode}</span> : null}
+          {data?.progress && !isFullyCancelled ? <span className="ml-auto font-site-code text-sky-400">{Math.round(data.progress.percent)}%</span> : null}
+        </div>
+        {data?.progress && !isFullyCancelled ? <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-700" role="progressbar" aria-label="Journey progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(data.progress.percent)}><div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.max(0, Math.min(100, data.progress.percent))}%` }} /></div> : null}
       </header>
 
-      {loading && !data ? <div className="grid flex-1 place-items-center p-6 text-center"><div><RefreshCw className="mx-auto animate-spin text-blue-700" size={22} aria-hidden="true" /><p className="mt-3 text-sm text-slate-600">Building the live schedule…</p></div></div> : null}
-      {error ? <div className="m-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"><p>{error}</p><button type="button" onClick={onRetry} className="mt-3 min-h-11 rounded-lg bg-red-800 px-3 py-2 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-800">Try again</button></div> : null}
+      <div className="grid shrink-0 grid-cols-[60px_1fr_60px] items-center border-b border-slate-700 px-3 py-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+        <span>Arrival</span><span className="text-center">{scheduleGroups.length ? `${scheduleGroups.length} stops · ${data?.totalDistanceKm ?? "—"} km` : "Route schedule"}</span><span className="text-right">Departure</span>
+      </div>
 
-      {data ? <div className="flex min-h-0 flex-1 flex-col">
-        {refreshError ? <p role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-[11px] text-amber-900">Refresh failed. Showing the last update.</p> : null}
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-2.5">
-          <div><h3 className="text-xs font-black tracking-[0.08em] text-slate-900 uppercase">Route schedule</h3><p className="mt-0.5 text-[11px] font-medium text-slate-500">{scheduleGroups.length} stops · {data.totalDistanceKm ?? "—"} km</p></div>
+      {loading && !data ? <div className="grid min-h-0 flex-1 place-items-center px-4 text-center"><div><RefreshCw className="mx-auto animate-spin text-sky-400 motion-reduce:animate-none" size={22} aria-hidden="true" /><p className="mt-3 text-sm text-slate-300">Building live schedule…</p></div></div> : null}
+      {error && !data ? <div className="m-4 rounded-xl border border-red-500/30 bg-red-950/30 p-4 text-sm text-red-200"><p>{error}</p><button type="button" onClick={onRetry} className="mt-3 min-h-11 rounded-lg bg-red-600 px-3 py-2 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400">Try again</button></div> : null}
+      {data ? <>
+        {refreshError ? <p role="status" className="border-b border-amber-500/30 bg-amber-950/30 px-4 py-2 text-xs text-amber-200">Refresh failed. Showing last update.</p> : null}
+        {isFullyCancelled ? <p role="note" className="border-b border-red-500/30 bg-red-950/30 px-4 py-2 text-xs text-red-200">Service cancelled today.</p> : null}
+        <div ref={scheduleRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
+          {scheduleGroups.length ? <ol className="relative before:pointer-events-none before:absolute before:top-5 before:bottom-5 before:left-[72px] before:w-px before:bg-slate-600 before:content-['']" aria-label="Train station timeline">
+            {scheduleGroups.map((group) => {
+              const stop = group.stop;
+              const current = stop === currentStop;
+              const passed = stop.status === "passed";
+              const cancelled = isFullyCancelled || isCancelledScheduleStop(stop);
+              const scheduledArrival = formatScheduleTime(stop.arrival?.scheduled);
+              const scheduledDeparture = formatScheduleTime(stop.departure?.scheduled);
+              const actualArrival = formatScheduleTime(stop.arrival?.actual);
+              const actualDeparture = formatScheduleTime(stop.departure?.actual);
+              const arrivalDelayed = actualArrival !== "--" && scheduledArrival !== "--" && actualArrival !== scheduledArrival;
+              const departureDelayed = actualDeparture !== "--" && scheduledDeparture !== "--" && actualDeparture !== scheduledDeparture;
+              const expanded = expandedSegments.has(group.key);
+              return <li key={group.key}>
+                <article aria-current={current ? "location" : undefined} className={`relative grid min-h-[58px] grid-cols-[56px_24px_minmax(0,1fr)_56px] items-center rounded-lg px-1 py-1.5 ${current ? "bg-slate-800 ring-1 ring-sky-500/40" : "hover:bg-slate-800/60"}`}>
+                  <div className="min-w-0 text-left font-site-code text-[10px] leading-4"><span className="block text-slate-300">{scheduledArrival}</span><span className={`block ${cancelled ? "text-red-400" : arrivalDelayed ? "text-sky-400" : "text-slate-500"}`}>{cancelled ? "CANCEL" : actualArrival !== "--" ? actualArrival : ""}</span></div>
+                  <span className="relative z-10 grid h-full place-items-center" aria-hidden="true"><i className={`size-2.5 rounded-full ring-[3px] ring-[#111827] ${cancelled ? "bg-red-500" : current ? "bg-sky-400" : passed ? "bg-slate-400" : "bg-amber-400"}`} /></span>
+                  <div className="min-w-0 px-1.5"><strong className={`block truncate text-[13px] leading-4 ${cancelled ? "text-slate-500 line-through" : current ? "text-sky-400" : "text-slate-100"}`} title={stop.stationName}>{stop.stationName || stop.stationCode}</strong><span className="mt-0.5 block truncate text-[10px] text-slate-400">{stop.stationCode} · {stop.distanceKm === "" || stop.distanceKm == null ? "—" : `${stop.distanceKm} km`}{stop.platform ? ` · PF ${stop.platform}` : ""}</span></div>
+                  <div className="min-w-0 text-right font-site-code text-[10px] leading-4"><span className="block text-slate-300">{scheduledDeparture}</span><span className={`block ${cancelled ? "text-red-400" : departureDelayed ? "text-red-400" : "text-slate-500"}`}>{cancelled ? "CANCEL" : actualDeparture !== "--" ? actualDeparture : ""}</span></div>
+                </article>
+                {group.intermediates.length ? <div>
+                  <button type="button" onClick={() => toggleSegment(group.key)} aria-expanded={expanded} aria-controls={`segment-${group.key}`} className={`grid min-h-10 w-full grid-cols-[56px_24px_minmax(0,1fr)_56px] items-center rounded-lg px-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${expanded ? "bg-slate-800" : "hover:bg-slate-800/60"}`}>
+                    <span /><span className="relative z-10 h-full" aria-hidden="true"><i className="absolute top-1/2 -right-1 left-1/2 h-px bg-slate-600" /></span><span className="min-w-0 px-1.5"><span className="block truncate text-[11px] font-semibold text-slate-400">{group.intermediates.length} passing stations</span></span><ChevronDown size={15} className={`mx-auto text-slate-400 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+                  </button>
+                  {expanded ? <ol id={`segment-${group.key}`}>
+                    {group.intermediates.map((intermediate) => {
+                      const intermediateCurrent = intermediate === currentStop;
+                      const scheduledArrival = formatScheduleTime(intermediate.arrival?.scheduled);
+                      const actualArrival = formatScheduleTime(intermediate.arrival?.actual);
+                      const scheduledDeparture = formatScheduleTime(intermediate.departure?.scheduled);
+                      const actualDeparture = formatScheduleTime(intermediate.departure?.actual);
+                      const arrivalDelayed = actualArrival !== "--" && scheduledArrival !== "--" && actualArrival !== scheduledArrival;
+                      const departureDelayed = actualDeparture !== "--" && scheduledDeparture !== "--" && actualDeparture !== scheduledDeparture;
+                      return <li key={`${intermediate.stationCode}-${intermediate.index}`} aria-current={intermediateCurrent ? "location" : undefined} className={`grid min-h-12 grid-cols-[56px_24px_minmax(0,1fr)_56px] items-center rounded-lg px-1 py-1 ${intermediateCurrent ? "bg-sky-950/50 ring-1 ring-sky-500/40" : ""}`}>
+                        <div className="min-w-0 text-left font-site-code text-[11px] leading-4"><span className={`block ${actualArrival === "--" ? "text-slate-400" : arrivalDelayed ? "text-red-400" : intermediateCurrent ? "text-sky-300" : "text-slate-200"}`}>{actualArrival !== "--" ? actualArrival : scheduledArrival}</span>{actualArrival !== "--" && scheduledArrival !== "--" && actualArrival !== scheduledArrival ? <span className="block text-[10px] text-slate-500">{scheduledArrival}</span> : null}</div>
+                        <span className="relative z-10 h-full" aria-hidden="true"><i className={`absolute top-1/2 left-1/2 size-2 -translate-1/2 rounded-full ${intermediateCurrent ? "bg-sky-400 ring-4 ring-sky-900" : "bg-slate-500"}`} /></span>
+                        <div className="min-w-0 px-1.5"><strong className={`block truncate text-[13px] font-semibold ${intermediateCurrent ? "text-sky-300" : "text-slate-200"}`} title={intermediate.stationName}>{intermediate.stationName || intermediate.stationCode}</strong><span className="font-site-code text-[11px] text-slate-400">{intermediate.stationCode} · {intermediate.distanceKm === "" || intermediate.distanceKm == null ? "—" : `${intermediate.distanceKm} km`}</span></div>
+                        <div className="min-w-0 text-right font-site-code text-[11px] leading-4"><span className={`block ${actualDeparture === "--" ? "text-slate-400" : departureDelayed ? "text-red-400" : intermediateCurrent ? "text-sky-300" : "text-slate-200"}`}>{actualDeparture !== "--" ? actualDeparture : scheduledDeparture}</span>{actualDeparture !== "--" && scheduledDeparture !== "--" && actualDeparture !== scheduledDeparture ? <span className="block text-[10px] text-slate-500">{scheduledDeparture}</span> : null}</div>
+                      </li>;
+                    })}
+                  </ol> : null}
+                </div> : null}
+              </li>;
+            })}
+          </ol> : <p className="p-6 text-center text-sm text-slate-400">Station timeline unavailable for this run.</p>}
         </div>
-        {cancellationNote ? <div role="note" className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs leading-5 text-red-800"><strong>Schedule notice:</strong> {cancellationNote}</div> : null}
-
-        {scheduleGroups.length > 0 ? <div ref={scheduleRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-50 px-4 py-3">
-          <ol className="relative before:pointer-events-none before:absolute before:top-8 before:bottom-8 before:left-[88px] before:z-10 before:w-px before:bg-slate-300 before:content-['']" aria-label="Train station timeline">
-          {scheduleGroups.map((group) => {
-            const stop = group.stop;
-            const isCurrent = stop.status === "current" || stop.stationCode === data.currentPosition?.stationCode;
-            const isPassed = stop.status === "passed";
-            const scheduledArrival = formatScheduleTime(stop.arrival?.scheduled);
-            const scheduledDeparture = formatScheduleTime(stop.departure?.scheduled);
-            const actualArrivalValue = formatScheduleTime(stop.arrival?.actual);
-            const actualDepartureValue = formatScheduleTime(stop.departure?.actual);
-            const actualArrival = isFullyCancelled && scheduledArrival !== "--" ? "CANCEL" : actualArrivalValue;
-            const actualDeparture = isFullyCancelled && scheduledDeparture !== "--" ? "CANCEL" : actualDepartureValue;
-            const arrivalDelayed = Boolean(stop.arrival?.delay && !/on time/i.test(stop.arrival.delay));
-            const departureDelayed = Boolean(stop.departure?.delay && !/on time/i.test(stop.departure.delay));
-            const arrivalCancelled = isFullyCancelled || isCancelledScheduleValue(stop.arrival?.actual);
-            const departureCancelled = isFullyCancelled || isCancelledScheduleValue(stop.departure?.actual);
-            const stopCancelled = isFullyCancelled || isCancelledScheduleStop(stop);
-            const expanded = expandedSegments.has(group.key);
-            return <li key={group.key}>
-              <article aria-current={isCurrent ? "location" : undefined} className={`grid min-h-[68px] grid-cols-[68px_24px_minmax(0,1fr)_68px] items-center rounded-xl px-2 py-2 transition-colors ${isCurrent ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-white"}`}>
-                <div className="min-w-0 text-left"><strong className="block font-site-code text-xs leading-4 text-slate-800">{scheduledArrival}</strong><strong className={`block font-site-code text-xs leading-4 ${actualArrival === "--" ? "text-slate-400" : arrivalCancelled ? "font-bold text-red-600" : arrivalDelayed ? "text-rose-600" : "text-emerald-700"}`}>{actualArrival}</strong></div>
-                <div className="relative z-[1000] h-full" aria-hidden="true"><span className={`absolute top-1/2 left-1/2 grid size-4 -translate-1/2 place-items-center rounded-full border-[3px] border-slate-50 ${stopCancelled ? "bg-red-600" : isCurrent ? "bg-blue-600 ring-4 ring-blue-100" : isPassed ? "bg-blue-700" : "bg-amber-400"}`} /></div>
-                <div className="min-w-0 px-3"><h4 className={`truncate text-sm font-bold ${stopCancelled ? "text-slate-500 line-through decoration-red-500 decoration-2" : "text-slate-950"}`} title={stop.stationName}>{stop.stationName || stop.stationCode}</h4><div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] text-slate-500"><strong className="font-site-code text-slate-700">{stop.stationCode}</strong><span>·</span><span>{stop.distanceKm === "" || stop.distanceKm == null ? "—" : `${stop.distanceKm} km`}</span><span className="rounded bg-slate-200 px-1.5 py-0.5 font-bold text-slate-700">PF {stop.platform || "—"}</span></div></div>
-                <div className="min-w-0 text-right"><strong className="block font-site-code text-xs leading-4 text-slate-800">{scheduledDeparture}</strong><strong className={`block font-site-code text-xs leading-4 ${actualDeparture === "--" ? "text-slate-400" : departureCancelled ? "font-bold text-red-600" : departureDelayed ? "text-rose-600" : "text-emerald-700"}`}>{actualDeparture}</strong></div>
-              </article>
-
-              {group.intermediates.length > 0 ? <div>
-                <button type="button" onClick={() => toggleSegment(group.key)} aria-expanded={expanded} aria-controls={`segment-${group.key}`} className={`grid min-h-10 w-full grid-cols-[68px_24px_minmax(0,1fr)_68px] items-center rounded-lg px-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-blue-700 ${expanded ? "bg-blue-50" : "hover:bg-white"}`}>
-                  <span /><span className="relative z-[1000] h-full" aria-hidden="true"><i className="absolute top-1/2 -right-2 left-1/2 h-px bg-slate-300" /></span><span className="min-w-0 px-2"><span className="block truncate text-[11px] font-semibold text-slate-600">{group.intermediates.length} passing stations</span></span><ChevronDown size={15} className={`mx-auto text-slate-500 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
-                </button>
-                {expanded ? <ol id={`segment-${group.key}`}>
-                  {group.intermediates.map((intermediate) => {
-                    const intermediateCurrent = intermediate.status === "current" || intermediate.stationCode === data.currentPosition?.stationCode;
-                    return <li key={`${intermediate.stationCode}-${intermediate.index}`} aria-current={intermediateCurrent ? "location" : undefined} className={`grid min-h-10 grid-cols-[68px_24px_minmax(0,1fr)_68px] items-center rounded-lg px-2 py-1.5 ${intermediateCurrent ? "bg-blue-100 ring-1 ring-blue-300" : ""}`}>
-                      <span className="text-right text-[9px] font-bold text-slate-400 uppercase">Passes</span><span className="relative z-[1000] h-full" aria-hidden="true"><i className={`absolute top-1/2 left-1/2 size-2 -translate-1/2 rounded-full ${intermediateCurrent ? "bg-blue-700 ring-4 ring-blue-100" : "bg-slate-400"}`} /></span><div className="min-w-0 px-3"><strong className="block truncate text-xs font-semibold text-slate-700" title={intermediate.stationName}>{intermediate.stationName || intermediate.stationCode}</strong><span className="font-site-code text-[10px] text-slate-500">{intermediate.stationCode}</span></div><span className="pr-1 text-right font-site-code text-[10px] text-slate-500">{intermediate.distanceKm === "" || intermediate.distanceKm == null ? "—" : `${intermediate.distanceKm} km`}</span>
-                    </li>;
-                  })}
-                </ol> : null}
-              </div> : null}
-            </li>;
-          })}
-          </ol>
-        </div> : <div className="grid flex-1 place-items-center p-6 text-center"><p className="text-sm text-slate-600">Station timeline unavailable for this run.</p></div>}
-      </div> : null}
+        <footer className="flex shrink-0 items-center gap-3 border-t border-slate-700 bg-slate-950/60 py-3 pr-4 pl-24">
+          <div className="min-w-0 flex-1"><div className="flex items-center gap-2"><strong className="truncate text-sm text-white">{isFullyCancelled ? "Service cancelled" : data.currentPosition ? `At ${data.currentPosition.stationName}` : "Position unavailable"}</strong>{currentDelay && !/on time|^0\s*(?:m|min)?$/i.test(currentDelay.trim()) ? <span className="shrink-0 rounded bg-red-600 px-1.5 py-0.5 font-site-code text-[10px] font-bold text-white">{currentDelay}</span> : null}</div><p className="mt-0.5 truncate text-[11px] text-slate-400" title={data.statusNote}>{data.statusNote || data.lastUpdate || "Latest train report"}</p></div>
+          <button type="button" onClick={onRetry} disabled={loading || refreshing} className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-900/30 hover:bg-blue-500 disabled:cursor-wait disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400" aria-label="Refresh live train details"><RefreshCw size={18} className={refreshing ? "animate-spin motion-reduce:animate-none" : ""} aria-hidden="true" /></button>
+        </footer>
+      </> : null}
     </aside>
   );
 }
@@ -826,31 +915,52 @@ export function RailAtlas() {
   const mapNodeRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
+  const glMapRef = useRef<MapLibreMap | null>(null);
+  const refreshLiveMapRef = useRef<(() => void) | null>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
   const layersButtonRef = useRef<HTMLButtonElement>(null);
+  const legendButtonRef = useRef<HTMLButtonElement>(null);
   const railwayLayerRef = useRef<Layer | null>(null);
   const stationLayerRef = useRef<LayerGroup | null>(null);
+  const liveTrainHitTestRef = useRef<((x: number, y: number) => boolean) | null>(null);
   const selectedLayerRef = useRef<LayerGroup | null>(null);
   const trainLayerRef = useRef<LayerGroup | null>(null);
+  const focusedTrainRef = useRef("");
   const [mapReady, setMapReady] = useState(false);
   const [stations, setStations] = useState<Station[]>([]);
   const [selected, setSelected] = useState<Station | null>(null);
   const [selectedTrain, setSelectedTrain] = useState<TrainSelection | null>(null);
+  const [focusSelectedTrainOnly, setFocusSelectedTrainOnly] = useState(false);
   const selectedTrainActiveRef = useRef(false);
   selectedTrainActiveRef.current = Boolean(selectedTrain);
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
-  const [showStations, setShowStations] = useState(true);
-  const [showTracks, setShowTracks] = useState(true);
+  const [showStations, setShowStations] = useState(false);
+  const [showTracks, setShowTracks] = useState(false);
+  const [showLiveTrains, setShowLiveTrains] = useState(true);
+  const [visibleTrainCategories, setVisibleTrainCategories] = useState<LiveTrainCategory[]>(ALL_LIVE_TRAIN_CATEGORIES);
+  const [liveTrainLayerReady, setLiveTrainLayerReady] = useState(false);
+  const [liveMapTrains, setLiveMapTrains] = useState<MappedLiveMapTrain[]>([]);
+  const [liveMapTotal, setLiveMapTotal] = useState(0);
+  const [liveMapState, setLiveMapState] = useState<"loading" | "ready" | "stale" | "error">("loading");
+  const [liveMapError, setLiveMapError] = useState("");
   const [mapZoom, setMapZoom] = useState(5);
   const [minMapZoom, setMinMapZoom] = useState(3);
   const [layersOpen, setLayersOpen] = useState(false);
+  const [legendOpen, setLegendOpen] = useState(false);
   const [turnstileScriptReady, setTurnstileScriptReady] = useState(false);
   const atlasAccess = useRailAtlasAccess(turnstileScriptReady);
   const stationBoard = useStationBoard(selected, atlasAccess.ready);
   const globalSearch = useGlobalSearch(query, atlasAccess.ready);
   const trainLive = useTrainLive(selectedTrain, atlasAccess.ready);
   const stationGrid = useMemo(() => indexStations(stations), [stations]);
+  const stationByCode = useMemo(() => new Map(stations.map((station) => [station.code, station])), [stations]);
+  const liveTrainCounts = useMemo(() => {
+    const counts = Object.fromEntries(ALL_LIVE_TRAIN_CATEGORIES.map((category) => [category, 0])) as Record<LiveTrainCategory, number>;
+    for (const train of liveMapTrains) counts[liveTrainCategory(train.trainType)] += 1;
+    return counts;
+  }, [liveMapTrains]);
+  const visibleTrainCategorySet = useMemo(() => new Set(visibleTrainCategories), [visibleTrainCategories]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -912,6 +1022,7 @@ export function RailAtlas() {
         style: "https://tiles.openfreemap.org/styles/dark",
       }).addTo(map);
       const glMap = darkBasemap.getMaplibreMap();
+      glMapRef.current = glMap;
       glMap.once("load", () => {
         const countryBoundaryLayer = "boundary_country_z5-";
         if (glMap.getLayer(countryBoundaryLayer)) {
@@ -961,6 +1072,7 @@ export function RailAtlas() {
       disposed = true;
       mapRef.current?.remove();
       mapRef.current = null;
+      glMapRef.current = null;
     };
   }, []);
 
@@ -996,14 +1108,22 @@ export function RailAtlas() {
   }, [mapReady]);
 
   useEffect(() => {
-    if (!layersOpen) return;
+    if (!layersOpen && !legendOpen) return;
     const closeOnOutsideClick = (event: PointerEvent) => {
-      if (!controlsRef.current?.contains(event.target as Node)) setLayersOpen(false);
+      if (!controlsRef.current?.contains(event.target as Node)) {
+        setLayersOpen(false);
+        setLegendOpen(false);
+      }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      setLayersOpen(false);
-      layersButtonRef.current?.focus();
+      if (legendOpen) {
+        setLegendOpen(false);
+        legendButtonRef.current?.focus();
+      } else {
+        setLayersOpen(false);
+        layersButtonRef.current?.focus();
+      }
     };
     document.addEventListener("pointerdown", closeOnOutsideClick);
     document.addEventListener("keydown", closeOnEscape);
@@ -1011,7 +1131,7 @@ export function RailAtlas() {
       document.removeEventListener("pointerdown", closeOnOutsideClick);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [layersOpen]);
+  }, [layersOpen, legendOpen]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
@@ -1095,6 +1215,168 @@ export function RailAtlas() {
     if (selectedTrain || !showTracks) layer.removeFrom(map);
     else layer.addTo(map);
   }, [selectedTrain, showTracks, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map || !atlasAccess.ready || !showLiveTrains) return;
+
+    let disposed = false;
+    let controller: AbortController | null = null;
+    const fetchLiveTrains = async () => {
+      if (document.visibilityState === "hidden") return;
+      controller?.abort();
+      const activeController = new AbortController();
+      controller = activeController;
+      setLiveMapState("loading");
+      try {
+        const response = await fetch("/api/rail-atlas/live-trains", {
+          signal: activeController.signal,
+          cache: "no-store",
+        });
+        renewRailAtlasSessionOnUnauthorized(response);
+        const payload: LiveMapResponse = await response.json();
+        if (!response.ok || !payload.success || !payload.data) {
+          throw new Error(payload.error || "Live trains unavailable");
+        }
+        if (disposed) return;
+        setLiveMapTotal(payload.data.count);
+        setLiveMapTrains(payload.data.trains.filter(hasMappedPosition));
+        setLiveMapState(payload.data.stale ? "stale" : "ready");
+        setLiveMapError("");
+      } catch (reason) {
+        if (disposed || activeController.signal.aborted) return;
+        setLiveMapState("error");
+        setLiveMapError(reason instanceof Error ? reason.message : "Live trains unavailable");
+      }
+    };
+    refreshLiveMapRef.current = () => { void fetchLiveTrains(); };
+    void fetchLiveTrains();
+    document.addEventListener("visibilitychange", fetchLiveTrains);
+    const interval = setInterval(fetchLiveTrains, 120_000);
+    return () => {
+      disposed = true;
+      controller?.abort();
+      refreshLiveMapRef.current = null;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", fetchLiveTrains);
+    };
+  }, [mapReady, atlasAccess.ready, showLiveTrains]);
+
+  useEffect(() => {
+    const glMap = glMapRef.current;
+    if (!mapReady || !glMap) return;
+    let disposed = false;
+    let installed = false;
+    const setup = () => {
+      if (disposed || installed || !glMap.getStyle()?.layers?.length) return;
+      installed = true;
+      glMap.off("styledata", setup);
+      glMap.off("load", setup);
+      for (const category of LIVE_TRAIN_CATEGORIES) {
+        const id = `railkit-train-${category.id}`;
+        if (!glMap.hasImage(id)) glMap.addImage(id, createLiveTrainIcon(category.color), { pixelRatio: 2 });
+      }
+      if (!glMap.getSource("railkit-live-trains")) {
+        glMap.addSource("railkit-live-trains", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      }
+      if (!glMap.getLayer("railkit-live-train-arrows")) {
+        glMap.addLayer({
+          id: "railkit-live-train-arrows",
+          type: "symbol",
+          source: "railkit-live-trains",
+          layout: {
+            "icon-image": ["get", "icon"],
+            "icon-rotate": ["get", "bearing"],
+            "icon-rotation-alignment": "map",
+            "icon-pitch-alignment": "map",
+            "icon-allow-overlap": true,
+            "icon-ignore-placement": true,
+            "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.9, 8, 1.1, 12, 1.5],
+          },
+        });
+      }
+      setLiveTrainLayerReady(true);
+    };
+    glMap.on("styledata", setup);
+    glMap.on("load", setup);
+    setup();
+    return () => { disposed = true; glMap.off("styledata", setup); glMap.off("load", setup); };
+  }, [mapReady]);
+
+  useEffect(() => {
+    const glMap = glMapRef.current;
+    if (!mapReady || !liveTrainLayerReady || !glMap) return;
+    glMap.setLayoutProperty("railkit-live-train-arrows", "visibility", showLiveTrains ? "visible" : "none");
+    const shownTrains = focusSelectedTrainOnly && selectedTrain
+      ? liveMapTrains.filter((train) => train.trainNo === selectedTrain.trainNo && (!selectedTrain.date || train.journeyDate === selectedTrain.date))
+      : liveMapTrains;
+    const features = shownTrains.map((train) => {
+      const next = train.upcomingStation.code ? stationByCode.get(train.upcomingStation.code) : undefined;
+      const dx = next ? (next.lon - train.currentStation.lon) * Math.cos(train.currentStation.lat * Math.PI / 180) : 0;
+      const dy = next ? next.lat - train.currentStation.lat : 1;
+      return {
+        type: "Feature" as const,
+        geometry: { type: "Point" as const, coordinates: [train.currentStation.lon, train.currentStation.lat] },
+        properties: {
+          icon: `railkit-train-${liveTrainCategory(train.trainType)}`,
+          category: liveTrainCategory(train.trainType),
+          trainNo: train.trainNo,
+          journeyDate: train.journeyDate,
+          bearing: Math.atan2(dx, dy) * 180 / Math.PI,
+        },
+      };
+    });
+    (glMap.getSource("railkit-live-trains") as GeoJSONSource).setData({ type: "FeatureCollection", features });
+  }, [mapReady, liveTrainLayerReady, showLiveTrains, selectedTrain, focusSelectedTrainOnly, liveMapTrains, stationByCode]);
+
+  useEffect(() => {
+    const glMap = glMapRef.current;
+    if (!mapReady || !liveTrainLayerReady || !glMap) return;
+    glMap.setFilter("railkit-live-train-arrows", ["in", ["get", "category"], ["literal", visibleTrainCategories]]);
+  }, [mapReady, liveTrainLayerReady, visibleTrainCategories]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map || !showLiveTrains || liveMapTrains.length === 0) return;
+    const selectTrain = (train: MappedLiveMapTrain) => {
+      map.closePopup();
+      setSelected(null);
+      setSelectedTrain({ trainNo: train.trainNo, trainName: train.trainName, date: train.journeyDate });
+    };
+    const trainsAt = (x: number, y: number) => {
+      return liveMapTrains.filter((train) => {
+        if (focusSelectedTrainOnly && selectedTrain
+          && (train.trainNo !== selectedTrain.trainNo || (selectedTrain.date && train.journeyDate !== selectedTrain.date))) return false;
+        if (!visibleTrainCategorySet.has(liveTrainCategory(train.trainType))) return false;
+        const point = map.latLngToContainerPoint([train.currentStation.lat, train.currentStation.lon]);
+        return Math.abs(point.x - x) <= 10 && Math.abs(point.y - y) <= 10 && Math.hypot(point.x - x, point.y - y) <= 10;
+      });
+    };
+    liveTrainHitTestRef.current = (x, y) => trainsAt(x, y).length > 0;
+    const handleClick = (event: LeafletMouseEvent) => {
+      const matches = trainsAt(event.containerPoint.x, event.containerPoint.y);
+      if (matches.length === 0) return;
+      if (matches.length === 1) { selectTrain(matches[0]); return; }
+      void import("leaflet").then((L) => {
+        const list = document.createElement("div");
+        list.className = "max-h-60 min-w-48 overflow-y-auto";
+        for (const train of matches) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "block min-h-11 w-full rounded px-2 py-1 text-left text-sm hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-700";
+          button.textContent = `${train.trainNo} · ${train.trainName || train.trainType || "Train"}`;
+          button.addEventListener("click", () => selectTrain(train));
+          list.append(button);
+        }
+        L.popup({ maxWidth: 280 }).setLatLng(event.latlng).setContent(list).openOn(map);
+      });
+    };
+    map.on("click", handleClick);
+    return () => {
+      map.off("click", handleClick);
+      liveTrainHitTestRef.current = null;
+    };
+  }, [mapReady, showLiveTrains, liveMapTrains, visibleTrainCategorySet, focusSelectedTrainOnly, selectedTrain]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
@@ -1220,7 +1502,7 @@ export function RailAtlas() {
         });
       };
       const handleMapClick = (event: LeafletMouseEvent) => {
-        if (selectedTrain) return;
+        if (selectedTrain || liveTrainHitTestRef.current?.(event.containerPoint.x, event.containerPoint.y)) return;
         const nearest = findNearest(event, 22);
         if (nearest) setSelected(nearest);
       };
@@ -1282,16 +1564,17 @@ export function RailAtlas() {
     if (!mapReady || !mapRef.current) return;
     trainLayerRef.current?.removeFrom(mapRef.current);
     trainLayerRef.current = null;
+    if (!selectedTrain) focusedTrainRef.current = "";
     if (!selectedTrain || !trainLive.data) return;
     let cancelled = false;
     import("leaflet").then((L) => {
       if (cancelled || !mapRef.current || !trainLive.data) return;
       const data = trainLive.data;
-      const route = getStraightTrainRoute(data);
+      const route = data.route?.length > 1 ? data.route : getStraightTrainRoute(data);
       const isFullyCancelled = Boolean(data.statusNote && /\bcancel(?:led|lation)?\b/i.test(data.statusNote));
       const layers: Layer[] = [];
       if (route.length > 1) {
-        layers.push(L.polyline(route, { pane: "activeTrain", color: isFullyCancelled ? "#94a3b8" : "#2563eb", weight: 4, opacity: isFullyCancelled ? 0.7 : 0.9, dashArray: isFullyCancelled ? "7 7" : undefined, interactive: false }));
+        layers.push(L.polyline(route, { pane: "activeTrain", color: isFullyCancelled ? "#94a3b8" : "#cbd5e1", weight: 2.5, opacity: isFullyCancelled ? 0.6 : 0.8, dashArray: isFullyCancelled ? "7 7" : undefined, interactive: false }));
       }
       data.timeline
         .filter((stop) => stop.type !== "intermediate" && Number.isFinite(stop.lat) && Number.isFinite(stop.lon))
@@ -1300,10 +1583,10 @@ export function RailAtlas() {
           const stopCancelled = isFullyCancelled || isCancelledScheduleStop(stop);
           layers.push(L.circleMarker([stop.lat!, stop.lon!], {
             pane: "activeTrain",
-            radius: 4.5,
-            color: stopCancelled ? "#ffffff" : "#2563eb",
+            radius: 3.5,
+            color: stopCancelled ? "#fecaca" : "#e2e8f0",
             weight: 2,
-            fillColor: stopCancelled ? "#dc2626" : "#eff6ff",
+            fillColor: stopCancelled ? "#dc2626" : "#1e293b",
             fillOpacity: 1,
             bubblingMouseEvents: false,
           }).bindTooltip(`${stop.stationName || stop.stationCode} (${stop.stationCode})`, { direction: "top" }));
@@ -1314,14 +1597,19 @@ export function RailAtlas() {
         const rotation = Number.isFinite(data.currentPosition.bearing) ? data.currentPosition.bearing : 0;
         const icon = L.divIcon({
           className: "",
-          iconSize: [38, 38],
-          iconAnchor: [19, 19],
-          html: `<div style="width:38px;height:38px;display:grid;place-items:center;border:3px solid white;border-radius:50%;background:#1d4ed8;box-shadow:0 6px 18px rgba(15,23,42,.35);transform:rotate(${rotation}deg)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2 20 21l-8-4-8 4 8-19Z" fill="white"/></svg></div>`,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17],
+          html: `<div style="width:34px;height:34px;display:grid;place-items:center;border:2px solid #93c5fd;border-radius:50%;background:#1d4ed8;box-shadow:0 0 0 5px rgba(37,99,235,.18),0 6px 18px rgba(0,0,0,.45);transform:rotate(${rotation}deg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2 20 21l-8-4-8 4 8-19Z" fill="white"/></svg></div>`,
         });
-        layers.push(L.marker([data.currentPosition.lat, data.currentPosition.lon], { pane: "activeTrain", icon, interactive: false, zIndexOffset: 1000 }).bindTooltip(`${data.trainNo} · ${data.currentPosition.stationCode}`, { permanent: true, direction: "top", offset: [0, -20] }));
+        layers.push(L.marker([data.currentPosition.lat, data.currentPosition.lon], { pane: "activeTrain", icon, interactive: false, zIndexOffset: 1000 }));
       }
       trainLayerRef.current = L.layerGroup(layers).addTo(mapRef.current);
-      if (route.length > 1) mapRef.current.fitBounds(L.latLngBounds(route), { padding: [40, 40], maxZoom: 9, animate: true });
+      const focusKey = `${selectedTrain.trainNo}:${selectedTrain.date || ""}`;
+      if (focusedTrainRef.current !== focusKey) {
+        focusedTrainRef.current = focusKey;
+        if (route.length > 1) focusTrainRouteOnMap(mapRef.current, route);
+        else if (data.currentPosition) focusTrainOnMap(mapRef.current, data.currentPosition.lat, data.currentPosition.lon);
+      }
     }).catch(() => {
       if (!cancelled) setError("Live train route could not be displayed");
     });
@@ -1333,14 +1621,27 @@ export function RailAtlas() {
       || (isMappedStation(result) ? result : null);
     if (!station) return;
     setSelectedTrain(null);
+    setFocusSelectedTrainOnly(false);
     setSelected(station);
     setQuery("");
   };
 
   const chooseTrain = (train: TrainSelection) => {
     setSelected(null);
+    setFocusSelectedTrainOnly(false);
     setSelectedTrain(train);
     setQuery("");
+  };
+
+  const focusSelectedTrain = () => {
+    const nextFocused = !focusSelectedTrainOnly;
+    setFocusSelectedTrainOnly(nextFocused);
+    if (!nextFocused || !mapRef.current || !trainLive.data) return;
+    const route = trainLive.data.route?.length > 1 ? trainLive.data.route : getStraightTrainRoute(trainLive.data);
+    if (route.length > 1) focusTrainRouteOnMap(mapRef.current, route);
+    else if (trainLive.data.currentPosition) {
+      focusTrainOnMap(mapRef.current, trainLive.data.currentPosition.lat, trainLive.data.currentPosition.lon);
+    }
   };
 
   return (
@@ -1353,61 +1654,90 @@ export function RailAtlas() {
         <div ref={mapNodeRef} className="absolute inset-0 bg-slate-200" />
       </section>
 
-      <div className="absolute top-3 left-3 z-[1000] w-[min(380px,calc(100%-1.5rem))]">
-        <div className="rounded-2xl border border-slate-300 bg-white p-1.5 shadow-[0_10px_30px_-12px_rgba(15,23,42,0.45)] transition-colors focus-within:border-blue-700 focus-within:ring-2 focus-within:ring-blue-700/20">
-          <div className="flex h-11 items-center gap-2">
-            <label className="flex min-w-0 flex-1 cursor-text items-center gap-2">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-900 text-white"><Search size={18} strokeWidth={2} aria-hidden="true" /></span>
+      {showLiveTrains && !selectedTrain ? <div role="status" aria-live="polite" aria-atomic="true" title={liveMapError || undefined} className="absolute top-3 right-3 z-[900] max-w-[45vw] rounded-2xl border border-slate-600/70 bg-slate-950/90 px-3 py-2 text-xs font-semibold text-slate-100 shadow-xl backdrop-blur-xl">
+        <span className={`mr-1.5 inline-block size-2 rounded-full ${liveMapState === "ready" ? "bg-emerald-500" : liveMapState === "loading" ? "animate-pulse bg-sky-500 motion-reduce:animate-none" : "bg-red-600"}`} aria-hidden="true" />
+        {liveMapTrains.length ? `${liveMapTrains.length.toLocaleString("en-IN")}${liveMapTotal > liveMapTrains.length ? ` of ${liveMapTotal.toLocaleString("en-IN")}` : ""} running trains mapped${liveMapState === "loading" ? " · refreshing" : liveMapState === "stale" ? " · update delayed" : liveMapState === "error" ? " · refresh failed" : ""}` : liveMapState === "loading" ? "Loading live trains" : "Live trains unavailable"}
+      </div> : null}
+
+      <div className={`absolute top-3 left-3 z-[1000] w-[min(480px,calc(100%-1.5rem))] ${selectedTrain ? "lg:left-[calc(390px+1rem)]" : ""}`}>
+        <div className="rounded-2xl border border-slate-600/70 bg-slate-950/90 p-1.5 text-slate-100 shadow-xl backdrop-blur-xl transition-colors focus-within:border-sky-500/70 focus-within:ring-2 focus-within:ring-sky-400/20">
+          <div className="flex h-11 items-center gap-2 px-1">
+            <label className="flex min-w-0 flex-1 cursor-text items-center gap-3">
+              <Search className="ml-1 shrink-0 text-slate-300" size={18} strokeWidth={1.9} aria-hidden="true" />
               <span className="sr-only">Search station name, train name or number</span>
-              <input ref={searchInputRef} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") setQuery(""); }} className="min-w-0 flex-1 bg-transparent text-[15px] font-medium text-slate-900 outline-none placeholder:font-normal placeholder:text-slate-500" placeholder="Find a station or train" autoComplete="off" />
+              <input ref={searchInputRef} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") setQuery(""); }} className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-100 outline-none placeholder:font-normal placeholder:text-slate-400" placeholder={selectedTrain ? "Search another train or station" : "Search train, station, or route…"} autoComplete="off" />
             </label>
-            {query ? <button type="button" onClick={() => { setQuery(""); searchInputRef.current?.focus(); }} className="grid size-10 shrink-0 place-items-center rounded-xl text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" aria-label="Clear search"><X size={17} aria-hidden="true" /></button> : null}
+            {query ? <button type="button" onClick={() => { setQuery(""); searchInputRef.current?.focus(); }} className="grid size-10 shrink-0 place-items-center rounded-xl text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400" aria-label="Clear search"><X size={17} aria-hidden="true" /></button> : null}
           </div>
         </div>
         {query.trim().length >= 2 ? (
-          <div id="rail-atlas-search-results" className="mt-2 max-h-[min(60dvh,460px)] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-[0_18px_40px_-18px_rgba(15,23,42,0.5)]" aria-busy={globalSearch.loading}>
-            {globalSearch.loading ? <div role="status" aria-label="Searching stations and trains" className="space-y-2 p-3"><span className="sr-only">Searching stations and trains…</span>{[0, 1, 2].map((index) => <div key={index} className="flex h-12 items-center gap-3 rounded-lg px-2"><span className="size-8 shrink-0 animate-pulse rounded-md bg-slate-200 motion-reduce:animate-none" /><span className="h-3.5 animate-pulse rounded bg-slate-200 motion-reduce:animate-none" style={{ width: `${65 - index * 12}%` }} /></div>)}</div> : null}
-            {!globalSearch.loading && globalSearch.error ? <p className="px-4 py-3 text-sm text-red-700">{globalSearch.error}</p> : null}
-            {!globalSearch.loading && !globalSearch.error && globalSearch.results.stations.length === 0 && globalSearch.results.trains.length === 0 ? <p className="px-4 py-3 text-sm text-slate-600">No stations or trains found.</p> : null}
-            {!globalSearch.loading && !globalSearch.error && globalSearch.results.stations.length > 0 ? <div className="border-b border-slate-200 p-2">
-              <p className="px-2 py-1 text-[10px] font-bold tracking-[0.14em] text-slate-500 uppercase">Stations</p>
-              {globalSearch.results.stations.map((station) => <button key={station.code} type="button" onClick={() => chooseSearchStation(station)} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-2 text-left hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-700">
+          <div id="rail-atlas-search-results" className="mt-2 max-h-[min(60dvh,460px)] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950/95 text-slate-100 shadow-2xl backdrop-blur-xl" aria-busy={globalSearch.loading}>
+            {globalSearch.loading ? <div role="status" aria-label="Searching stations and trains" className="space-y-2 p-3"><span className="sr-only">Searching stations and trains…</span>{[0, 1, 2].map((index) => <div key={index} className="flex h-12 items-center gap-3 rounded-lg px-2"><span className="size-8 shrink-0 animate-pulse rounded-md bg-slate-700 motion-reduce:animate-none" /><span className="h-3.5 animate-pulse rounded bg-slate-700 motion-reduce:animate-none" style={{ width: `${65 - index * 12}%` }} /></div>)}</div> : null}
+            {!globalSearch.loading && globalSearch.error ? <p className="px-4 py-3 text-sm text-red-300">{globalSearch.error}</p> : null}
+            {!globalSearch.loading && !globalSearch.error && globalSearch.results.stations.length === 0 && globalSearch.results.trains.length === 0 ? <p className="px-4 py-3 text-sm text-slate-400">No stations or trains found.</p> : null}
+            {!globalSearch.loading && !globalSearch.error && globalSearch.results.stations.length > 0 ? <div className="border-b border-slate-700 p-2">
+              <p className="px-2 py-1 text-[10px] font-bold tracking-[0.14em] text-slate-400 uppercase">Stations</p>
+              {globalSearch.results.stations.map((station) => <button key={station.code} type="button" onClick={() => chooseSearchStation(station)} className="flex min-h-12 w-full items-center gap-3 rounded-lg px-2 text-left hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-sky-400">
                 <span className="grid size-8 shrink-0 place-items-center rounded-md bg-slate-800 font-site-code text-[10px] font-bold text-white">{station.code}</span>
-                <span className="min-w-0"><strong className="block truncate text-sm text-slate-900">{station.name}</strong><small className="block text-xs text-slate-500">Open station details</small></span>
+                <span className="min-w-0"><strong className="block truncate text-sm text-slate-100">{station.name}</strong><small className="block text-xs text-slate-400">Open station details</small></span>
               </button>)}
             </div> : null}
             {!globalSearch.loading && !globalSearch.error && globalSearch.results.trains.length > 0 ? <div className="p-2">
-              <p className="px-2 py-1 text-[10px] font-bold tracking-[0.14em] text-slate-500 uppercase">Trains</p>
-              {globalSearch.results.trains.map((train) => <button type="button" onClick={() => chooseTrain(train)} key={train.trainNo} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-left hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-700"><span className="font-site-code text-xs font-bold text-blue-700">{train.trainNo}</span><span className="truncate text-sm font-semibold text-slate-800">{train.trainName}</span><span className="ml-auto text-[10px] font-semibold text-slate-500">Track</span></button>)}
+              <p className="px-2 py-1 text-[10px] font-bold tracking-[0.14em] text-slate-400 uppercase">Trains</p>
+              {globalSearch.results.trains.map((train) => <button type="button" onClick={() => chooseTrain(train)} key={train.trainNo} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-2 text-left hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-sky-400"><span className="font-site-code text-xs font-bold text-sky-300">{train.trainNo}</span><span className="truncate text-sm font-semibold text-slate-100">{train.trainName}</span><span className="ml-auto text-[10px] font-semibold text-slate-400">Track</span></button>)}
             </div> : null}
           </div>
         ) : null}
       </div>
 
-      <div ref={controlsRef} className="absolute bottom-16 left-3 z-[900]" aria-label="Map controls">
-        <div className="flex w-14 flex-col gap-2 rounded-2xl border border-slate-200 bg-white/95 p-1.5 shadow-lg backdrop-blur">
-          <button type="button" onClick={() => mapRef.current?.zoomIn()} disabled={!mapReady || mapZoom >= 18} aria-label="Zoom in" title="Zoom in" className="grid size-11 cursor-pointer place-items-center rounded-xl text-slate-800 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><Plus size={20} strokeWidth={2} aria-hidden="true" /></button>
-          <button type="button" onClick={() => mapRef.current?.zoomOut()} disabled={!mapReady || mapZoom <= minMapZoom + 0.01} aria-label="Zoom out" title="Zoom out" className="grid size-11 cursor-pointer place-items-center rounded-xl text-slate-800 transition-colors hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><Minus size={20} strokeWidth={2} aria-hidden="true" /></button>
-          <span className="mx-2 border-t border-slate-200" aria-hidden="true" />
-          <button ref={layersButtonRef} type="button" onClick={() => setLayersOpen((open) => !open)} aria-label="Map layers" aria-expanded={layersOpen} aria-controls={layersOpen ? "rail-atlas-layer-options" : undefined} title="Map layers" className={`grid size-11 cursor-pointer place-items-center rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700 ${layersOpen ? "bg-blue-700 text-white" : "text-slate-800 hover:bg-blue-50 hover:text-blue-700"}`}><Layers3 size={19} strokeWidth={1.8} aria-hidden="true" /></button>
-          <span className="mx-2 border-t border-slate-200" aria-hidden="true" />
-          <Link href="/" aria-label="Back to RailKit site" title="Back to site" className="group relative grid size-11 cursor-pointer place-items-center rounded-xl text-slate-800 no-underline transition-colors hover:bg-blue-50 hover:text-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"><House size={19} strokeWidth={1.8} aria-hidden="true" /><span className="pointer-events-none absolute left-[calc(100%+0.75rem)] whitespace-nowrap rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true">Back to site</span></Link>
+      <div ref={controlsRef} className={`absolute right-3 bottom-4 z-[900] ${selectedTrain ? "hidden lg:block" : ""}`} aria-label="Map controls">
+        <div className="flex w-14 flex-col gap-1 rounded-2xl border border-slate-600/70 bg-slate-950/90 p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.4)] backdrop-blur-xl">
+          <button type="button" onClick={() => mapRef.current?.zoomIn()} disabled={!mapReady || mapZoom >= 18} aria-label="Zoom in" title="Zoom in" className="grid size-11 cursor-pointer place-items-center rounded-xl text-slate-200 transition-colors hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"><Plus size={20} strokeWidth={2} aria-hidden="true" /></button>
+          <button type="button" onClick={() => mapRef.current?.zoomOut()} disabled={!mapReady || mapZoom <= minMapZoom + 0.01} aria-label="Zoom out" title="Zoom out" className="grid size-11 cursor-pointer place-items-center rounded-xl text-slate-200 transition-colors hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"><Minus size={20} strokeWidth={2} aria-hidden="true" /></button>
+          <span className="mx-2 border-t border-slate-700" aria-hidden="true" />
+          <button ref={layersButtonRef} type="button" onClick={() => { setLayersOpen((open) => !open); setLegendOpen(false); }} aria-label="Map layers" aria-expanded={layersOpen} aria-controls={layersOpen ? "rail-atlas-layer-options" : undefined} title="Map layers" className={`grid size-11 cursor-pointer place-items-center rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${layersOpen ? "bg-sky-500/20 text-sky-300" : "text-slate-200 hover:bg-slate-700 hover:text-white"}`}><Layers3 size={19} strokeWidth={1.8} aria-hidden="true" /></button>
+          <button ref={legendButtonRef} type="button" onClick={() => { setLegendOpen((open) => !open); setLayersOpen(false); }} aria-label="Train legend" aria-expanded={legendOpen} aria-controls={legendOpen ? "rail-atlas-train-legend" : undefined} title="Train legend" className={`grid size-11 cursor-pointer place-items-center rounded-xl transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${legendOpen ? "bg-sky-500/20 text-sky-300" : "text-slate-200 hover:bg-slate-700 hover:text-white"}`}><ListFilter size={19} strokeWidth={1.8} aria-hidden="true" /></button>
+          {selectedTrain ? <button type="button" onClick={focusSelectedTrain} disabled={!trainLive.data?.currentPosition && !trainLive.data?.route?.length} aria-label={focusSelectedTrainOnly ? "Show all trains" : "Focus selected train only"} title={focusSelectedTrainOnly ? "Show all trains" : "Focus selected train only"} aria-pressed={focusSelectedTrainOnly} className={`grid size-11 cursor-pointer place-items-center rounded-xl transition-colors hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${focusSelectedTrainOnly ? "bg-sky-500/20 text-sky-300" : "text-slate-200"}`}><Focus size={19} strokeWidth={1.8} aria-hidden="true" /></button> : null}
+          <span className="mx-2 border-t border-slate-700" aria-hidden="true" />
+          <button type="button" onClick={() => refreshLiveMapRef.current?.()} disabled={!showLiveTrains || liveMapState === "loading" || !atlasAccess.ready} aria-label="Refresh live trains" title="Refresh live trains" className="grid size-11 cursor-pointer place-items-center rounded-xl text-slate-200 transition-colors hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"><RefreshCw size={18} strokeWidth={1.8} className={liveMapState === "loading" ? "animate-spin motion-reduce:animate-none" : ""} aria-hidden="true" /></button>
+          <Link href="/" aria-label="Back to RailKit site" title="Back to site" className="grid size-11 cursor-pointer place-items-center rounded-xl text-slate-200 no-underline transition-colors hover:bg-slate-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"><House size={18} strokeWidth={1.8} aria-hidden="true" /></Link>
         </div>
-        {layersOpen ? <div id="rail-atlas-layer-options" className="absolute bottom-[60px] left-[calc(100%+0.75rem)] w-52 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl" aria-label="Map layers">
-          <p className="px-2 pt-1 pb-1.5 text-xs font-bold tracking-wide text-slate-500 uppercase">Map layers</p>
-          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-2 text-sm font-medium text-slate-800 hover:bg-slate-50">
-            <span className="flex items-center gap-2"><i className="size-2 rounded-full border border-white bg-amber-600 ring-1 ring-amber-800" aria-hidden="true" /> Stations</span>
-            <input className="size-4 accent-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" type="checkbox" checked={showStations} onChange={(event) => setShowStations(event.target.checked)} />
+        {layersOpen ? <div id="rail-atlas-layer-options" className="absolute right-[calc(100%+0.75rem)] bottom-0 w-56 rounded-2xl border border-slate-700 bg-slate-950/95 p-2 text-slate-100 shadow-2xl backdrop-blur-xl" aria-label="Map layers">
+          <p className="border-b border-slate-700 px-2 pt-1 pb-2 text-sm font-semibold">Map layers</p>
+          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-2 text-sm hover:bg-slate-800">
+            <span className="flex items-center gap-2"><i className="size-2 rounded-full bg-amber-500" aria-hidden="true" /> Stations</span>
+            <input className="size-4 accent-sky-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400" type="checkbox" checked={showStations} onChange={(event) => { setShowStations(event.target.checked); if (event.target.checked) setShowLiveTrains(false); }} />
           </label>
-          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-2 text-sm font-medium text-slate-800 hover:bg-slate-50">
-            <span className="flex items-center gap-2"><i className="h-[3px] w-5 bg-blue-700" aria-hidden="true" /> Railway tracks</span>
-            <input className="size-4 accent-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700" type="checkbox" checked={showTracks} onChange={(event) => setShowTracks(event.target.checked)} />
+          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-2 text-sm hover:bg-slate-800">
+            <span className="flex items-center gap-2"><i className="h-[3px] w-5 bg-sky-400" aria-hidden="true" /> Railway tracks</span>
+            <input className="size-4 accent-sky-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400" type="checkbox" checked={showTracks} onChange={(event) => { setShowTracks(event.target.checked); if (event.target.checked) setShowLiveTrains(false); }} />
           </label>
+          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-2 text-sm hover:bg-slate-800">
+            <span className="flex items-center gap-2"><i className="size-2 rounded-full bg-emerald-400" aria-hidden="true" /> Live trains</span>
+            <input className="size-4 accent-sky-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400" type="checkbox" checked={showLiveTrains} onChange={(event) => { setShowLiveTrains(event.target.checked); if (event.target.checked) { setShowStations(false); setShowTracks(false); } }} />
+          </label>
+        </div> : null}
+        {legendOpen ? <div id="rail-atlas-train-legend" className="absolute right-[calc(100%+0.75rem)] bottom-0 w-[min(280px,calc(100vw-5.5rem))] max-h-[min(75dvh,540px)] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950/95 p-3 text-slate-100 shadow-2xl backdrop-blur-xl" aria-label="Train legend">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-700 px-1 pb-2">
+            <h2 className="text-sm font-semibold">Map Details</h2>
+            <button type="button" onClick={() => setVisibleTrainCategories(visibleTrainCategories.length ? [] : ALL_LIVE_TRAIN_CATEGORIES)} className="min-h-11 cursor-pointer rounded-md px-2 text-xs font-semibold text-sky-400 hover:bg-slate-800 hover:text-sky-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400">{visibleTrainCategories.length ? "Hide All" : "Show All"}</button>
+          </div>
+          <div className="pt-1">
+            {LIVE_TRAIN_CATEGORIES.map((category) => {
+              const active = visibleTrainCategorySet.has(category.id);
+              return <button key={category.id} type="button" aria-pressed={active} onClick={() => setVisibleTrainCategories((current) => current.includes(category.id) ? current.filter((id) => id !== category.id) : [...current, category.id])} className={`flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-1.5 text-left text-[13px] transition-colors hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${active ? "text-slate-100" : "text-slate-500"}`}>
+                <Check size={15} strokeWidth={2} className={`shrink-0 ${active ? "opacity-100" : "opacity-0"}`} aria-hidden="true" />
+                <i className={`size-3.5 shrink-0 rounded-full ${active ? "opacity-100" : "opacity-40"}`} style={{ backgroundColor: category.color }} aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate">{category.label}</span>
+                <span className="rounded bg-slate-800 px-1.5 py-0.5 font-site-code text-[11px] tabular-nums text-slate-400">{liveTrainCounts[category.id].toLocaleString("en-IN")}</span>
+              </button>;
+            })}
+          </div>
         </div> : null}
       </div>
 
       {selected ? <StationDetailsPanel station={selected} board={stationBoard.board} hours={stationBoard.hours} loading={stationBoard.loading} error={stationBoard.error} onClose={() => setSelected(null)} onRetry={stationBoard.retry} onSelectTrain={(train) => chooseTrain({ trainNo: train.trainNo, trainName: train.trainName, date: train.runDate })} /> : null}
-      {selectedTrain ? <TrainDetailsPanel selection={selectedTrain} data={trainLive.data} loading={trainLive.loading} refreshing={trainLive.refreshing} error={trainLive.error} refreshError={trainLive.refreshError} onClose={() => setSelectedTrain(null)} onRetry={trainLive.retry} /> : null}
+      {selectedTrain ? <TrainDetailsPanel selection={selectedTrain} data={trainLive.data} loading={trainLive.loading} refreshing={trainLive.refreshing} error={trainLive.error} refreshError={trainLive.refreshError} focusOnly={focusSelectedTrainOnly} onFocusTrain={focusSelectedTrain} onClose={() => { setSelectedTrain(null); setFocusSelectedTrainOnly(false); }} onRetry={trainLive.retry} /> : null}
 
       {atlasAccess.error ? <div role="alert" className="absolute right-3 bottom-3 left-3 z-[1100] mx-auto max-w-lg rounded-xl border border-red-200 bg-white px-4 py-3 text-sm text-red-800 shadow-lg"><p>{atlasAccess.error}</p><button type="button" onClick={() => window.location.reload()} className="mt-2 min-h-9 cursor-pointer rounded-lg bg-red-800 px-3 py-1.5 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-800">Retry security check</button></div> : null}
       {error ? <div role="alert" className="absolute right-3 bottom-3 left-3 z-[1000] mx-auto max-w-lg rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-lg">{error}. Run npm run update:station-data if the station file is missing.</div> : null}

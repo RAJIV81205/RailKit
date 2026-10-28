@@ -514,6 +514,7 @@ function PricingPageContent({
   const searchParams = useSearchParams();
 
   const [authState, setAuthState] = useState<AuthState>({ status: "loading" });
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const [notice, setNotice] = useState<Notice>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PaidPlanType | null>(null);
@@ -531,6 +532,11 @@ function PricingPageContent({
   const contactUrl = `mailto:${initialContactEmail}?subject=${encodeURIComponent("RailKit Payment Help")}`;
   const orderIdFromQuery = searchParams.get("order_id");
   const isPaymentReturn = searchParams.get("payment_return") === "1";
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setClockNow(Date.now()), 60_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const showNotice = useCallback((kind: NoticeKind, text: string) => {
     setNotice({ id: Date.now(), kind, text });
@@ -717,10 +723,18 @@ function PricingPageContent({
     const isLoading = authState.status === "loading";
     const isAuthed = authState.status === "authenticated";
     const currentPlan = isAuthed ? (authState as { plan: "free" | PaidPlanType }).plan : null;
+    const expiration = isAuthed && authState.expirationDate
+      ? new Date(authState.expirationDate).getTime()
+      : NaN;
+    const inRenewalWindow = Number.isFinite(expiration) &&
+      expiration > clockNow && expiration - clockNow <= 7 * 24 * 60 * 60 * 1000;
     if (!initialBillingV2Enabled && plan.planType !== "free") return { label: "Coming soon", disabled: true, action: () => {} };
     if (isAuthed && authState.upcomingPlan?.orderId && plan.planType !== "free") return { label: plan.planType === currentPlan ? "Renewal scheduled" : "Current plan active", disabled: true, action: () => {} };
     if (isAuthed && currentPlan === plan.planType && currentPlan !== "free") {
-      return { label: "Renew plan", disabled: false, action: () => { void openPaymentModal(plan.planType as PaidPlanType, false, true); } };
+      if (inRenewalWindow) {
+        return { label: "Renew plan", disabled: false, action: () => { void openPaymentModal(plan.planType as PaidPlanType, false, true); } };
+      }
+      return { label: "Current plan active", disabled: true, action: () => {} };
     }
     if (isAuthed && currentPlan === "pro" && authState.status === "authenticated" && authState.billingInterval !== "year" && plan.planType === "advance") return { label: "Upgrade to Advance", disabled: false, action: () => { void openPaymentModal("advance", true); } };
     if (isAuthed && currentPlan && currentPlan !== "free") return { label: "Current plan active", disabled: true, action: () => {} };

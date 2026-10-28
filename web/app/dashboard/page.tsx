@@ -1789,7 +1789,9 @@ export default function DashboardPage() {
                         </dl>
                         <p className="mt-3 text-[11px] leading-relaxed text-[#6b7280]">
                           {billingDates.isFinalCycle
-                            ? "Final cycle — renew your plan before expiry."
+                            ? dbUser.upcomingPlan?.orderId
+                              ? "Your scheduled next term starts when this plan expires."
+                              : "Final cycle — renew your plan before expiry."
                             : "Monthly requests reset automatically. Unused monthly requests do not carry over."}
                           {" "}Unused extra requests stay until plan expiry.
                         </p>
@@ -1803,7 +1805,7 @@ export default function DashboardPage() {
                     )}
 
                     {!isAnnual && paymentSummary}
-                    {(normalizedPlan === "pro" && dbUser.billingInterval !== "year") && (
+                    {(normalizedPlan === "pro" && dbUser.billingInterval !== "year" && !dbUser.upcomingPlan?.orderId) && (
                       <button
                         type="button"
                         onClick={() => router.push("/pricing")}

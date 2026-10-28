@@ -995,6 +995,9 @@ export function RailAtlas() {
         maxBoundsViscosity: 1,
         preferCanvas: true,
         zoomControl: false,
+        zoomAnimation: false,
+        fadeAnimation: false,
+        markerZoomAnimation: false,
       });
       const indiaBoundsZoom = map.getBoundsZoom(INDIA_MAP_BOUNDS, false, L.point(24, 24));
       map.setMinZoom(indiaBoundsZoom);
@@ -1645,13 +1648,13 @@ export function RailAtlas() {
   };
 
   return (
-    <main className="relative h-dvh overflow-hidden bg-slate-200 text-slate-900">
+    <main className="relative h-dvh overflow-hidden bg-[#0b0e14] text-slate-100">
       {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ? <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" strategy="afterInteractive" onReady={() => setTurnstileScriptReady(true)} /> : null}
       <div ref={atlasAccess.containerRef} className="hidden" aria-hidden="true" />
       <h1 className="sr-only">Rail Atlas: Indian railway map, stations and live trains</h1>
       <p className="sr-only">Search Indian railway stations and trains, explore the track network, check upcoming trains at a station, and view a train&apos;s latest reported position and route.</p>
       <section className="absolute inset-0" aria-label="Indian railway network map">
-        <div ref={mapNodeRef} className="absolute inset-0 bg-slate-200" />
+        <div ref={mapNodeRef} className="absolute inset-0 bg-[#0b0e14]" />
       </section>
 
       {showLiveTrains && !selectedTrain ? <div role="status" aria-live="polite" aria-atomic="true" title={liveMapError || undefined} className="absolute top-3 right-3 z-[900] max-w-[45vw] rounded-2xl border border-slate-600/70 bg-slate-950/90 px-3 py-2 text-xs font-semibold text-slate-100 shadow-xl backdrop-blur-xl">

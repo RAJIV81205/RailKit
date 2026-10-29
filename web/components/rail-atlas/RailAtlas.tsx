@@ -89,8 +89,12 @@ function hasMappedPosition(train: LiveMapTrain): train is MappedLiveMapTrain {
 
 const LIVE_TRAIN_CATEGORIES = [
   { id: "vandeBharat", label: "Vande Bharat", color: "#fb923c" },
-  { id: "rajdhaniDuronto", label: "Rajdhani / Duronto", color: "#fb7185" },
+  { id: "rajdhaniDuronto", label: "Rajdhani / Duronto / Shatabdi", color: "#fb7185" },
+  { id: "tourist", label: "Tourist Trains", color: "#6366f1" },
+  { id: "tejas", label: "Tejas", color: "#ef4444" },
+  { id: "namoBharat", label: "Namo Bharat", color: "#06b6d4" },
   { id: "superfast", label: "Superfast Express", color: "#60a5fa" },
+  { id: "amritBharat", label: "Amrit Bharat", color: "#a855f7" },
   { id: "expressMail", label: "Express / Mail", color: "#2dd4bf" },
   { id: "garibRathHumsafar", label: "Garib Rath / Humsafar", color: "#f87171" },
   { id: "janShatabdi", label: "Jan Shatabdi", color: "#f472b6" },
@@ -105,8 +109,12 @@ const ALL_LIVE_TRAIN_CATEGORIES = LIVE_TRAIN_CATEGORIES.map((category) => catego
 
 function liveTrainCategory(trainType: string): LiveTrainCategory {
   const type = trainType.toUpperCase();
+  if (type.includes("AMRIT BHARAT")) return "amritBharat";
   if (type.includes("VANDE BHARAT")) return "vandeBharat";
-  if (/RAJDHANI|DURONTO/.test(type)) return "rajdhaniDuronto";
+  if (/RAJDHANI|DURONTO|SHATABDI/.test(type)) return "rajdhaniDuronto";
+  if (type.includes("TOURIST TRAIN")) return "tourist";
+  if (type.includes("TEJAS")) return "tejas";
+  if (type.includes("NAMO BHARAT")) return "namoBharat";
   if (/GARIB RATH|HUMSAFAR/.test(type)) return "garibRathHumsafar";
   if (type.includes("JAN SHATABDI")) return "janShatabdi";
   if (type.includes("SUPERFAST")) return "superfast";

@@ -1734,7 +1734,7 @@ export function RailAtlas() {
           maxBoundsViscosity: 1,
           preferCanvas: true,
           zoomControl: false,
-
+          attributionControl: false
         });
         const indiaBoundsZoom = map.getBoundsZoom(
           INDIA_MAP_BOUNDS,

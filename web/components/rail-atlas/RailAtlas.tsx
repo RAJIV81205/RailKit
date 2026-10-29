@@ -111,12 +111,12 @@ function liveTrainCategory(trainType: string): LiveTrainCategory {
   const type = trainType.toUpperCase();
   if (type.includes("AMRIT BHARAT")) return "amritBharat";
   if (type.includes("VANDE BHARAT")) return "vandeBharat";
+  if (type.includes("JAN SHATABDI")) return "janShatabdi";
   if (/RAJDHANI|DURONTO|SHATABDI/.test(type)) return "rajdhaniDuronto";
   if (type.includes("TOURIST TRAIN")) return "tourist";
   if (type.includes("TEJAS")) return "tejas";
   if (type.includes("NAMO BHARAT")) return "namoBharat";
   if (/GARIB RATH|HUMSAFAR/.test(type)) return "garibRathHumsafar";
-  if (type.includes("JAN SHATABDI")) return "janShatabdi";
   if (type.includes("SUPERFAST")) return "superfast";
   if (/SUBURBAN|MEMU|\bEMU\b|\bDMU\b/.test(type)) return "suburbanEmu";
   if (type.includes("PASSENGER")) return "passenger";

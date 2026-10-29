@@ -1628,7 +1628,7 @@ export function RailAtlas() {
   const railwayLayerRef = useRef<Layer | null>(null);
   const stationLayerRef = useRef<LayerGroup | null>(null);
   const liveTrainHitTestRef = useRef<
-    ((x: number, y: number) => boolean) | null
+    ((x: number, y: number) => MappedLiveMapTrain | null) | null
   >(null);
   const selectedLayerRef = useRef<LayerGroup | null>(null);
   const trainLayerRef = useRef<LayerGroup | null>(null);
@@ -2226,7 +2226,7 @@ export function RailAtlas() {
         );
       });
     };
-    liveTrainHitTestRef.current = (x, y) => trainsAt(x, y).length > 0;
+    liveTrainHitTestRef.current = (x, y) => trainsAt(x, y)[0] || null;
     const handleClick = (event: LeafletMouseEvent) => {
       const matches = trainsAt(event.containerPoint.x, event.containerPoint.y);
       if (matches.length === 0) return;
@@ -2351,7 +2351,12 @@ export function RailAtlas() {
   }, [mapReady, selectedTrain, showStations, stations, stationGrid]);
 
   useEffect(() => {
-    if (!mapReady || !mapRef.current || !showStations || stations.length === 0)
+    if (
+      !mapReady ||
+      !mapRef.current ||
+      (!showStations && !showLiveTrains) ||
+      (showStations && stations.length === 0 && liveMapTrains.length === 0)
+    )
       return;
     const map = mapRef.current;
     let cancelled = false;
@@ -2397,9 +2402,15 @@ export function RailAtlas() {
         moveFrame = window.requestAnimationFrame(() => {
           moveFrame = 0;
           if (!latestMove) return;
-          const nearest = findNearest(latestMove, 16);
-          map.getContainer().style.cursor = nearest ? "pointer" : "";
-          if (!nearest) {
+          const train = showLiveTrains
+            ? liveTrainHitTestRef.current?.(
+                latestMove.containerPoint.x,
+                latestMove.containerPoint.y,
+              )
+            : null;
+          const nearest = !train && showStations ? findNearest(latestMove, 16) : null;
+          map.getContainer().style.cursor = train || nearest ? "pointer" : "";
+          if (!train && !nearest) {
             if (hoverTooltip) {
               map.removeLayer(hoverTooltip);
               hoverTooltip = null;
@@ -2413,8 +2424,16 @@ export function RailAtlas() {
               opacity: 0.96,
             });
           hoverTooltip
-            .setContent(nearest.code)
-            .setLatLng([nearest.lat, nearest.lon]);
+            .setContent(
+              train
+                ? `${train.trainNo} - ${train.trainName || "Train"}`
+                : nearest!.code,
+            )
+            .setLatLng(
+              train
+                ? [train.currentStation.lat, train.currentStation.lon]
+                : [nearest!.lat, nearest!.lon],
+            );
           if (!map.hasLayer(hoverTooltip)) hoverTooltip.addTo(map);
         });
       };
@@ -2427,6 +2446,7 @@ export function RailAtlas() {
           )
         )
           return;
+        if (!showStations) return;
         const nearest = findNearest(event, 22);
         if (nearest) setSelected(nearest);
       };
@@ -2453,7 +2473,17 @@ export function RailAtlas() {
       cancelled = true;
       cleanupInteraction?.();
     };
-  }, [mapReady, selectedTrain, showStations, stations, stationGrid]);
+  }, [
+    mapReady,
+    selectedTrain,
+    showStations,
+    showLiveTrains,
+    liveMapTrains,
+    visibleTrainCategorySet,
+    focusSelectedTrainOnly,
+    stationGrid,
+    stations,
+  ]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
@@ -2505,8 +2535,7 @@ export function RailAtlas() {
       .then((L) => {
         if (cancelled || !mapRef.current || !trainLive.data) return;
         const data = trainLive.data;
-        const route =
-          data.route?.length > 1 ? data.route : getStraightTrainRoute(data);
+        const route = getStraightTrainRoute(data);
         const isFullyCancelled = Boolean(
           data.statusNote && /\bcancel(?:led|lation)?\b/i.test(data.statusNote),
         );
@@ -2645,10 +2674,7 @@ export function RailAtlas() {
     const nextFocused = !focusSelectedTrainOnly;
     setFocusSelectedTrainOnly(nextFocused);
     if (!nextFocused || !mapRef.current || !trainLive.data) return;
-    const route =
-      trainLive.data.route?.length > 1
-        ? trainLive.data.route
-        : getStraightTrainRoute(trainLive.data);
+    const route = getStraightTrainRoute(trainLive.data);
     if (route.length > 1) focusTrainRouteOnMap(mapRef.current, route);
     else if (trainLive.data.currentPosition) {
       focusTrainOnMap(

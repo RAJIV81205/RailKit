@@ -16,6 +16,7 @@ import type { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 import {
   Check,
   ChevronDown,
+  CalendarDays,
   Clock3,
   Focus,
   House,
@@ -339,6 +340,14 @@ function formatScheduleTime(value?: string) {
   )
     return "--";
   return normalized.match(/\b\d{1,2}:\d{2}\b/)?.[0] || normalized;
+}
+
+function journeyDay(value?: string) {
+  const normalized = String(value || "").trim();
+  const ddMmYyyy = normalized.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+  if (ddMmYyyy) return ddMmYyyy[1].padStart(2, "0");
+  const yyyMmDd = normalized.match(/^\d{4}[-/](\d{1,2})[-/](\d{1,2})$/);
+  return yyyMmDd ? yyyMmDd[2].padStart(2, "0") : "—";
 }
 
 function isActualTimeLate(actual: string, scheduled: string) {
@@ -1663,72 +1672,96 @@ function TrainDetailsPanel({
       aria-label={`${selection.trainName} live train details`}
     >
       <header className="shrink-0 border-b border-slate-700 px-4 pt-3 pb-2">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="font-site-code text-base font-bold leading-5 text-white">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-site-code text-sm font-bold leading-5 text-white">
               {selection.trainNo}
             </h2>
             <p
-              className="truncate text-xs text-slate-300"
+              className="truncate text-xs leading-4 text-slate-300"
               title={data?.trainName || selection.trainName}
             >
               {data?.trainName || selection.trainName}
             </p>
+            <p className="mt-0.5 truncate font-site-code text-[11px] leading-4 text-slate-400" title={`${data?.start?.stationCode || "SRC"} to ${data?.end?.stationCode || "DSTN"}`}>
+              {data?.start?.stationCode || "SRC"} <span className="text-slate-600">→</span> {data?.end?.stationCode || "DSTN"}
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={onFocusTrain}
-            disabled={!data?.currentPosition && !data?.route?.length}
-            aria-pressed={focusOnly}
-            className={`grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg transition-colors hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-300 lg:hidden ${focusOnly ? "text-white" : "text-slate-400"}`}
-            style={focusOnly ? { color: accentColor, backgroundColor: `color-mix(in srgb, ${accentColor} 14%, transparent)` } : undefined}
-            aria-label={
-              focusOnly ? "Show all trains" : "Focus selected train only"
-            }
-            title={focusOnly ? "Show all trains" : "Focus selected train only"}
-          >
-            <Focus size={17} aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
-            aria-label="Close train details"
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-          <span className="rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-1.5 font-medium text-slate-200">
-            {data?.date || selection.date || "Current run"}
-          </span>
-          {data?.start?.stationCode && data?.end?.stationCode ? (
-            <span className="truncate text-slate-400">
-              {data.start.stationCode} → {data.end.stationCode}
+          <div className="flex shrink-0 items-center gap-1">
+            <span
+              className="flex size-12 flex-col items-center justify-center rounded-xl border border-slate-700 bg-slate-800/80 text-slate-300"
+              title={data?.date || selection.date || "Journey date unavailable"}
+              aria-label={`Journey day ${journeyDay(data?.date || selection.date)}`}
+            >
+              <CalendarDays size={18} className="text-slate-400" aria-hidden="true" />
+              <span className="font-site-code text-sm font-bold leading-4 text-white">
+                {journeyDay(data?.date || selection.date)}
+              </span>
             </span>
-          ) : null}
-          {data?.progress && !isFullyCancelled ? (
-            <span className="ml-auto font-site-code" style={{ color: accentColor }}>
-              {Math.round(data.progress.percent)}%
-            </span>
-          ) : null}
+            <button
+              type="button"
+              onClick={onFocusTrain}
+              disabled={!data?.currentPosition && !data?.route?.length}
+              aria-pressed={focusOnly}
+              className={`grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg transition-colors hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-300 lg:hidden ${focusOnly ? "text-white" : "text-slate-400"}`}
+              style={focusOnly ? { color: accentColor, backgroundColor: `color-mix(in srgb, ${accentColor} 14%, transparent)` } : undefined}
+              aria-label={focusOnly ? "Show all trains" : "Focus selected train only"}
+              title={focusOnly ? "Show all trains" : "Focus selected train only"}
+            >
+              <Focus size={17} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
+              aria-label="Close train details"
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+          </div>
         </div>
         {data?.progress && !isFullyCancelled ? (
-          <div
-            className="mt-2 h-1 overflow-hidden rounded-full bg-slate-700"
-            role="progressbar"
-            aria-label="Journey progress"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(data.progress.percent)}
-          >
+          <div className="mt-2 flex items-center gap-2">
             <div
-              className="h-full rounded-full"
-              style={{ width: `${Math.max(0, Math.min(100, data.progress.percent))}%`, backgroundColor: accentColor }}
-            />
+              className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-700"
+              role="progressbar"
+              aria-label="Journey progress"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(data.progress.percent)}
+            >
+              <div
+                className="h-full rounded-full transition-[width] duration-500"
+                style={{ width: `${Math.max(0, Math.min(100, data.progress.percent))}%`, backgroundColor: accentColor }}
+              />
+            </div>
+            <span className="shrink-0 font-site-code text-[11px] font-semibold" style={{ color: accentColor }}>
+              {Math.round(data.progress.percent)}%
+            </span>
           </div>
         ) : null}
       </header>
+
+      {isVandeBharat && data ? (
+        <div className="flex shrink-0 border-b border-slate-700 px-3 pt-2" role="tablist" aria-label="Train details">
+          {(["route", "coaches"] as const).map((tab) => {
+            const active = detailsTab === tab;
+            return (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setDetailsTab(tab)}
+                className={`min-h-9 border-b-2 px-3 text-xs font-semibold capitalize transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-300 ${active ? "text-slate-100" : "border-transparent text-slate-400 hover:text-slate-200"}`}
+                style={active ? { borderColor: accentColor, color: accentColor } : undefined}
+              >
+                {tab === "route" ? "Route" : `Coaches${coachPositions.length ? ` · ${coachPositions.length}` : ""}`}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {detailsTab === "route" ? (
         <div className="grid shrink-0 grid-cols-[60px_1fr_60px] items-center border-b border-slate-700 px-3 py-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
@@ -1786,26 +1819,6 @@ function TrainDetailsPanel({
             >
               Service cancelled today.
             </p>
-          ) : null}
-          {isVandeBharat ? (
-            <div className="flex shrink-0 border-b border-slate-700 px-3 pt-2" role="tablist" aria-label="Train details">
-              {(["route", "coaches"] as const).map((tab) => {
-                const active = detailsTab === tab;
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setDetailsTab(tab)}
-                    className={`min-h-9 border-b-2 px-3 text-xs font-semibold capitalize transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-300 ${active ? "text-slate-100" : "border-transparent text-slate-400 hover:text-slate-200"}`}
-                    style={active ? { borderColor: accentColor, color: accentColor } : undefined}
-                  >
-                    {tab === "route" ? "Route" : `Coaches${coachPositions.length ? ` · ${coachPositions.length}` : ""}`}
-                  </button>
-                );
-              })}
-            </div>
           ) : null}
           {isVandeBharat && detailsTab === "coaches" ? (
             <CoachConsist

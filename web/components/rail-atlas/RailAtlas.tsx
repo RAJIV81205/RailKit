@@ -170,6 +170,11 @@ function liveTrainCategory(trainType: string): LiveTrainCategory {
   return "other";
 }
 
+function liveTrainCategoryColor(trainType: string) {
+  const category = liveTrainCategory(trainType);
+  return LIVE_TRAIN_CATEGORIES.find((item) => item.id === category)?.color || "#cbd5e1";
+}
+
 function createLiveTrainIcon(color: string): ImageData {
   const canvas = document.createElement("canvas");
   canvas.width = 24;
@@ -315,6 +320,18 @@ function formatScheduleTime(value?: string) {
   )
     return "--";
   return normalized.match(/\b\d{1,2}:\d{2}\b/)?.[0] || normalized;
+}
+
+function isActualTimeLate(actual: string, scheduled: string) {
+  const actualMatch = actual.match(/^(\d{1,2}):(\d{2})$/);
+  const scheduledMatch = scheduled.match(/^(\d{1,2}):(\d{2})$/);
+  if (!actualMatch || !scheduledMatch) return false;
+  const actualMinutes = Number(actualMatch[1]) * 60 + Number(actualMatch[2]);
+  const scheduledMinutes = Number(scheduledMatch[1]) * 60 + Number(scheduledMatch[2]);
+  let difference = actualMinutes - scheduledMinutes;
+  if (difference > 12 * 60) difference -= 24 * 60;
+  if (difference < -12 * 60) difference += 24 * 60;
+  return difference > 0;
 }
 
 function StationBoardTime({
@@ -1135,6 +1152,7 @@ function StationDetailsPanel({
 
 function TrainDetailsPanel({
   selection,
+  trainType,
   data,
   loading,
   refreshing,
@@ -1146,6 +1164,7 @@ function TrainDetailsPanel({
   onFocusTrain,
 }: {
   selection: TrainSelection;
+  trainType: string;
   data: TrainLiveData | null;
   loading: boolean;
   refreshing: boolean;
@@ -1156,6 +1175,7 @@ function TrainDetailsPanel({
   onRetry: () => void;
   onFocusTrain: () => void;
 }) {
+  const accentColor = liveTrainCategoryColor(trainType);
   const scheduleRef = useRef<HTMLDivElement>(null);
   const isFullyCancelled = Boolean(
     data?.statusNote && /\bcancel(?:led|lation)?\b/i.test(data.statusNote),
@@ -1236,7 +1256,8 @@ function TrainDetailsPanel({
             onClick={onFocusTrain}
             disabled={!data?.currentPosition && !data?.route?.length}
             aria-pressed={focusOnly}
-            className={`grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg transition-colors hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 lg:hidden ${focusOnly ? "bg-sky-500/20 text-sky-300" : "text-slate-400"}`}
+            className={`grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg transition-colors hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-300 lg:hidden ${focusOnly ? "text-white" : "text-slate-400"}`}
+            style={focusOnly ? { color: accentColor, backgroundColor: `color-mix(in srgb, ${accentColor} 14%, transparent)` } : undefined}
             aria-label={
               focusOnly ? "Show all trains" : "Focus selected train only"
             }
@@ -1247,7 +1268,7 @@ function TrainDetailsPanel({
           <button
             type="button"
             onClick={onClose}
-            className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+            className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg text-slate-400 hover:bg-slate-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
             aria-label="Close train details"
           >
             <X size={18} aria-hidden="true" />
@@ -1263,7 +1284,7 @@ function TrainDetailsPanel({
             </span>
           ) : null}
           {data?.progress && !isFullyCancelled ? (
-            <span className="ml-auto font-site-code text-sky-400">
+            <span className="ml-auto font-site-code" style={{ color: accentColor }}>
               {Math.round(data.progress.percent)}%
             </span>
           ) : null}
@@ -1278,10 +1299,8 @@ function TrainDetailsPanel({
             aria-valuenow={Math.round(data.progress.percent)}
           >
             <div
-              className="h-full rounded-full bg-sky-500"
-              style={{
-                width: `${Math.max(0, Math.min(100, data.progress.percent))}%`,
-              }}
+              className="h-full rounded-full"
+              style={{ width: `${Math.max(0, Math.min(100, data.progress.percent))}%`, backgroundColor: accentColor }}
             />
           </div>
         ) : null}
@@ -1301,7 +1320,8 @@ function TrainDetailsPanel({
         <div className="grid min-h-0 flex-1 place-items-center px-4 text-center">
           <div>
             <RefreshCw
-              className="mx-auto animate-spin text-sky-400 motion-reduce:animate-none"
+              className="mx-auto animate-spin motion-reduce:animate-none"
+              style={{ color: accentColor }}
               size={22}
               aria-hidden="true"
             />
@@ -1368,27 +1388,22 @@ function TrainDetailsPanel({
                   const actualDeparture = formatScheduleTime(
                     stop.departure?.actual,
                   );
-                  const arrivalDelayed =
-                    actualArrival !== "--" &&
-                    scheduledArrival !== "--" &&
-                    actualArrival !== scheduledArrival;
-                  const departureDelayed =
-                    actualDeparture !== "--" &&
-                    scheduledDeparture !== "--" &&
-                    actualDeparture !== scheduledDeparture;
+                  const arrivalDelayed = isActualTimeLate(actualArrival, scheduledArrival);
+                  const departureDelayed = isActualTimeLate(actualDeparture, scheduledDeparture);
                   const expanded = expandedSegments.has(group.key);
                   return (
                     <li key={group.key}>
                       <article
                         aria-current={current ? "location" : undefined}
-                        className={`relative grid min-h-[58px] grid-cols-[56px_24px_minmax(0,1fr)_56px] items-center rounded-lg px-1 py-1.5 ${current ? "bg-slate-800 ring-1 ring-sky-500/40" : "hover:bg-slate-800/60"}`}
+                        className="relative grid min-h-[58px] grid-cols-[56px_24px_minmax(0,1fr)_56px] items-center rounded-lg px-1 py-1.5 hover:bg-slate-800/60"
+                        style={current ? { backgroundColor: `color-mix(in srgb, ${accentColor} 10%, #1e293b)`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accentColor} 55%, transparent)` } : undefined}
                       >
                         <div className="min-w-0 text-left font-site-code text-[10px] leading-4">
                           <span className="block text-slate-300">
                             {scheduledArrival}
                           </span>
                           <span
-                            className={`block ${cancelled ? "text-red-400" : arrivalDelayed ? "text-sky-400" : "text-slate-500"}`}
+                            className={`block ${cancelled ? "text-red-400" : arrivalDelayed ? "text-red-400" : actualArrival !== "--" ? "text-slate-200" : "text-slate-500"}`}
                           >
                             {cancelled
                               ? "CANCEL"
@@ -1402,12 +1417,14 @@ function TrainDetailsPanel({
                           aria-hidden="true"
                         >
                           <i
-                            className={`size-2.5 rounded-full ring-[3px] ring-[#111827] ${cancelled ? "bg-red-500" : current ? "bg-sky-400" : passed ? "bg-slate-400" : "bg-amber-400"}`}
+                            className={`size-2.5 rounded-full ring-[3px] ring-[#111827] ${cancelled ? "bg-red-500" : passed ? "bg-slate-400" : "bg-amber-400"}`}
+                            style={current && !cancelled ? { backgroundColor: accentColor } : undefined}
                           />
                         </span>
                         <div className="min-w-0 px-1.5">
                           <strong
-                            className={`block truncate text-[13px] leading-4 ${cancelled ? "text-slate-500 line-through" : current ? "text-sky-400" : "text-slate-100"}`}
+                            className={`block truncate text-[13px] leading-4 ${cancelled ? "text-slate-500 line-through" : current ? "" : "text-slate-100"}`}
+                            style={current && !cancelled ? { color: accentColor } : undefined}
                             title={stop.stationName}
                           >
                             {stop.stationName || stop.stationCode}
@@ -1425,7 +1442,7 @@ function TrainDetailsPanel({
                             {scheduledDeparture}
                           </span>
                           <span
-                            className={`block ${cancelled ? "text-red-400" : departureDelayed ? "text-red-400" : "text-slate-500"}`}
+                            className={`block ${cancelled ? "text-red-400" : departureDelayed ? "text-red-400" : actualDeparture !== "--" ? "text-slate-200" : "text-slate-500"}`}
                           >
                             {cancelled
                               ? "CANCEL"
@@ -1442,7 +1459,7 @@ function TrainDetailsPanel({
                             onClick={() => toggleSegment(group.key)}
                             aria-expanded={expanded}
                             aria-controls={`segment-${group.key}`}
-                            className={`grid min-h-10 w-full grid-cols-[56px_24px_minmax(0,1fr)_56px] items-center rounded-lg px-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-sky-400 ${expanded ? "bg-slate-800" : "hover:bg-slate-800/60"}`}
+                            className={`grid min-h-10 w-full grid-cols-[56px_24px_minmax(0,1fr)_56px] items-center rounded-lg px-1 text-left transition-colors focus-visible:outline-2 focus-visible:outline-amber-400 ${expanded ? "bg-slate-800" : "hover:bg-slate-800/60"}`}
                           >
                             <span />
                             <span
@@ -1479,14 +1496,10 @@ function TrainDetailsPanel({
                                 const actualDeparture = formatScheduleTime(
                                   intermediate.departure?.actual,
                                 );
-                                const arrivalDelayed =
-                                  actualArrival !== "--" &&
-                                  scheduledArrival !== "--" &&
-                                  actualArrival !== scheduledArrival;
-                                const departureDelayed =
-                                  actualDeparture !== "--" &&
-                                  scheduledDeparture !== "--" &&
-                                  actualDeparture !== scheduledDeparture;
+                                const arrivalDelayed = isActualTimeLate(actualArrival, scheduledArrival);
+                                const departureDelayed = isActualTimeLate(actualDeparture, scheduledDeparture);
+                                const arrivalEarly = actualArrival !== "--" && scheduledArrival !== "--" && actualArrival !== scheduledArrival && !arrivalDelayed;
+                                const departureEarly = actualDeparture !== "--" && scheduledDeparture !== "--" && actualDeparture !== scheduledDeparture && !departureDelayed;
                                 return (
                                   <li
                                     key={`${intermediate.stationCode}-${intermediate.index}`}
@@ -1495,11 +1508,12 @@ function TrainDetailsPanel({
                                         ? "location"
                                         : undefined
                                     }
-                                    className={`grid min-h-12 grid-cols-[56px_24px_minmax(0,1fr)_56px] items-center rounded-lg px-1 py-1 ${intermediateCurrent ? "bg-sky-950/50 ring-1 ring-sky-500/40" : ""}`}
+                                    className="grid min-h-12 grid-cols-[56px_24px_minmax(0,1fr)_56px] items-center rounded-lg px-1 py-1"
+                                    style={intermediateCurrent ? { backgroundColor: `color-mix(in srgb, ${accentColor} 9%, transparent)`, boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accentColor} 55%, transparent)` } : undefined}
                                   >
                                     <div className="min-w-0 text-left font-site-code text-[11px] leading-4">
                                       <span
-                                        className={`block ${actualArrival === "--" ? "text-slate-400" : arrivalDelayed ? "text-red-400" : intermediateCurrent ? "text-sky-300" : "text-slate-200"}`}
+                                        className={`block ${actualArrival === "--" ? "text-slate-400" : arrivalDelayed ? "text-red-400" : arrivalEarly ? "text-emerald-400" : "text-slate-200"}`}
                                       >
                                         {actualArrival !== "--"
                                           ? actualArrival
@@ -1518,12 +1532,14 @@ function TrainDetailsPanel({
                                       aria-hidden="true"
                                     >
                                       <i
-                                        className={`absolute top-1/2 left-1/2 size-2 -translate-1/2 rounded-full ${intermediateCurrent ? "bg-sky-400 ring-4 ring-sky-900" : "bg-slate-500"}`}
+                                        className={`absolute top-1/2 left-1/2 size-2 -translate-1/2 rounded-full ${intermediateCurrent ? "" : "bg-slate-500"}`}
+                                        style={intermediateCurrent ? { backgroundColor: accentColor, boxShadow: `0 0 0 4px color-mix(in srgb, ${accentColor} 20%, transparent)` } : undefined}
                                       />
                                     </span>
                                     <div className="min-w-0 px-1.5">
                                       <strong
-                                        className={`block truncate text-[13px] font-semibold ${intermediateCurrent ? "text-sky-300" : "text-slate-200"}`}
+                                        className={`block truncate text-[13px] font-semibold ${intermediateCurrent ? "" : "text-slate-200"}`}
+                                        style={intermediateCurrent ? { color: accentColor } : undefined}
                                         title={intermediate.stationName}
                                       >
                                         {intermediate.stationName ||
@@ -1539,7 +1555,7 @@ function TrainDetailsPanel({
                                     </div>
                                     <div className="min-w-0 text-right font-site-code text-[11px] leading-4">
                                       <span
-                                        className={`block ${actualDeparture === "--" ? "text-slate-400" : departureDelayed ? "text-red-400" : intermediateCurrent ? "text-sky-300" : "text-slate-200"}`}
+                                        className={`block ${actualDeparture === "--" ? "text-slate-400" : departureDelayed ? "text-red-400" : departureEarly ? "text-emerald-400" : "text-slate-200"}`}
                                       >
                                         {actualDeparture !== "--"
                                           ? actualDeparture
@@ -1598,7 +1614,8 @@ function TrainDetailsPanel({
               type="button"
               onClick={onRetry}
               disabled={loading || refreshing}
-              className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-full bg-blue-600 text-white shadow-lg shadow-blue-900/30 hover:bg-blue-500 disabled:cursor-wait disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+              className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-full text-white shadow-lg disabled:cursor-wait disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-300"
+              style={{ backgroundColor: accentColor }}
               aria-label="Refresh live train details"
             >
               <RefreshCw
@@ -1652,7 +1669,6 @@ export function RailAtlas() {
   >(ALL_LIVE_TRAIN_CATEGORIES);
   const [liveTrainLayerReady, setLiveTrainLayerReady] = useState(false);
   const [liveMapTrains, setLiveMapTrains] = useState<MappedLiveMapTrain[]>([]);
-  const [liveMapTotal, setLiveMapTotal] = useState(0);
   const [liveMapState, setLiveMapState] = useState<
     "loading" | "ready" | "stale" | "error"
   >("loading");
@@ -1666,6 +1682,16 @@ export function RailAtlas() {
   const stationBoard = useStationBoard(selected, atlasAccess.ready);
   const globalSearch = useGlobalSearch(query, atlasAccess.ready);
   const trainLive = useTrainLive(selectedTrain, atlasAccess.ready);
+  const selectedTrainType = selectedTrain
+    ? liveMapTrains.find(
+        (train) =>
+          train.trainNo === selectedTrain.trainNo &&
+          (!selectedTrain.date || train.journeyDate === selectedTrain.date),
+      )?.trainType || "Other"
+    : "Other";
+  const selectedTrainAccent = liveTrainCategoryColor(selectedTrainType);
+  const selectedTrainAccentRef = useRef(selectedTrainAccent);
+  selectedTrainAccentRef.current = selectedTrainAccent;
   const stationGrid = useMemo(() => indexStations(stations), [stations]);
   const stationByCode = useMemo(
     () => new Map(stations.map((station) => [station.code, station])),
@@ -2039,7 +2065,6 @@ export function RailAtlas() {
           throw new Error(payload.error || "Live trains unavailable");
         }
         if (disposed) return;
-        setLiveMapTotal(payload.data.count);
         setLiveMapTrains(payload.data.trains.filter(hasMappedPosition));
         setLiveMapState(payload.data.stale ? "stale" : "ready");
         setLiveMapError("");
@@ -2618,7 +2643,7 @@ export function RailAtlas() {
             className: "",
             iconSize: [34, 34],
             iconAnchor: [17, 17],
-            html: `<div style="width:34px;height:34px;display:grid;place-items:center;border:2px solid #93c5fd;border-radius:50%;background:#1d4ed8;box-shadow:0 0 0 5px rgba(37,99,235,.18),0 6px 18px rgba(0,0,0,.45);transform:rotate(${rotation}deg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2 20 21l-8-4-8 4 8-19Z" fill="white"/></svg></div>`,
+            html: `<div style="width:34px;height:34px;display:grid;place-items:center;border:2px solid ${selectedTrainAccentRef.current};border-radius:50%;background:${selectedTrainAccentRef.current};box-shadow:0 0 0 5px color-mix(in srgb, ${selectedTrainAccentRef.current} 24%, transparent),0 6px 18px rgba(0,0,0,.45);transform:rotate(${rotation}deg)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2 20 21l-8-4-8 4 8-19Z" fill="white"/></svg></div>`,
           });
           layers.push(
             L.marker([data.currentPosition.lat, data.currentPosition.lon], {
@@ -2722,15 +2747,7 @@ export function RailAtlas() {
           title={liveMapError || undefined}
           className="absolute top-3 right-3 z-[900] max-w-[45vw] rounded-2xl border border-slate-600/70 bg-slate-950/90 px-3 py-2 text-xs font-semibold text-slate-100 shadow-xl backdrop-blur-xl"
         >
-          <span
-            className={`mr-1.5 inline-block size-2 rounded-full ${liveMapState === "ready" ? "bg-emerald-500" : liveMapState === "loading" ? "animate-pulse bg-sky-500 motion-reduce:animate-none" : "bg-red-600"}`}
-            aria-hidden="true"
-          />
-          {liveMapTrains.length
-            ? `${liveMapTrains.length.toLocaleString("en-IN")}${liveMapTotal > liveMapTrains.length ? ` of ${liveMapTotal.toLocaleString("en-IN")}` : ""} running trains mapped${liveMapState === "loading" ? " · refreshing" : liveMapState === "stale" ? " · update delayed" : liveMapState === "error" ? " · refresh failed" : ""}`
-            : liveMapState === "loading"
-              ? "Loading live trains"
-              : "Live trains unavailable"}
+          {liveMapTrains.length.toLocaleString("en-IN")} trains mapped
         </div>
       ) : null}
 
@@ -3144,6 +3161,7 @@ export function RailAtlas() {
       {selectedTrain ? (
         <TrainDetailsPanel
           selection={selectedTrain}
+          trainType={selectedTrainType}
           data={trainLive.data}
           loading={trainLive.loading}
           refreshing={trainLive.refreshing}

@@ -256,6 +256,25 @@ type TrainLiveData = {
   } | null;
   route: [number, number][];
   timeline: TrainTimelineItem[];
+  coachPosition?: TrainCoachPosition[];
+  coachPositionTimeline?: Array<{
+    stationCode?: string;
+    stationName?: string;
+    coachPosition: TrainCoachPosition[];
+  }>;
+};
+
+type TrainCoachPosition = {
+  type?: string;
+  number?: string;
+  position?: string;
+  id?: string;
+  operatedBy?: string;
+  coachType?: string;
+  coachNo?: string;
+  manufacturedIn?: number | null;
+  coachClass?: string;
+  variant?: string;
 };
 
 type TrainLiveResponse = {
@@ -1150,6 +1169,331 @@ function StationDetailsPanel({
   );
 }
 
+function CoachCar({
+  coach,
+  trainNo,
+  trainName,
+  index,
+  isLastCoach,
+}: {
+  coach: TrainCoachPosition;
+  trainNo: string;
+  trainName: string;
+  index: number;
+  isLastCoach: boolean;
+}) {
+  const id = `vb-${trainNo}-${index}`.replace(/[^a-zA-Z0-9_-]/g, "");
+  const seats = coach.variant?.match(/-(\d+)-V\d+/i)?.[1] || "—";
+  const coachNoX = isLastCoach ? 226 : 548;
+  const coachX = isLastCoach ? 423 : 777;
+  const seatsX = isLastCoach ? 652 : 974;
+  if (index === 0 || isLastCoach) {
+    return (
+      <svg
+        className="block h-auto w-full select-none drop-shadow-xl"
+        viewBox="0 0 1200 390"
+        role="img"
+        aria-label={`Vande Bharat ${isLastCoach ? "trailing" : "leading"} driving coach, coach ${coach.number || "unavailable"}, unique coach number ${coach.coachNo || "unavailable"}, ${seats} seats`}
+      >
+        <defs>
+          <linearGradient id={`${id}-shell`} x1="0" y1="0" x2="0" y2="1">
+            <stop stopColor="#454e5a" />
+            <stop offset="1" stopColor="#252c36" />
+          </linearGradient>
+          <linearGradient id={`${id}-window`} x1="0" y1="0" x2="0" y2="1">
+            <stop stopColor="#6b90ae" />
+            <stop offset="1" stopColor="#26384e" />
+          </linearGradient>
+          <linearGradient id={`${id}-nose`} x1="0" y1="0" x2="0" y2="1">
+            <stop stopColor="#ff9b27" />
+            <stop offset=".5" stopColor="#ff7007" />
+            <stop offset="1" stopColor="#e85c04" />
+          </linearGradient>
+        </defs>
+        <g transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined}>
+        <rect x="1164" y="128" width="32" height="164" rx="8" fill="#252a32" stroke="#68717a" strokeWidth="5" />
+        <path d="M18 283 Q11 261 32 234 L95 166 Q171 88 303 100 L354 113 H1162 Q1172 113 1172 124 V292 H82 Q30 292 18 283Z" fill="#d9dce0" stroke="#343b45" strokeWidth="4" />
+        <path d="M28 248 L102 171 Q175 105 307 114 H1167 V253 H83 Q40 257 28 248Z" fill={`url(#${id}-shell)`} />
+        <path d="M21 263 Q58 234 99 185 Q178 92 307 99 H1164 V133 H311 Q187 129 113 199 L36 283Z" fill={`url(#${id}-nose)`} />
+        <path d="M24 273 Q100 247 165 246 H1167 V293 H79 Q34 292 24 273Z" fill="#f0f1f3" />
+        <path d="M35 287 Q93 259 170 260 H1165 V271 H159 Q93 269 49 295Z" fill="#ff7009" />
+        <path d="M64 229 L113 175 Q175 116 256 120 L209 151 Q156 174 120 210 L91 235Z" fill="#162332" stroke="#738c9d" strokeWidth="3" />
+        <path d="M117 173 Q172 130 238 128" stroke="#a6c7da" strokeWidth="5" fill="none" />
+        <path d="M66 228 L101 218 L83 237 L57 242Z" fill="#182735" stroke="#a6b2bd" strokeWidth="2" />
+        <rect x="330" y="100" width="120" height="12" rx="3" fill="#626b75" />
+        <rect x="820" y="99" width="155" height="14" rx="3" fill="#5e6771" />
+        <path d="M837 103 H958" stroke="#242d35" strokeWidth="5" strokeDasharray="3 5" />
+        <rect x="312" y="147" width="67" height="145" rx="3" fill="#fa760c" stroke="#19212b" strokeWidth="5" />
+        <rect x="330" y="165" width="32" height="64" rx="5" fill={`url(#${id}-window)`} stroke="#202833" strokeWidth="5" />
+        <rect x="370" y="233" width="5" height="15" rx="2" fill="#dbe1e8" />
+        <g fill={`url(#${id}-window)`} stroke="#151c24" strokeWidth="5">
+          <rect x="412" y="218" width="115" height="42" rx="7" /><rect x="548" y="218" width="115" height="42" rx="7" />
+          <rect x="684" y="218" width="115" height="42" rx="7" /><rect x="820" y="218" width="115" height="42" rx="7" />
+          <rect x="956" y="218" width="115" height="42" rx="7" />
+        </g>
+        <rect x="410" y="143" width="670" height="71" rx="12" fill="#121922" stroke="#84909b" strokeWidth="2" />
+        <path d="M686 153 V203 M868 153 V203" stroke="#b1b9c1" strokeWidth="2" />
+        </g>
+        <g fontFamily="Arial,Helvetica,sans-serif" textAnchor="middle">
+          <g fontSize="15" fontWeight="700" fill="#c8d0d9"><text x={coachNoX} y="163">COACH NO.</text><text x={coachX} y="163">COACH</text><text x={seatsX} y="163">SEATS</text></g>
+          <g fontSize="39" fontWeight="800" fill="#ffffff">
+            <text x={coachNoX} y="203" textLength={isLastCoach ? 156 : 216} lengthAdjust="spacingAndGlyphs">{coach.coachNo || "—"}</text>
+            <text x={coachX} y="203">{coach.number || "—"}</text>
+            <text x={seatsX} y="203">{seats}</text>
+          </g>
+        </g>
+        <g fontFamily="Arial,Helvetica,sans-serif" fontWeight="700" fill="#152a4d" textAnchor={isLastCoach ? "end" : undefined}>
+          <text x={isLastCoach ? 1058 : 142} y="269" fontSize="19">VANDE BHARAT</text><text x={isLastCoach ? 1035 : 165} y="286" fontSize="11" letterSpacing="2">EXPRESS</text>
+          <text x={isLastCoach ? 337 : 863} y="286" fontSize="14">INDIAN RAILWAYS</text>
+        </g>
+        <path transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined} d="M138 293 H158" stroke="#f68a13" strokeWidth="3" /><path transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined} d="M158 293 H178" stroke="white" strokeWidth="3" /><path transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined} d="M178 293 H198" stroke="#168d53" strokeWidth="3" />
+        <g transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined} fill="#303842" stroke="#1b232d" strokeWidth="3">
+          <rect x="455" y="293" width="160" height="27" rx="4" /><rect x="635" y="293" width="150" height="28" rx="4" />
+          <rect x="800" y="293" width="130" height="27" rx="4" /><path d="M154 297 H365 L348 331 H172Z" /><path d="M914 297 H1128 L1110 331 H933Z" />
+        </g>
+        <g transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined} fill="#222a34" stroke="#8b959f" strokeWidth="6"><circle cx="198" cy="334" r="29" /><circle cx="323" cy="334" r="29" /><circle cx="954" cy="334" r="29" /><circle cx="1080" cy="334" r="29" /></g>
+        <g transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined} fill="#697582" stroke="#1a222b" strokeWidth="5"><circle cx="198" cy="334" r="12" /><circle cx="323" cy="334" r="12" /><circle cx="954" cy="334" r="12" /><circle cx="1080" cy="334" r="12" /></g>
+      </svg>
+    );
+  }
+  return (
+    <svg
+      className="block h-auto w-full select-none drop-shadow-xl"
+      viewBox="0 0 1200 370"
+      role="img"
+      aria-label={`${coach.number || "Coach"}, unique coach number ${coach.coachNo || "unavailable"}, ${seats} seats`}
+    >
+      <defs>
+        <linearGradient id={`${id}-body`} x2="0" y2="1">
+          <stop stopColor="#434a54" />
+          <stop offset="1" stopColor="#242b35" />
+        </linearGradient>
+        <linearGradient id={`${id}-glass`} x2="0" y2="1">
+          <stop stopColor="#6286a2" />
+          <stop offset="1" stopColor="#263b52" />
+        </linearGradient>
+      </defs>
+      <rect x="15" y="104" width="1170" height="190" rx="17" fill="#c9cdd1" stroke="#242933" strokeWidth="5" />
+      <rect x="2" y="139" width="23" height="120" rx="5" fill="#303741" />
+      <rect x="1175" y="139" width="23" height="120" rx="5" fill="#303741" />
+      <rect x="35" y="87" width="1130" height="30" rx="12" fill="#ff6d0a" />
+      <path d="M45 101 H1155" stroke="#ffad48" strokeWidth="4" />
+      <rect x="220" y="76" width="180" height="15" rx="5" fill="#5d6670" />
+      <rect x="800" y="76" width="180" height="15" rx="5" fill="#5d6670" />
+      <rect x="30" y="117" width="1140" height="136" rx="9" fill={`url(#${id}-body)`} />
+      <path d="M30 247 H1170 V293 H30Z" fill="#d6d8db" />
+      <path d="M165 117 L260 210 H285 L190 117Z M940 253 L986 293 H1015 L970 253Z" fill="#ff700b" />
+      <rect x="30" y="254" width="1140" height="12" fill="#ff730c" />
+      <g fill="#ff790e" stroke="#1e252c" strokeWidth="5">
+        <rect x="65" y="123" width="68" height="169" rx="3" />
+        <rect x="1067" y="123" width="68" height="169" rx="3" />
+      </g>
+      <g fill={`url(#${id}-glass)`} stroke="#1b222a" strokeWidth="5">
+        <rect x="85" y="153" width="28" height="54" rx="10" />
+        <rect x="1087" y="153" width="28" height="54" rx="10" />
+      </g>
+      <g fill={`url(#${id}-glass)`} stroke="#151b22" strokeWidth="6">
+        <rect x="166" y="218" width="112" height="37" rx="5" />
+        <rect x="298" y="218" width="112" height="37" rx="5" />
+        <rect x="430" y="218" width="112" height="37" rx="5" />
+        <rect x="562" y="218" width="112" height="37" rx="5" />
+        <rect x="694" y="218" width="112" height="37" rx="5" />
+        <rect x="826" y="218" width="112" height="37" rx="5" />
+      </g>
+      <rect x="250" y="126" width="700" height="86" rx="13" fill="#151b23" stroke="#77818b" strokeWidth="2" />
+      <path d="M545 139 V199 M755 139 V199" stroke="#aab4c0" strokeWidth="2" />
+      <g fontFamily="Arial, Helvetica, sans-serif" textAnchor="middle">
+        <g fontSize="17" fontWeight="700" fill="#c4ccd5">
+          <text x="397" y="150">COACH NO.</text>
+          <text x="650" y="150">COACH</text>
+          <text x="852" y="150">SEATS</text>
+        </g>
+        <g fontSize="48" fontWeight="800" fill="#ffffff">
+          <text x="397" y="196" textLength="210" lengthAdjust="spacingAndGlyphs">{coach.coachNo || "—"}</text>
+          <text x="650" y="196">{coach.number || "—"}</text>
+          <text x="852" y="196">{seats}</text>
+        </g>
+      </g>
+      <g fontFamily="Arial, Helvetica, sans-serif" fill="#1b293a" fontWeight="700">
+        <text x="166" y="284" fontSize="18">{trainName.toUpperCase()}</text>
+        <text x="872" y="284" fontSize="15">INDIAN RAILWAYS</text>
+      </g>
+      <g fill="#303741" stroke="#1c222a" strokeWidth="3">
+        <rect x="370" y="293" width="140" height="28" rx="4" />
+        <rect x="525" y="293" width="170" height="29" rx="4" />
+        <rect x="710" y="293" width="120" height="27" rx="4" />
+        <path d="M125 297 H335 L310 331 H150Z" />
+        <path d="M865 297 H1075 L1050 331 H890Z" />
+      </g>
+      <g fill="#202832" stroke="#77818b" strokeWidth="6">
+        <circle cx="175" cy="331" r="30" /><circle cx="290" cy="331" r="30" />
+        <circle cx="910" cy="331" r="30" /><circle cx="1025" cy="331" r="30" />
+      </g>
+      <g fill="#65707d" stroke="#1d242d" strokeWidth="5">
+        <circle cx="175" cy="331" r="13" /><circle cx="290" cy="331" r="13" />
+        <circle cx="910" cy="331" r="13" /><circle cx="1025" cy="331" r="13" />
+      </g>
+    </svg>
+  );
+}
+
+function CoachConsist({
+  coaches,
+  trainNo,
+  trainName,
+  accentColor,
+}: {
+  coaches: TrainCoachPosition[];
+  trainNo: string;
+  trainName: string;
+  accentColor: string;
+}) {
+  const stripRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ x: number; scrollLeft: number } | null>(null);
+  const suppressCoachClickRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const ordered = useMemo(
+    () => [...coaches].sort((a, b) => Number(a.position) - Number(b.position)),
+    [coaches],
+  );
+  const move = (direction: -1 | 1) =>
+    stripRef.current?.scrollBy({ left: direction * 280, behavior: "smooth" });
+  const activeCoach = ordered[activeIndex] || ordered[0];
+  const seatCount = activeCoach?.variant?.match(/-(\d+)-V\d+/i)?.[1] || "—";
+  const coachDetails = activeCoach
+    ? [
+        ["Coach", activeCoach.number],
+        ["Coach number", activeCoach.coachNo],
+        ["Seats", seatCount],
+        ["Type", activeCoach.type],
+        ["Coach type", activeCoach.coachType],
+        ["Position", activeCoach.position],
+        ["Coach ID", activeCoach.id],
+        ["Class", activeCoach.coachClass],
+        ["Operator", activeCoach.operatedBy],
+        ["Manufactured", activeCoach.manufacturedIn],
+        ["Variant", activeCoach.variant],
+      ] as const
+    : [];
+
+  return (
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden" aria-label="Train coach positions">
+      <header className="flex items-center justify-between gap-2 border-b border-slate-700 px-3 py-2">
+        <div>
+          <p className="text-xs font-semibold text-slate-100">Coach composition</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">{ordered.length} coaches · drag to explore</p>
+        </div>
+        <div className="flex gap-1">
+          {([-1, 1] as const).map((direction) => (
+            <button
+              key={direction}
+              type="button"
+              onClick={() => move(direction)}
+              className="grid size-8 place-items-center rounded-lg text-slate-300 hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-slate-300"
+              aria-label={direction < 0 ? "Previous coaches" : "Next coaches"}
+            >
+              {direction < 0 ? <span aria-hidden="true">‹</span> : <span aria-hidden="true">›</span>}
+            </button>
+          ))}
+        </div>
+      </header>
+      {ordered.length ? (
+        <>
+          <div
+            ref={stripRef}
+            className={`flex h-[142px] flex-none snap-x snap-mandatory items-center overflow-x-auto overscroll-x-contain px-3 py-2 [scrollbar-width:thin] ${dragging ? "cursor-grabbing select-none" : "cursor-grab"}`}
+            style={{ scrollBehavior: dragging ? "auto" : "smooth", touchAction: "pan-x" }}
+            onScroll={(event) => {
+              const strip = event.currentTarget;
+              const center = strip.getBoundingClientRect().left + strip.clientWidth / 2;
+              let closestIndex = 0;
+              let closestDistance = Infinity;
+              strip.querySelectorAll<HTMLElement>("[data-coach-index]").forEach((item) => {
+                const bounds = item.getBoundingClientRect();
+                const distance = Math.abs(bounds.left + bounds.width / 2 - center);
+                if (distance < closestDistance) {
+                  closestDistance = distance;
+                  closestIndex = Number(item.dataset.coachIndex || 0);
+                }
+              });
+              setActiveIndex(closestIndex);
+            }}
+            onMouseDown={(event) => {
+              if (event.button !== 0 || !stripRef.current) return;
+              dragRef.current = { x: event.clientX, scrollLeft: stripRef.current.scrollLeft };
+              setDragging(true);
+            }}
+            onMouseMove={(event) => {
+              if (!dragRef.current || !stripRef.current) return;
+              if (Math.abs(event.clientX - dragRef.current.x) > 4) {
+                suppressCoachClickRef.current = true;
+              }
+              stripRef.current.scrollLeft = dragRef.current.scrollLeft - (event.clientX - dragRef.current.x);
+            }}
+            onMouseUp={() => { dragRef.current = null; setDragging(false); }}
+            onMouseLeave={() => { dragRef.current = null; setDragging(false); }}
+            onDragStart={(event) => event.preventDefault()}
+          >
+            {ordered.map((coach, index) => (
+              <button
+                key={`${coach.id || coach.number || "coach"}-${coach.position || index}`}
+                type="button"
+                data-coach-index={index}
+                aria-pressed={activeIndex === index}
+                aria-label={`Coach ${index + 1} of ${ordered.length}: ${coach.number || "unnumbered"}`}
+                onClick={(event) => {
+                  if (suppressCoachClickRef.current) {
+                    suppressCoachClickRef.current = false;
+                    event.preventDefault();
+                    return;
+                  }
+                  setActiveIndex(index);
+                  event.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+                }}
+                className={`-mr-2 w-[min(76vw,310px)] flex-none snap-center rounded-lg p-1 transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 ${activeIndex === index ? "opacity-100" : "opacity-75 hover:opacity-100"}`}
+                style={{ outlineColor: accentColor }}
+              >
+                <CoachCar
+                  coach={coach}
+                  trainNo={trainNo}
+                  trainName={trainName}
+                  index={index}
+                  isLastCoach={index === ordered.length - 1}
+                />
+              </button>
+            ))}
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto border-t border-slate-700 px-4 py-3">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+              <h3 className="text-sm font-semibold text-white">
+                {activeCoach?.number || "Selected coach"}
+              </h3>
+              <span className="font-site-code text-[11px] text-slate-400">
+                {ordered.length ? `${activeIndex + 1} of ${ordered.length}` : ""}
+              </span>
+            </div>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+              {coachDetails.map(([label, value]) => (
+                <div key={label} className="min-w-0">
+                  <dt className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">{label}</dt>
+                  <dd className="mt-0.5 truncate font-site-code text-xs text-slate-200" title={String(value ?? "—")}>
+                    {value == null || value === "" ? "—" : value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </>
+      ) : (
+        <div className="grid min-h-0 flex-1 place-items-center px-5 text-center text-sm text-slate-400">
+          Coach positions aren’t available for this run yet.
+        </div>
+      )}
+    </section>
+  );
+}
+
 function TrainDetailsPanel({
   selection,
   trainType,
@@ -1198,6 +1542,25 @@ function TrainDetailsPanel({
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(
     new Set(),
   );
+  const isVandeBharat = liveTrainCategory(trainType) === "vandeBharat";
+  const [detailsTab, setDetailsTab] = useState<"route" | "coaches">("route");
+  const coachPositions = useMemo(() => {
+    const entries = data?.coachPositionTimeline || [];
+    if (currentStationCode) {
+      for (let index = entries.length - 1; index >= 0; index -= 1) {
+        if (entries[index].stationCode?.toUpperCase() === currentStationCode.toUpperCase()) {
+          return entries[index].coachPosition || [];
+        }
+      }
+    }
+    return data?.coachPosition?.length
+      ? data.coachPosition
+      : entries[0]?.coachPosition || [];
+  }, [currentStationCode, data?.coachPosition, data?.coachPositionTimeline]);
+
+  useEffect(() => {
+    setDetailsTab("route");
+  }, [selection.trainNo, selection.date]);
 
   useEffect(() => {
     if (!data?.timeline.length) return;
@@ -1306,15 +1669,17 @@ function TrainDetailsPanel({
         ) : null}
       </header>
 
-      <div className="grid shrink-0 grid-cols-[60px_1fr_60px] items-center border-b border-slate-700 px-3 py-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
-        <span>Arrival</span>
-        <span className="text-center">
-          {scheduleGroups.length
-            ? `${scheduleGroups.length} stops · ${data?.totalDistanceKm ?? "—"} km`
-            : "Route schedule"}
-        </span>
-        <span className="text-right">Departure</span>
-      </div>
+      {detailsTab === "route" ? (
+        <div className="grid shrink-0 grid-cols-[60px_1fr_60px] items-center border-b border-slate-700 px-3 py-2 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+          <span>Arrival</span>
+          <span className="text-center">
+            {scheduleGroups.length
+              ? `${scheduleGroups.length} stops · ${data?.totalDistanceKm ?? "—"} km`
+              : "Route schedule"}
+          </span>
+          <span className="text-right">Departure</span>
+        </div>
+      ) : null}
 
       {loading && !data ? (
         <div className="grid min-h-0 flex-1 place-items-center px-4 text-center">
@@ -1361,6 +1726,34 @@ function TrainDetailsPanel({
               Service cancelled today.
             </p>
           ) : null}
+          {isVandeBharat ? (
+            <div className="flex shrink-0 border-b border-slate-700 px-3 pt-2" role="tablist" aria-label="Train details">
+              {(["route", "coaches"] as const).map((tab) => {
+                const active = detailsTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setDetailsTab(tab)}
+                    className={`min-h-9 border-b-2 px-3 text-xs font-semibold capitalize transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-300 ${active ? "text-slate-100" : "border-transparent text-slate-400 hover:text-slate-200"}`}
+                    style={active ? { borderColor: accentColor, color: accentColor } : undefined}
+                  >
+                    {tab === "route" ? "Route" : `Coaches${coachPositions.length ? ` · ${coachPositions.length}` : ""}`}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+          {isVandeBharat && detailsTab === "coaches" ? (
+            <CoachConsist
+              coaches={coachPositions}
+              trainNo={data.trainNo || selection.trainNo}
+              trainName={data.trainName || selection.trainName}
+              accentColor={accentColor}
+            />
+          ) : (
           <div
             ref={scheduleRef}
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2"
@@ -1586,6 +1979,7 @@ function TrainDetailsPanel({
               </p>
             )}
           </div>
+          )}
           <footer className="flex shrink-0 items-center gap-3 border-t border-slate-700 bg-slate-950/60 py-3 pr-4 pl-24">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">

@@ -139,6 +139,12 @@ export async function GET(request: NextRequest) {
         } : null,
         route,
         timeline: normalizedTimeline,
+        coachPosition: Array.isArray(payload.data.coachPosition)
+          ? payload.data.coachPosition
+          : [],
+        coachPositionTimeline: Array.isArray(payload.data.coachPositionTimeline)
+          ? payload.data.coachPositionTimeline
+          : [],
       },
     }, { headers: { "Cache-Control": "private, no-store" } });
   } catch {

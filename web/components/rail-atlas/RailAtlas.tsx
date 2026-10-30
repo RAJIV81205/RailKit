@@ -1349,8 +1349,10 @@ function CoachConsist({
   accentColor: string;
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ x: number; scrollLeft: number } | null>(null);
+  const dragRef = useRef<{ x: number; scrollLeft: number; pointerId: number; moved: boolean } | null>(null);
   const suppressCoachClickRef = useRef(false);
+  const snapTimerRef = useRef<number | null>(null);
+  const springingRef = useRef(false);
   const [dragging, setDragging] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const ordered = useMemo(
@@ -1359,6 +1361,44 @@ function CoachConsist({
   );
   const move = (direction: -1 | 1) =>
     stripRef.current?.scrollBy({ left: direction * 280, behavior: "smooth" });
+  const mostVisibleCoachIndex = (strip: HTMLDivElement) => {
+    const stripBounds = strip.getBoundingClientRect();
+    let visibleIndex = 0;
+    let mostVisibleWidth = -1;
+    strip.querySelectorAll<HTMLElement>("[data-coach-index]").forEach((item) => {
+      const bounds = item.getBoundingClientRect();
+      const visibleWidth = Math.max(
+        0,
+        Math.min(bounds.right, stripBounds.right) - Math.max(bounds.left, stripBounds.left),
+      );
+      if (visibleWidth > mostVisibleWidth) {
+        mostVisibleWidth = visibleWidth;
+        visibleIndex = Number(item.dataset.coachIndex || 0);
+      }
+    });
+    return visibleIndex;
+  };
+  const springToMostVisibleCoach = () => {
+    if (snapTimerRef.current !== null) window.clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = window.setTimeout(() => {
+      const strip = stripRef.current;
+      if (!strip) return;
+      const index = mostVisibleCoachIndex(strip);
+      const coach = strip.querySelector<HTMLElement>(`[data-coach-index="${index}"]`);
+      if (!coach) return;
+      setActiveIndex(index);
+      const stripBounds = strip.getBoundingClientRect();
+      const coachBounds = coach.getBoundingClientRect();
+      const offset = coachBounds.left + coachBounds.width / 2 - (stripBounds.left + strip.clientWidth / 2);
+      if (Math.abs(offset) < 3) return;
+      springingRef.current = true;
+      strip.scrollBy({ left: offset, behavior: "smooth" });
+      window.setTimeout(() => { springingRef.current = false; }, 500);
+    }, 140);
+  };
+  useEffect(() => () => {
+    if (snapTimerRef.current !== null) window.clearTimeout(snapTimerRef.current);
+  }, []);
   const activeCoach = ordered[activeIndex] || ordered[0];
   const seatCount = activeCoach?.variant?.match(/-(\d+)-V\d+/i)?.[1] || "—";
   const coachDetails = activeCoach
@@ -1402,37 +1442,48 @@ function CoachConsist({
         <>
           <div
             ref={stripRef}
-            className={`flex h-[142px] flex-none snap-x snap-mandatory items-center overflow-x-auto overscroll-x-contain px-3 py-2 [scrollbar-width:thin] ${dragging ? "cursor-grabbing select-none" : "cursor-grab"}`}
-            style={{ scrollBehavior: dragging ? "auto" : "smooth", touchAction: "pan-x" }}
+            className={`flex h-[142px] flex-none items-center overflow-x-auto overscroll-x-contain px-3 py-2 [scrollbar-width:thin] ${dragging ? "cursor-grabbing select-none" : "cursor-grab"}`}
+            style={{
+              scrollBehavior: "auto",
+              touchAction: "pan-x",
+              paddingLeft: "max(12px, calc((100% - min(76vw, 310px)) / 2))",
+              paddingRight: "max(12px, calc((100% - min(76vw, 310px)) / 2))",
+            }}
             onScroll={(event) => {
               const strip = event.currentTarget;
-              const center = strip.getBoundingClientRect().left + strip.clientWidth / 2;
-              let closestIndex = 0;
-              let closestDistance = Infinity;
-              strip.querySelectorAll<HTMLElement>("[data-coach-index]").forEach((item) => {
-                const bounds = item.getBoundingClientRect();
-                const distance = Math.abs(bounds.left + bounds.width / 2 - center);
-                if (distance < closestDistance) {
-                  closestDistance = distance;
-                  closestIndex = Number(item.dataset.coachIndex || 0);
-                }
-              });
-              setActiveIndex(closestIndex);
+              setActiveIndex(mostVisibleCoachIndex(strip));
+              if (!dragging && !springingRef.current) springToMostVisibleCoach();
             }}
-            onMouseDown={(event) => {
-              if (event.button !== 0 || !stripRef.current) return;
-              dragRef.current = { x: event.clientX, scrollLeft: stripRef.current.scrollLeft };
+            onPointerDown={(event) => {
+              if (event.pointerType !== "mouse" || event.button !== 0 || !stripRef.current) return;
+              if (snapTimerRef.current !== null) window.clearTimeout(snapTimerRef.current);
+              springingRef.current = false;
+              event.currentTarget.setPointerCapture(event.pointerId);
+              dragRef.current = {
+                x: event.clientX,
+                scrollLeft: stripRef.current.scrollLeft,
+                pointerId: event.pointerId,
+                moved: false,
+              };
               setDragging(true);
+              event.preventDefault();
             }}
-            onMouseMove={(event) => {
-              if (!dragRef.current || !stripRef.current) return;
+            onPointerMove={(event) => {
+              if (!dragRef.current || dragRef.current.pointerId !== event.pointerId || !stripRef.current) return;
               if (Math.abs(event.clientX - dragRef.current.x) > 4) {
-                suppressCoachClickRef.current = true;
+                dragRef.current.moved = true;
               }
               stripRef.current.scrollLeft = dragRef.current.scrollLeft - (event.clientX - dragRef.current.x);
             }}
-            onMouseUp={() => { dragRef.current = null; setDragging(false); }}
-            onMouseLeave={() => { dragRef.current = null; setDragging(false); }}
+            onPointerUp={() => {
+              const didMove = Boolean(dragRef.current?.moved);
+              suppressCoachClickRef.current = didMove;
+              if (didMove) window.setTimeout(() => { suppressCoachClickRef.current = false; }, 250);
+              dragRef.current = null;
+              setDragging(false);
+              springToMostVisibleCoach();
+            }}
+            onPointerCancel={() => { dragRef.current = null; setDragging(false); springToMostVisibleCoach(); }}
             onDragStart={(event) => event.preventDefault()}
           >
             {ordered.map((coach, index) => (
@@ -1451,7 +1502,7 @@ function CoachConsist({
                   setActiveIndex(index);
                   event.currentTarget.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
                 }}
-                className={`-mr-2 w-[min(76vw,310px)] flex-none snap-center rounded-lg p-1 transition-opacity focus-visible:outline-2 focus-visible:outline-offset-2 ${activeIndex === index ? "opacity-100" : "opacity-75 hover:opacity-100"}`}
+                className={`-mr-2 w-[min(76vw,310px)] flex-none rounded-lg p-1 transition-[opacity,transform] duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 ${activeIndex === index ? "relative z-10 scale-[1.03] opacity-100" : "scale-[0.96] opacity-35 hover:opacity-70"}`}
                 style={{ outlineColor: accentColor }}
               >
                 <CoachCar
@@ -1464,20 +1515,30 @@ function CoachConsist({
               </button>
             ))}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto border-t border-slate-700 px-4 py-3">
-            <div className="mb-3 flex items-baseline justify-between gap-3">
-              <h3 className="text-sm font-semibold text-white">
-                {activeCoach?.number || "Selected coach"}
-              </h3>
-              <span className="font-site-code text-[11px] text-slate-400">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-slate-700 px-4 py-3">
+            <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold tracking-[0.16em] uppercase" style={{ color: accentColor }}>Selected coach</p>
+                <h3 className="mt-0.5 truncate text-base font-semibold text-white">
+                  {activeCoach?.number || "Coach details"}
+                </h3>
+              </div>
+              <span className="shrink-0 rounded-full border border-slate-700 bg-slate-800 px-2.5 py-1 font-site-code text-[11px] text-slate-300">
                 {ordered.length ? `${activeIndex + 1} of ${ordered.length}` : ""}
               </span>
             </div>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <dl className="grid min-h-[330px] flex-1 grid-cols-2 grid-rows-6 gap-2">
               {coachDetails.map(([label, value]) => (
-                <div key={label} className="min-w-0">
-                  <dt className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">{label}</dt>
-                  <dd className="mt-0.5 truncate font-site-code text-xs text-slate-200" title={String(value ?? "—")}>
+                <div
+                  key={label}
+                  className={`flex min-h-0 min-w-0 flex-col justify-center rounded-xl border border-slate-700/80 bg-slate-800/45 px-3 py-2 ${label === "Variant" ? "col-span-2" : ""}`}
+                >
+                  <dt className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">{label}</dt>
+                  <dd
+                    className="mt-1 truncate font-site-code text-sm font-medium text-slate-100"
+                    style={label === "Coach number" ? { color: accentColor } : undefined}
+                    title={String(value ?? "—")}
+                  >
                     {value == null || value === "" ? "—" : value}
                   </dd>
                 </div>

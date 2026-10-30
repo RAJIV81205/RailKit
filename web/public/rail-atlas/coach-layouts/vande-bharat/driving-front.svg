@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 390" style="display:block;width:100%;height:auto">
+  <defs>
+    <linearGradient id="shell-__SVG_ID__" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#454e5a"/><stop offset="1" stop-color="#252c36"/></linearGradient>
+    <linearGradient id="window-__SVG_ID__" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#6b90ae"/><stop offset="1" stop-color="#26384e"/></linearGradient>
+    <linearGradient id="nose-__SVG_ID__" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ff9b27"/><stop offset=".5" stop-color="#ff7007"/><stop offset="1" stop-color="#e85c04"/></linearGradient>
+  </defs>
+  <g>
+    <rect x="1164" y="128" width="32" height="164" rx="8" fill="#252a32" stroke="#68717a" stroke-width="5"/>
+    <path d="M18 283Q11 261 32 234L95 166Q171 88 303 100L354 113H1162Q1172 113 1172 124V292H82Q30 292 18 283Z" fill="#d9dce0" stroke="#343b45" stroke-width="4"/>
+    <path d="M28 248L102 171Q175 105 307 114H1167V253H83Q40 257 28 248Z" fill="url(#shell-__SVG_ID__)"/>
+    <path d="M21 263Q58 234 99 185Q178 92 307 99H1164V133H311Q187 129 113 199L36 283Z" fill="url(#nose-__SVG_ID__)"/>
+    <path d="M24 273Q100 247 165 246H1167V293H79Q34 292 24 273Z" fill="#f0f1f3"/><path d="M35 287Q93 259 170 260H1165V271H159Q93 269 49 295Z" fill="#ff7009"/>
+    <path d="M64 229L113 175Q175 116 256 120L209 151Q156 174 120 210L91 235Z" fill="#162332" stroke="#738c9d" stroke-width="3"/><path d="M117 173Q172 130 238 128" stroke="#a6c7da" stroke-width="5" fill="none"/><path d="M66 228L101 218L83 237L57 242Z" fill="#182735" stroke="#a6b2bd" stroke-width="2"/>
+    <rect x="330" y="100" width="120" height="12" rx="3" fill="#626b75"/><rect x="820" y="99" width="155" height="14" rx="3" fill="#5e6771"/><path d="M837 103H958" stroke="#242d35" stroke-width="5" stroke-dasharray="3 5"/>
+    <rect x="312" y="147" width="67" height="145" rx="3" fill="#fa760c" stroke="#19212b" stroke-width="5"/><rect x="330" y="165" width="32" height="64" rx="5" fill="url(#window-__SVG_ID__)" stroke="#202833" stroke-width="5"/><rect x="370" y="233" width="5" height="15" rx="2" fill="#dbe1e8"/>
+    <g fill="url(#window-__SVG_ID__)" stroke="#151c24" stroke-width="5"><rect x="412" y="218" width="115" height="42" rx="7"/><rect x="548" y="218" width="115" height="42" rx="7"/><rect x="684" y="218" width="115" height="42" rx="7"/><rect x="820" y="218" width="115" height="42" rx="7"/><rect x="956" y="218" width="115" height="42" rx="7"/></g>
+    <rect x="410" y="143" width="670" height="71" rx="12" fill="#121922" stroke="#84909b" stroke-width="2"/><path d="M686 153V203M868 153V203" stroke="#b1b9c1" stroke-width="2"/>
+    <path d="M138 293H158" stroke="#f68a13" stroke-width="3"/><path d="M158 293H178" stroke="#fff" stroke-width="3"/><path d="M178 293H198" stroke="#168d53" stroke-width="3"/>
+    <g fill="#303842" stroke="#1b232d" stroke-width="3"><rect x="455" y="293" width="160" height="27" rx="4"/><rect x="635" y="293" width="150" height="28" rx="4"/><rect x="800" y="293" width="130" height="27" rx="4"/><path d="M154 297H365L348 331H172ZM914 297H1128L1110 331H933Z"/></g>
+    <g fill="#222a34" stroke="#8b959f" stroke-width="6"><circle cx="198" cy="334" r="29"/><circle cx="323" cy="334" r="29"/><circle cx="954" cy="334" r="29"/><circle cx="1080" cy="334" r="29"/></g><g fill="#697582" stroke="#1a222b" stroke-width="5"><circle cx="198" cy="334" r="12"/><circle cx="323" cy="334" r="12"/><circle cx="954" cy="334" r="12"/><circle cx="1080" cy="334" r="12"/></g>
+  </g>
+  <g font-family="Arial,Helvetica,sans-serif" text-anchor="middle"><g font-size="15" font-weight="700" fill="#c8d0d9"><text x="548" y="157">COACH NO.</text><text x="777" y="157">COACH</text><text x="974" y="157">SEATS</text></g><g font-size="39" font-weight="800" fill="#fff"><text x="548" y="203">__COACH_NO__</text><text x="777" y="203">__COACH_CODE__</text><text x="974" y="203">__SEAT_COUNT__</text></g></g>
+  <g font-family="Arial,Helvetica,sans-serif" font-weight="700" fill="#152a4d"><text x="142" y="269" font-size="19">VANDE BHARAT</text><text x="165" y="286" font-size="11" letter-spacing="2">EXPRESS</text><text x="863" y="286" font-size="14">INDIAN RAILWAYS</text></g>
+</svg>

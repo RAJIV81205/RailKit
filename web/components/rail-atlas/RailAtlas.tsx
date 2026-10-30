@@ -1178,171 +1178,101 @@ function StationDetailsPanel({
   );
 }
 
+const coachSvgTemplateCache = new Map<string, Promise<string>>();
+
+function coachSvgPath(trainType: string, coach: TrainCoachPosition, index: number, isLastCoach: boolean) {
+  const category = liveTrainCategory(trainType);
+  const folder = category === "vandeBharat"
+    ? "vande-bharat"
+    : category.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+  const isDrivingCoach = /DTC|DRIVING/i.test(String(coach.coachType || ""));
+  if (isDrivingCoach && index === 0) {
+    return `/rail-atlas/coach-layouts/${folder}/driving-front.svg?v=2`;
+  }
+  if (isDrivingCoach && isLastCoach) {
+    return `/rail-atlas/coach-layouts/${folder}/driving-rear.svg?v=2`;
+  }
+  return `/rail-atlas/coach-layouts/${folder}/coach.svg?v=2`;
+}
+
+function loadCoachSvgTemplate(path: string): Promise<string> {
+  const cached = coachSvgTemplateCache.get(path);
+  if (cached) return cached;
+  const request = (async () => {
+    const response = await fetch(path, { cache: "no-cache" });
+    if (response.ok) return response.text();
+    throw new Error("Coach SVG layout is unavailable");
+  })();
+  coachSvgTemplateCache.set(path, request);
+  return request;
+}
+
+function escapeSvgText(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 function CoachCar({
   coach,
   trainNo,
   trainName,
+  trainType,
   index,
   isLastCoach,
 }: {
   coach: TrainCoachPosition;
   trainNo: string;
   trainName: string;
+  trainType: string;
   index: number;
   isLastCoach: boolean;
 }) {
-  const id = `vb-${trainNo}-${index}`.replace(/[^a-zA-Z0-9_-]/g, "");
   const seats = coach.variant?.match(/-(\d+)-V\d+/i)?.[1] || "—";
-  const coachNoX = isLastCoach ? 226 : 548;
-  const coachX = isLastCoach ? 423 : 777;
-  const seatsX = isLastCoach ? 652 : 974;
-  if (index === 0 || isLastCoach) {
-    return (
-      <svg
-        className="block h-auto w-full select-none drop-shadow-xl"
-        viewBox="0 0 1200 390"
-        role="img"
-        aria-label={`Vande Bharat ${isLastCoach ? "trailing" : "leading"} driving coach, coach ${coach.number || "unavailable"}, unique coach number ${coach.coachNo || "unavailable"}, ${seats} seats`}
-      >
-        <defs>
-          <linearGradient id={`${id}-shell`} x1="0" y1="0" x2="0" y2="1">
-            <stop stopColor="#454e5a" />
-            <stop offset="1" stopColor="#252c36" />
-          </linearGradient>
-          <linearGradient id={`${id}-window`} x1="0" y1="0" x2="0" y2="1">
-            <stop stopColor="#6b90ae" />
-            <stop offset="1" stopColor="#26384e" />
-          </linearGradient>
-          <linearGradient id={`${id}-nose`} x1="0" y1="0" x2="0" y2="1">
-            <stop stopColor="#ff9b27" />
-            <stop offset=".5" stopColor="#ff7007" />
-            <stop offset="1" stopColor="#e85c04" />
-          </linearGradient>
-        </defs>
-        <g transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined}>
-        <rect x="1164" y="128" width="32" height="164" rx="8" fill="#252a32" stroke="#68717a" strokeWidth="5" />
-        <path d="M18 283 Q11 261 32 234 L95 166 Q171 88 303 100 L354 113 H1162 Q1172 113 1172 124 V292 H82 Q30 292 18 283Z" fill="#d9dce0" stroke="#343b45" strokeWidth="4" />
-        <path d="M28 248 L102 171 Q175 105 307 114 H1167 V253 H83 Q40 257 28 248Z" fill={`url(#${id}-shell)`} />
-        <path d="M21 263 Q58 234 99 185 Q178 92 307 99 H1164 V133 H311 Q187 129 113 199 L36 283Z" fill={`url(#${id}-nose)`} />
-        <path d="M24 273 Q100 247 165 246 H1167 V293 H79 Q34 292 24 273Z" fill="#f0f1f3" />
-        <path d="M35 287 Q93 259 170 260 H1165 V271 H159 Q93 269 49 295Z" fill="#ff7009" />
-        <path d="M64 229 L113 175 Q175 116 256 120 L209 151 Q156 174 120 210 L91 235Z" fill="#162332" stroke="#738c9d" strokeWidth="3" />
-        <path d="M117 173 Q172 130 238 128" stroke="#a6c7da" strokeWidth="5" fill="none" />
-        <path d="M66 228 L101 218 L83 237 L57 242Z" fill="#182735" stroke="#a6b2bd" strokeWidth="2" />
-        <rect x="330" y="100" width="120" height="12" rx="3" fill="#626b75" />
-        <rect x="820" y="99" width="155" height="14" rx="3" fill="#5e6771" />
-        <path d="M837 103 H958" stroke="#242d35" strokeWidth="5" strokeDasharray="3 5" />
-        <rect x="312" y="147" width="67" height="145" rx="3" fill="#fa760c" stroke="#19212b" strokeWidth="5" />
-        <rect x="330" y="165" width="32" height="64" rx="5" fill={`url(#${id}-window)`} stroke="#202833" strokeWidth="5" />
-        <rect x="370" y="233" width="5" height="15" rx="2" fill="#dbe1e8" />
-        <g fill={`url(#${id}-window)`} stroke="#151c24" strokeWidth="5">
-          <rect x="412" y="218" width="115" height="42" rx="7" /><rect x="548" y="218" width="115" height="42" rx="7" />
-          <rect x="684" y="218" width="115" height="42" rx="7" /><rect x="820" y="218" width="115" height="42" rx="7" />
-          <rect x="956" y="218" width="115" height="42" rx="7" />
-        </g>
-        <rect x="410" y="143" width="670" height="71" rx="12" fill="#121922" stroke="#84909b" strokeWidth="2" />
-        <path d="M686 153 V203 M868 153 V203" stroke="#b1b9c1" strokeWidth="2" />
-        </g>
-        <g fontFamily="Arial,Helvetica,sans-serif" textAnchor="middle">
-          <g fontSize="15" fontWeight="700" fill="#c8d0d9"><text x={coachNoX} y="163">COACH NO.</text><text x={coachX} y="163">COACH</text><text x={seatsX} y="163">SEATS</text></g>
-          <g fontSize="39" fontWeight="800" fill="#ffffff">
-            <text x={coachNoX} y="203" textLength={isLastCoach ? 156 : 216} lengthAdjust="spacingAndGlyphs">{coach.coachNo || "—"}</text>
-            <text x={coachX} y="203">{coach.number || "—"}</text>
-            <text x={seatsX} y="203">{seats}</text>
-          </g>
-        </g>
-        <g fontFamily="Arial,Helvetica,sans-serif" fontWeight="700" fill="#152a4d" textAnchor={isLastCoach ? "end" : undefined}>
-          <text x={isLastCoach ? 1058 : 142} y="269" fontSize="19">VANDE BHARAT</text><text x={isLastCoach ? 1035 : 165} y="286" fontSize="11" letterSpacing="2">EXPRESS</text>
-          <text x={isLastCoach ? 337 : 863} y="286" fontSize="14">INDIAN RAILWAYS</text>
-        </g>
-        <path transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined} d="M138 293 H158" stroke="#f68a13" strokeWidth="3" /><path transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined} d="M158 293 H178" stroke="white" strokeWidth="3" /><path transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined} d="M178 293 H198" stroke="#168d53" strokeWidth="3" />
-        <g transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined} fill="#303842" stroke="#1b232d" strokeWidth="3">
-          <rect x="455" y="293" width="160" height="27" rx="4" /><rect x="635" y="293" width="150" height="28" rx="4" />
-          <rect x="800" y="293" width="130" height="27" rx="4" /><path d="M154 297 H365 L348 331 H172Z" /><path d="M914 297 H1128 L1110 331 H933Z" />
-        </g>
-        <g transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined} fill="#222a34" stroke="#8b959f" strokeWidth="6"><circle cx="198" cy="334" r="29" /><circle cx="323" cy="334" r="29" /><circle cx="954" cy="334" r="29" /><circle cx="1080" cy="334" r="29" /></g>
-        <g transform={isLastCoach ? "translate(1200 0) scale(-1 1)" : undefined} fill="#697582" stroke="#1a222b" strokeWidth="5"><circle cx="198" cy="334" r="12" /><circle cx="323" cy="334" r="12" /><circle cx="954" cy="334" r="12" /><circle cx="1080" cy="334" r="12" /></g>
-      </svg>
+  const svgId = `coach-${trainNo}-${index}`.replace(/[^a-zA-Z0-9_-]/g, "");
+  const svgPath = coachSvgPath(trainType, coach, index, isLastCoach);
+  const [template, setTemplate] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let current = true;
+    setTemplate(null);
+    setFailed(false);
+    loadCoachSvgTemplate(svgPath)
+      .then((value) => { if (current) setTemplate(value); })
+      .catch(() => { if (current) setFailed(true); });
+    return () => { current = false; };
+  }, [svgPath]);
+
+  const svgMarkup = useMemo(() => {
+    if (!template) return "";
+    const values: Record<string, string> = {
+      SVG_ID: svgId,
+      COACH_CODE: escapeSvgText(String(coach.number || "—")),
+      COACH_NO: escapeSvgText(String(coach.coachNo || "—")),
+      SEAT_COUNT: escapeSvgText(seats),
+      TRAIN_NAME: escapeSvgText(String(trainName || "INDIAN RAILWAYS").toUpperCase().slice(0, 24)),
+    };
+    return Object.entries(values).reduce(
+      (result, [key, value]) => result.replaceAll(`__${key}__`, value),
+      template,
     );
-  }
+  }, [template, svgId, coach.number, coach.coachNo, seats, trainName]);
+
+  const label = `${coach.number || "Coach"}, unique coach number ${coach.coachNo || "unavailable"}, ${seats} seats`;
   return (
-    <svg
-      className="block h-auto w-full select-none drop-shadow-xl"
-      viewBox="0 0 1200 370"
-      role="img"
-      aria-label={`${coach.number || "Coach"}, unique coach number ${coach.coachNo || "unavailable"}, ${seats} seats`}
-    >
-      <defs>
-        <linearGradient id={`${id}-body`} x2="0" y2="1">
-          <stop stopColor="#434a54" />
-          <stop offset="1" stopColor="#242b35" />
-        </linearGradient>
-        <linearGradient id={`${id}-glass`} x2="0" y2="1">
-          <stop stopColor="#6286a2" />
-          <stop offset="1" stopColor="#263b52" />
-        </linearGradient>
-      </defs>
-      <rect x="15" y="104" width="1170" height="190" rx="17" fill="#c9cdd1" stroke="#242933" strokeWidth="5" />
-      <rect x="2" y="139" width="23" height="120" rx="5" fill="#303741" />
-      <rect x="1175" y="139" width="23" height="120" rx="5" fill="#303741" />
-      <rect x="35" y="87" width="1130" height="30" rx="12" fill="#ff6d0a" />
-      <path d="M45 101 H1155" stroke="#ffad48" strokeWidth="4" />
-      <rect x="220" y="76" width="180" height="15" rx="5" fill="#5d6670" />
-      <rect x="800" y="76" width="180" height="15" rx="5" fill="#5d6670" />
-      <rect x="30" y="117" width="1140" height="136" rx="9" fill={`url(#${id}-body)`} />
-      <path d="M30 247 H1170 V293 H30Z" fill="#d6d8db" />
-      <path d="M165 117 L260 210 H285 L190 117Z M940 253 L986 293 H1015 L970 253Z" fill="#ff700b" />
-      <rect x="30" y="254" width="1140" height="12" fill="#ff730c" />
-      <g fill="#ff790e" stroke="#1e252c" strokeWidth="5">
-        <rect x="65" y="123" width="68" height="169" rx="3" />
-        <rect x="1067" y="123" width="68" height="169" rx="3" />
-      </g>
-      <g fill={`url(#${id}-glass)`} stroke="#1b222a" strokeWidth="5">
-        <rect x="85" y="153" width="28" height="54" rx="10" />
-        <rect x="1087" y="153" width="28" height="54" rx="10" />
-      </g>
-      <g fill={`url(#${id}-glass)`} stroke="#151b22" strokeWidth="6">
-        <rect x="166" y="218" width="112" height="37" rx="5" />
-        <rect x="298" y="218" width="112" height="37" rx="5" />
-        <rect x="430" y="218" width="112" height="37" rx="5" />
-        <rect x="562" y="218" width="112" height="37" rx="5" />
-        <rect x="694" y="218" width="112" height="37" rx="5" />
-        <rect x="826" y="218" width="112" height="37" rx="5" />
-      </g>
-      <rect x="250" y="126" width="700" height="86" rx="13" fill="#151b23" stroke="#77818b" strokeWidth="2" />
-      <path d="M545 139 V199 M755 139 V199" stroke="#aab4c0" strokeWidth="2" />
-      <g fontFamily="Arial, Helvetica, sans-serif" textAnchor="middle">
-        <g fontSize="17" fontWeight="700" fill="#c4ccd5">
-          <text x="397" y="150">COACH NO.</text>
-          <text x="650" y="150">COACH</text>
-          <text x="852" y="150">SEATS</text>
-        </g>
-        <g fontSize="48" fontWeight="800" fill="#ffffff">
-          <text x="397" y="196" textLength="210" lengthAdjust="spacingAndGlyphs">{coach.coachNo || "—"}</text>
-          <text x="650" y="196">{coach.number || "—"}</text>
-          <text x="852" y="196">{seats}</text>
-        </g>
-      </g>
-      <g fontFamily="Arial, Helvetica, sans-serif" fill="#1b293a" fontWeight="700">
-        <text x="166" y="284" fontSize="18">{trainName.toUpperCase()}</text>
-        <text x="872" y="284" fontSize="15">INDIAN RAILWAYS</text>
-      </g>
-      <g fill="#303741" stroke="#1c222a" strokeWidth="3">
-        <rect x="370" y="293" width="140" height="28" rx="4" />
-        <rect x="525" y="293" width="170" height="29" rx="4" />
-        <rect x="710" y="293" width="120" height="27" rx="4" />
-        <path d="M125 297 H335 L310 331 H150Z" />
-        <path d="M865 297 H1075 L1050 331 H890Z" />
-      </g>
-      <g fill="#202832" stroke="#77818b" strokeWidth="6">
-        <circle cx="175" cy="331" r="30" /><circle cx="290" cy="331" r="30" />
-        <circle cx="910" cy="331" r="30" /><circle cx="1025" cy="331" r="30" />
-      </g>
-      <g fill="#65707d" stroke="#1d242d" strokeWidth="5">
-        <circle cx="175" cy="331" r="13" /><circle cx="290" cy="331" r="13" />
-        <circle cx="910" cy="331" r="13" /><circle cx="1025" cy="331" r="13" />
-      </g>
-    </svg>
+    <div className="w-full select-none" role="img" aria-label={label}>
+      {svgMarkup ? (
+        <div className="w-full" dangerouslySetInnerHTML={{ __html: svgMarkup }} />
+      ) : (
+        <div className="grid aspect-[1200/390] w-full place-items-center rounded-lg bg-slate-800/60 text-sm text-slate-300">
+          {failed ? coach.number || "Coach" : "Loading coach layout…"}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1350,11 +1280,13 @@ function CoachConsist({
   coaches,
   trainNo,
   trainName,
+  trainType,
   accentColor,
 }: {
   coaches: TrainCoachPosition[];
   trainNo: string;
   trainName: string;
+  trainType: string;
   accentColor: string;
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
@@ -1518,6 +1450,7 @@ function CoachConsist({
                   coach={coach}
                   trainNo={trainNo}
                   trainName={trainName}
+                  trainType={trainType}
                   index={index}
                   isLastCoach={index === ordered.length - 1}
                 />
@@ -1825,6 +1758,7 @@ function TrainDetailsPanel({
               coaches={coachPositions}
               trainNo={data.trainNo || selection.trainNo}
               trainName={data.trainName || selection.trainName}
+              trainType={trainType}
               accentColor={accentColor}
             />
           ) : (

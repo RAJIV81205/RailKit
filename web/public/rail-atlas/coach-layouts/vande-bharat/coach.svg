@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 370" style="display:block;width:100%;height:auto">
+  <defs>
+    <linearGradient id="body-__SVG_ID__" x2="0" y2="1"><stop stop-color="#434a54"/><stop offset="1" stop-color="#242b35"/></linearGradient>
+    <linearGradient id="glass-__SVG_ID__" x2="0" y2="1"><stop stop-color="#6286a2"/><stop offset="1" stop-color="#263b52"/></linearGradient>
+  </defs>
+  <rect x="15" y="104" width="1170" height="190" rx="17" fill="#c9cdd1" stroke="#242933" stroke-width="5"/>
+  <rect x="2" y="139" width="23" height="120" rx="5" fill="#303741"/><rect x="1175" y="139" width="23" height="120" rx="5" fill="#303741"/>
+  <rect x="35" y="87" width="1130" height="30" rx="12" fill="#ff6d0a"/><path d="M45 101H1155" stroke="#ffad48" stroke-width="4"/>
+  <rect x="220" y="76" width="180" height="15" rx="5" fill="#5d6670"/><rect x="800" y="76" width="180" height="15" rx="5" fill="#5d6670"/>
+  <rect x="30" y="117" width="1140" height="136" rx="9" fill="url(#body-__SVG_ID__)"/>
+  <path d="M30 247H1170V293H30Z" fill="#d6d8db"/><path d="M165 117L260 210H285L190 117ZM940 253L986 293H1015L970 253Z" fill="#ff700b"/><rect x="30" y="254" width="1140" height="12" fill="#ff730c"/>
+  <g fill="#ff790e" stroke="#1e252c" stroke-width="5"><rect x="65" y="123" width="68" height="169" rx="3"/><rect x="1067" y="123" width="68" height="169" rx="3"/></g>
+  <g fill="url(#glass-__SVG_ID__)" stroke="#1b222a" stroke-width="5"><rect x="85" y="153" width="28" height="54" rx="10"/><rect x="1087" y="153" width="28" height="54" rx="10"/></g>
+  <g fill="url(#glass-__SVG_ID__)" stroke="#151b22" stroke-width="6"><rect x="166" y="218" width="112" height="37" rx="5"/><rect x="298" y="218" width="112" height="37" rx="5"/><rect x="430" y="218" width="112" height="37" rx="5"/><rect x="562" y="218" width="112" height="37" rx="5"/><rect x="694" y="218" width="112" height="37" rx="5"/><rect x="826" y="218" width="112" height="37" rx="5"/></g>
+  <rect x="250" y="126" width="700" height="86" rx="13" fill="#151b23" stroke="#77818b" stroke-width="2"/><path d="M545 139V199M755 139V199" stroke="#aab4c0" stroke-width="2"/>
+  <g font-family="Arial,Helvetica,sans-serif" text-anchor="middle"><g font-size="17" font-weight="700" fill="#c4ccd5"><text x="397" y="143">COACH NO.</text><text x="650" y="143">COACH</text><text x="852" y="143">SEATS</text></g><g font-size="48" font-weight="800" fill="#fff"><text x="397" y="201">__COACH_NO__</text><text x="650" y="201">__COACH_CODE__</text><text x="852" y="201">__SEAT_COUNT__</text></g></g>
+  <g font-family="Arial,Helvetica,sans-serif" fill="#1b293a"><text x="166" y="284" font-size="18" font-weight="700">__TRAIN_NAME__</text><text x="872" y="284" font-size="15" font-weight="700">INDIAN RAILWAYS</text></g>
+  <g fill="#303741" stroke="#1c222a" stroke-width="3"><rect x="370" y="293" width="140" height="28" rx="4"/><rect x="525" y="293" width="170" height="29" rx="4"/><rect x="710" y="293" width="120" height="27" rx="4"/><path d="M125 297H335L310 331H150ZM865 297H1075L1050 331H890Z"/></g>
+  <g fill="#202832" stroke="#77818b" stroke-width="6"><circle cx="175" cy="331" r="30"/><circle cx="290" cy="331" r="30"/><circle cx="910" cy="331" r="30"/><circle cx="1025" cy="331" r="30"/></g><g fill="#65707d" stroke="#1d242d" stroke-width="5"><circle cx="175" cy="331" r="13"/><circle cx="290" cy="331" r="13"/><circle cx="910" cy="331" r="13"/><circle cx="1025" cy="331" r="13"/></g>
+</svg>

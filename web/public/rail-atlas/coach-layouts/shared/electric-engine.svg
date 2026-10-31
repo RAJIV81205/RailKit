@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2172 724" role="img" aria-label="Electric locomotive side view" style="display:block;width:100%;height:auto">
+<defs>
+  <linearGradient id="__SVG_ID__-body" x2="0" y2="1"><stop stop-color="#f0f1ed"/><stop offset=".48" stop-color="#d0d5d5"/><stop offset="1" stop-color="#89969f"/></linearGradient>
+  <linearGradient id="__SVG_ID__-roof" x2="0" y2="1"><stop stop-color="#a8b0b5"/><stop offset="1" stop-color="#5a6873"/></linearGradient>
+  <linearGradient id="__SVG_ID__-glass" x2="0" y2="1"><stop stop-color="#6c91a5"/><stop offset="1" stop-color="#213746"/></linearGradient>
+</defs>
+<!-- Raised pantograph identifies electric traction. -->
+<path d="M845 154 L944 61 L1045 154 M1045 154 L1144 61 L1242 154" fill="none" stroke="#36424c" stroke-width="13" stroke-linejoin="round"/>
+<path d="M901 58 H1188" stroke="#28343c" stroke-width="12" stroke-linecap="round"/>
+<path d="M975 60 L1030 17 H1120 L1172 60" fill="none" stroke="#4b5962" stroke-width="10"/>
+<path d="M826 155 H1270" stroke="#333f48" stroke-width="12"/>
+<!-- Body and driver's cab. -->
+<path d="M136 211 Q144 175 200 162 H1917 Q1970 172 2003 217 L2077 428 Q2091 480 2048 490 H127 Q91 490 85 456 L105 288Z" fill="url(#__SVG_ID__-body)" stroke="#46525c" stroke-width="8"/>
+<path d="M208 162 H1900 L1942 189 H160Z" fill="url(#__SVG_ID__-roof)" stroke="#53616b" stroke-width="6"/>
+<path d="M109 374 H2067 L2078 425 H97Z" fill="#af2935"/>
+<path d="M96 426 H2079 V449 H96Z" fill="#6b7782"/>
+<path d="M95 452 H2055 V488 H125 Q98 488 95 452Z" fill="#929da5"/>
+<!-- Cabs and windscreens. -->
+<path d="M174 230 H465 V336 H136 L147 281Z" fill="#364954" stroke="#4f5c67" stroke-width="7"/>
+<path d="M184 237 H306 V324 H154Z M323 237 H452 V324 H323Z" fill="url(#__SVG_ID__-glass)" stroke="#8a9da8" stroke-width="5"/>
+<path d="M1717 230 H1994 L2035 336 H1717Z" fill="#364954" stroke="#4f5c67" stroke-width="7"/>
+<path d="M1727 237 H1855 V324 H1727Z M1872 237 H1986 L2014 324 H1872Z" fill="url(#__SVG_ID__-glass)" stroke="#8a9da8" stroke-width="5"/>
+<path d="M178 271 H447 M1727 271 H2004" stroke="#a4b8c3" stroke-width="3" opacity=".5"/>
+<!-- Side vents and central nameplate. -->
+<rect x="529" y="225" width="280" height="122" rx="6" fill="#8d9ba5" stroke="#5a6872" stroke-width="6"/>
+<rect x="1363" y="225" width="280" height="122" rx="6" fill="#8d9ba5" stroke="#5a6872" stroke-width="6"/>
+<g stroke="#5b6b76" stroke-width="9"><path d="M559 247 V327 M593 247 V327 M627 247 V327 M661 247 V327 M695 247 V327 M729 247 V327 M763 247 V327 M797 247 V327 M1392 247 V327 M1426 247 V327 M1460 247 V327 M1494 247 V327 M1528 247 V327 M1562 247 V327 M1596 247 V327 M1630 247 V327"/></g>
+<rect x="840" y="217" width="492" height="137" rx="10" fill="#263540" stroke="#75838e" stroke-width="5"/>
+<text x="1086" y="268" fill="#e8eef1" font-family="Arial,Helvetica,sans-serif" font-size="35" font-weight="700" text-anchor="middle" letter-spacing="4">INDIAN RAILWAYS</text>
+<text x="1086" y="326" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="49" font-weight="800" text-anchor="middle">ELECTRIC LOCOMOTIVE</text>
+<!-- Headlamps and cab access. -->
+<circle cx="149" cy="402" r="19" fill="#f7eac2" stroke="#58636a" stroke-width="6"/>
+<circle cx="2023" cy="402" r="19" fill="#f7eac2" stroke="#58636a" stroke-width="6"/>
+<path d="M493 226 V456 M1679 226 V456" stroke="#6e7981" stroke-width="8"/>
+<rect x="480" y="342" width="12" height="51" rx="4" fill="#3f4d57"/>
+<rect x="1681" y="342" width="12" height="51" rx="4" fill="#3f4d57"/>
+<!-- Underframe, bogies and wheels. -->
+<path d="M107 490 H2066 V529 H107Z" fill="#303a43" stroke="#172029" stroke-width="6"/>
+<rect x="893" y="516" width="386" height="56" rx="6" fill="#3d4a54" stroke="#18222b" stroke-width="6"/>
+<path d="M239 528 H730 L689 582 H278Z M1442 528 H1933 L1894 582 H1482Z" fill="#2b343d" stroke="#151d25" stroke-width="7"/>
+<g fill="#202a33" stroke="#83919b" stroke-width="9"><circle cx="331" cy="578" r="55"/><circle cx="641" cy="578" r="55"/><circle cx="1531" cy="578" r="55"/><circle cx="1841" cy="578" r="55"/></g>
+<g fill="#677681" stroke="#1b252e" stroke-width="8"><circle cx="331" cy="578" r="23"/><circle cx="641" cy="578" r="23"/><circle cx="1531" cy="578" r="23"/><circle cx="1841" cy="578" r="23"/></g>
+<rect x="2069" y="433" width="85" height="29" rx="10" fill="#313940"/>
+</svg>

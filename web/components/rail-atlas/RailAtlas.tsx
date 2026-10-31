@@ -1178,10 +1178,11 @@ function StationDetailsPanel({
 const coachSvgTemplateCache = new Map<string, Promise<string>>();
 
 function coachSvgPath(trainType: string, coach: TrainCoachPosition, index: number, isLastCoach: boolean) {
+  if (isEngineCoach(coach)) return "/rail-atlas/coach-layouts/shared/electric-engine.svg?v=1";
+  if (isLuggageCoach(coach)) return "/rail-atlas/coach-layouts/shared/luggage.svg?v=1";
   const category = liveTrainCategory(trainType);
   const isRajdhani = /\bRAJDHANI\b/i.test(trainType);
   if (isRajdhani) {
-    if (isLuggageCoach(coach)) return "/rail-atlas/coach-layouts/rajdhani/luggage.svg?v=1";
     return "/rail-atlas/coach-layouts/rajdhani/coach.svg?v=5";
   }
   const folder = category === "vandeBharat"
@@ -1199,6 +1200,12 @@ function coachSvgPath(trainType: string, coach: TrainCoachPosition, index: numbe
 
 function isLuggageCoach(coach: TrainCoachPosition) {
   return [coach.number, coach.type, coach.coachClass].some((value) => /^LPR$/i.test(String(value || "")));
+}
+
+function isEngineCoach(coach: TrainCoachPosition) {
+  return [coach.number, coach.type, coach.coachClass, coach.coachType].some((value) =>
+    /^(?:ENG|ENGINE|LOCO|LOCOMOTIVE|WAP[- ]?\d+[A-Z]*)$/i.test(String(value || "").trim()),
+  );
 }
 
 function loadCoachSvgTemplate(path: string): Promise<string> {
@@ -1268,7 +1275,9 @@ function CoachCar({
     );
   }, [template, svgId, trainNo, coach.number, coach.coachNo, seats, trainName]);
 
-  const label = `${coach.number || "Coach"}, unique coach number ${coach.coachNo || "unavailable"}${isLuggageCoach(coach) ? ", luggage car" : `, ${seats} seats`}`;
+  const label = isEngineCoach(coach)
+    ? "Electric locomotive"
+    : `${coach.number || "Coach"}, unique coach number ${coach.coachNo || "unavailable"}${isLuggageCoach(coach) ? ", luggage car" : `, ${seats} seats`}`;
   return (
     <div className="w-full select-none" role="img" aria-label={label}>
       {svgMarkup ? (
@@ -1306,6 +1315,8 @@ function CoachConsist({
     () => [...coaches].sort((a, b) => Number(a.position) - Number(b.position)),
     [coaches],
   );
+  const hasEngine = ordered.some(isEngineCoach);
+  const showSyntheticEngine = !hasEngine && liveTrainCategory(trainType) !== "vandeBharat";
   const move = (direction: -1 | 1) =>
     stripRef.current?.scrollBy({ left: direction * 280, behavior: "smooth" });
   const mostVisibleCoachIndex = (strip: HTMLDivElement) => {
@@ -1349,7 +1360,13 @@ function CoachConsist({
   const activeCoach = ordered[activeIndex] || ordered[0];
   const seatCount = activeCoach?.variant?.match(/-(\d+)-V\d+/i)?.[1] || "—";
   const coachDetails = activeCoach
-    ? [
+    ? isEngineCoach(activeCoach)
+      ? [
+          ["Vehicle", "Electric locomotive"],
+          ["Position", activeCoach.position],
+          ["Operator", activeCoach.operatedBy && activeCoach.operatedBy !== "ENG" ? activeCoach.operatedBy : undefined],
+        ] as const
+      : [
         ["Coach", activeCoach.number],
         ["Coach number", activeCoach.coachNo],
         ...(!isLuggageCoach(activeCoach) ? [["Seats", seatCount] as const] : []),
@@ -1369,7 +1386,7 @@ function CoachConsist({
       <header className="flex items-center justify-between gap-2 border-b border-slate-700 px-3 py-2">
         <div>
           <p className="text-xs font-semibold text-slate-100">Coach composition</p>
-          <p className="mt-0.5 text-[11px] text-slate-400">{ordered.length} coaches · drag to explore</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">{ordered.length} {hasEngine ? "vehicles" : "coaches"} · drag to explore</p>
         </div>
         <div className="flex gap-1">
           {([-1, 1] as const).map((direction) => (
@@ -1433,13 +1450,23 @@ function CoachConsist({
             onPointerCancel={() => { dragRef.current = null; setDragging(false); springToMostVisibleCoach(); }}
             onDragStart={(event) => event.preventDefault()}
           >
+            {showSyntheticEngine ? <div className="-mr-2 w-[min(76vw,310px)] flex-none p-1" aria-label="Electric locomotive">
+              <CoachCar
+                coach={{ type: "ENGINE", number: "Electric locomotive" }}
+                trainNo={trainNo}
+                trainName={trainName}
+                trainType={trainType}
+                index={-1}
+                isLastCoach={false}
+              />
+            </div> : null}
             {ordered.map((coach, index) => (
               <button
                 key={`${coach.id || coach.number || "coach"}-${coach.position || index}`}
                 type="button"
                 data-coach-index={index}
                 aria-pressed={activeIndex === index}
-                aria-label={`Coach ${index + 1} of ${ordered.length}: ${coach.number || "unnumbered"}`}
+                aria-label={isEngineCoach(coach) ? `Electric locomotive, position ${coach.position || index}` : `Coach ${index + 1} of ${ordered.length}: ${coach.number || "unnumbered"}`}
                 onClick={(event) => {
                   if (suppressCoachClickRef.current) {
                     suppressCoachClickRef.current = false;
@@ -1466,9 +1493,9 @@ function CoachConsist({
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-slate-700 px-4 py-3">
             <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] font-bold tracking-[0.16em] uppercase" style={{ color: accentColor }}>Selected coach</p>
+                <p className="text-[10px] font-bold tracking-[0.16em] uppercase" style={{ color: accentColor }}>{activeCoach && isEngineCoach(activeCoach) ? "Selected locomotive" : "Selected coach"}</p>
                 <h3 className="mt-0.5 truncate text-base font-semibold text-white">
-                  {activeCoach?.number || "Coach details"}
+                  {activeCoach && isEngineCoach(activeCoach) ? "Electric locomotive" : activeCoach?.number || "Coach details"}
                 </h3>
               </div>
               <span className="shrink-0 rounded-full border border-slate-700 bg-slate-800 px-2.5 py-1 font-site-code text-[11px] text-slate-300">

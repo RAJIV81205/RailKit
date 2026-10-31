@@ -255,7 +255,6 @@ type TrainLiveData = {
     stationName: string;
     bearing: number;
   } | null;
-  route: [number, number][];
   timeline: TrainTimelineItem[];
   coachPosition?: TrainCoachPosition[];
   coachPositionTimeline?: Array<{
@@ -427,6 +426,14 @@ const INDIA_MAP_BOUNDS: [[number, number], [number, number]] = [
   [37.077615, 97.415161],
 ];
 
+function isWithinIndiaMapBounds(lat: number, lon: number) {
+  return (
+    Number.isFinite(lat) && Number.isFinite(lon) &&
+    lat >= INDIA_MAP_BOUNDS[0][0] && lat <= INDIA_MAP_BOUNDS[1][0] &&
+    lon >= INDIA_MAP_BOUNDS[0][1] && lon <= INDIA_MAP_BOUNDS[1][1]
+  );
+}
+
 function getStationMarkerRadius(zoom: number) {
   return 1.2;
 }
@@ -487,37 +494,27 @@ function stationsInBounds(
   return matches;
 }
 
-function getStraightTrainRoute(data: TrainLiveData): [number, number][] {
-  const stops = data.timeline
-    .filter((stop) => Number.isFinite(stop.lat) && Number.isFinite(stop.lon))
-    .map((stop) => ({
-      stationCode: stop.stationCode,
-      point: [stop.lat!, stop.lon!] as [number, number],
-    }));
-
-  if (data.start && stops[0]?.stationCode !== data.start.stationCode) {
-    stops.unshift({
-      stationCode: data.start.stationCode,
-      point: [data.start.lat, data.start.lon],
-    });
-  }
-  if (data.end && stops.at(-1)?.stationCode !== data.end.stationCode) {
-    stops.push({
-      stationCode: data.end.stationCode,
-      point: [data.end.lat, data.end.lon],
-    });
-  }
-
-  return stops.reduce<[number, number][]>((route, stop) => {
-    const previous = route.at(-1);
-    if (
-      !previous ||
-      previous[0] !== stop.point[0] ||
-      previous[1] !== stop.point[1]
+function getTrainRoutePoints(data: TrainLiveData): [number, number][] {
+  const points = data.timeline
+    .filter((stop) =>
+      Number.isFinite(stop.lat) && Number.isFinite(stop.lon) &&
+      isWithinIndiaMapBounds(stop.lat!, stop.lon!),
     )
-      route.push(stop.point);
-    return route;
-  }, []);
+    .map((stop) => [stop.lat!, stop.lon!] as [number, number]);
+  if (data.start && isWithinIndiaMapBounds(data.start.lat, data.start.lon)) {
+    if (!points.length || points[0][0] !== data.start.lat || points[0][1] !== data.start.lon) {
+      points.unshift([data.start.lat, data.start.lon]);
+    }
+  }
+  if (data.end && isWithinIndiaMapBounds(data.end.lat, data.end.lon)) {
+    const last = points.at(-1);
+    if (!last || last[0] !== data.end.lat || last[1] !== data.end.lon) {
+      points.push([data.end.lat, data.end.lon]);
+    }
+  }
+  return points.filter((point, index) =>
+    index === 0 || point[0] !== points[index - 1][0] || point[1] !== points[index - 1][1],
+  );
 }
 
 function focusTrainOnMap(map: LeafletMap, lat: number, lon: number) {
@@ -1634,7 +1631,7 @@ function TrainDetailsPanel({
             <button
               type="button"
               onClick={onFocusTrain}
-              disabled={!data?.currentPosition && !data?.route?.length}
+              disabled={!data?.currentPosition && !data?.timeline?.length}
               aria-pressed={focusOnly}
               className={`grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg transition-colors hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-300 lg:hidden ${focusOnly ? "text-white" : "text-slate-400"}`}
               style={focusOnly ? { color: accentColor, backgroundColor: `color-mix(in srgb, ${accentColor} 14%, transparent)` } : undefined}
@@ -2052,6 +2049,7 @@ export function RailAtlas() {
   const selectedLayerRef = useRef<LayerGroup | null>(null);
   const trainLayerRef = useRef<LayerGroup | null>(null);
   const focusedTrainRef = useRef("");
+  const animatedTrainRef = useRef("");
   const [mapReady, setMapReady] = useState(false);
   const [stations, setStations] = useState<Station[]>([]);
   const [selected, setSelected] = useState<Station | null>(null);
@@ -2955,36 +2953,38 @@ export function RailAtlas() {
     if (!mapReady || !mapRef.current) return;
     trainLayerRef.current?.removeFrom(mapRef.current);
     trainLayerRef.current = null;
-    if (!selectedTrain) focusedTrainRef.current = "";
+    if (!selectedTrain) {
+      focusedTrainRef.current = "";
+      animatedTrainRef.current = "";
+    }
     if (!selectedTrain || !trainLive.data) return;
     let cancelled = false;
+    let animationFrame: number | null = null;
     import("leaflet")
-      .then((L) => {
+      .then(async (L) => {
         if (cancelled || !mapRef.current || !trainLive.data) return;
         const data = trainLive.data;
-        const route = getStraightTrainRoute(data);
+        const route = getTrainRoutePoints(data);
         const isFullyCancelled = Boolean(
           data.statusNote && /\bcancel(?:led|lation)?\b/i.test(data.statusNote),
         );
         const layers: Layer[] = [];
-        if (route.length > 1) {
-          layers.push(
-            L.polyline(route, {
-              pane: "activeTrain",
-              color: isFullyCancelled ? "#94a3b8" : "#cbd5e1",
-              weight: 2.5,
-              opacity: isFullyCancelled ? 0.6 : 0.8,
-              dashArray: isFullyCancelled ? "7 7" : undefined,
-              interactive: false,
-            }),
-          );
-        }
+        const routeLine = route.length > 1 ? L.polyline([route[0], route[0]], {
+          pane: "activeTrain",
+          color: isFullyCancelled ? "#94a3b8" : "#cbd5e1",
+          weight: 2.5,
+          opacity: isFullyCancelled ? 0.6 : 0.8,
+          dashArray: isFullyCancelled ? "7 7" : undefined,
+          interactive: false,
+        }) : null;
+        if (routeLine) layers.push(routeLine);
         data.timeline
           .filter(
             (stop) =>
-              stop.type !== "intermediate" &&
+              stop.type === "stoppage" &&
               Number.isFinite(stop.lat) &&
-              Number.isFinite(stop.lon),
+              Number.isFinite(stop.lon) &&
+              isWithinIndiaMapBounds(stop.lat!, stop.lon!),
           )
           .filter(
             (stop) =>
@@ -3009,7 +3009,7 @@ export function RailAtlas() {
               ),
             );
           });
-        if (data.start)
+        if (data.start && isWithinIndiaMapBounds(data.start.lat, data.start.lon))
           layers.push(
             L.circleMarker([data.start.lat, data.start.lon], {
               pane: "activeTrain",
@@ -3023,7 +3023,7 @@ export function RailAtlas() {
               direction: "top",
             }),
           );
-        if (data.end)
+        if (data.end && isWithinIndiaMapBounds(data.end.lat, data.end.lon))
           layers.push(
             L.circleMarker([data.end.lat, data.end.lon], {
               pane: "activeTrain",
@@ -3037,7 +3037,11 @@ export function RailAtlas() {
               direction: "top",
             }),
           );
-        if (data.currentPosition && !isFullyCancelled) {
+        if (
+          data.currentPosition &&
+          isWithinIndiaMapBounds(data.currentPosition.lat, data.currentPosition.lon) &&
+          !isFullyCancelled
+        ) {
           const rotation = Number.isFinite(data.currentPosition.bearing)
             ? data.currentPosition.bearing
             : 0;
@@ -3056,24 +3060,68 @@ export function RailAtlas() {
             }),
           );
         }
-        trainLayerRef.current = L.layerGroup(layers).addTo(mapRef.current);
+        const trainLayer = L.layerGroup(layers).addTo(mapRef.current);
+        trainLayerRef.current = trainLayer;
         const focusKey = `${selectedTrain.trainNo}:${selectedTrain.date || ""}`;
         if (focusedTrainRef.current !== focusKey) {
           focusedTrainRef.current = focusKey;
           if (route.length > 1) focusTrainRouteOnMap(mapRef.current, route);
-          else if (data.currentPosition)
+          else if (
+            data.currentPosition &&
+            isWithinIndiaMapBounds(data.currentPosition.lat, data.currentPosition.lon)
+          )
             focusTrainOnMap(
               mapRef.current,
               data.currentPosition.lat,
               data.currentPosition.lon,
             );
         }
+
+        if (cancelled || !mapRef.current || route.length < 2 || !routeLine) return;
+
+        const trainNumberMatches = String(data.trainNo).padStart(5, "0") ===
+          String(selectedTrain.trainNo).padStart(5, "0");
+        if (animatedTrainRef.current === focusKey || !trainNumberMatches) {
+          routeLine.setLatLngs(route);
+          return;
+        }
+        animatedTrainRef.current = focusKey;
+
+        const segmentLengths = route.slice(1).map((point, index) =>
+          mapRef.current!.distance(route[index], point),
+        );
+        const totalLength = segmentLengths.reduce((sum, length) => sum + length, 0);
+        const animationStart = performance.now();
+        const animateRoute = (now: number) => {
+          if (cancelled) return;
+          const progress = Math.min(1, (now - animationStart) / 4200);
+          let remaining = totalLength * progress;
+          const visible: [number, number][] = [route[0]];
+          for (let index = 0; index < segmentLengths.length; index += 1) {
+            const length = segmentLengths[index];
+            if (remaining >= length) {
+              visible.push(route[index + 1]);
+              remaining -= length;
+              continue;
+            }
+            const ratio = length > 0 ? remaining / length : 1;
+            visible.push([
+              route[index][0] + (route[index + 1][0] - route[index][0]) * ratio,
+              route[index][1] + (route[index + 1][1] - route[index][1]) * ratio,
+            ]);
+            break;
+          }
+          routeLine.setLatLngs(visible);
+          if (progress < 1) animationFrame = window.requestAnimationFrame(animateRoute);
+        };
+        animationFrame = window.requestAnimationFrame(animateRoute);
       })
       .catch(() => {
         if (!cancelled) setError("Live train route could not be displayed");
       });
     return () => {
       cancelled = true;
+      if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
     };
   }, [mapReady, selectedTrain, trainLive.data]);
 
@@ -3101,8 +3149,9 @@ export function RailAtlas() {
     const nextFocused = !focusSelectedTrainOnly;
     setFocusSelectedTrainOnly(nextFocused);
     if (!nextFocused || !mapRef.current || !trainLive.data) return;
-    const route = getStraightTrainRoute(trainLive.data);
-    if (route.length > 1) focusTrainRouteOnMap(mapRef.current, route);
+    const data = trainLive.data;
+    const routePoints = getTrainRoutePoints(data);
+    if (routePoints.length > 1) focusTrainRouteOnMap(mapRef.current, routePoints);
     else if (trainLive.data.currentPosition) {
       focusTrainOnMap(
         mapRef.current,
@@ -3362,7 +3411,7 @@ export function RailAtlas() {
               onClick={focusSelectedTrain}
               disabled={
                 !trainLive.data?.currentPosition &&
-                !trainLive.data?.route?.length
+                !trainLive.data?.timeline?.length
               }
               aria-label={
                 focusSelectedTrainOnly

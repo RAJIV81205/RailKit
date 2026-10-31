@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
-import { routeAlongRailways } from "../../../../lib/rail-route";
 import { rejectNonFirstPartyRequest } from "@/lib/rail-atlas-origin";
 import { rejectMissingRailAtlasAccess } from "@/lib/rail-atlas-token";
 
@@ -13,6 +12,8 @@ type TimelineItem = {
   status?: string;
   stationCode?: string;
   stationName?: string;
+  lat?: number;
+  lon?: number;
   platform?: string;
   distanceKm?: string | number;
   arrival?: { scheduled?: string; actual?: string; delay?: string };
@@ -92,14 +93,13 @@ export async function GET(request: NextRequest) {
     const normalizedTimeline = timeline.map<NormalizedTimelineItem>((item, index) => {
       const code = String(item.stationCode || "").toUpperCase();
       const station = stations.get(code);
-      return station && Number.isFinite(station.lat) && Number.isFinite(station.lon)
-        ? { ...item, index, stationCode: code, lat: station.lat as number, lon: station.lon as number }
+      const lat = Number.isFinite(item.lat) ? item.lat : station?.lat;
+      const lon = Number.isFinite(item.lon) ? item.lon : station?.lon;
+      return Number.isFinite(lat) && Number.isFinite(lon)
+        ? { ...item, index, stationCode: code, lat: lat as number, lon: lon as number }
         : { ...item, index, stationCode: code };
     });
     const mappedTimeline = normalizedTimeline.filter((item): item is NormalizedTimelineItem & { lat: number; lon: number } => Number.isFinite(item.lat) && Number.isFinite(item.lon));
-
-    const routeWaypoints = mappedTimeline.filter((item, index) => item.type === "stoppage" || index === 0 || index === mappedTimeline.length - 1);
-    const route = await routeAlongRailways(routeWaypoints.map((item) => [item.lat, item.lon]));
     const currentCode = String(payload.data.currentStationCode || "").toUpperCase();
     let currentIndex = mappedTimeline.findIndex((item) => item.stationCode === currentCode);
     if (currentIndex < 0) currentIndex = mappedTimeline.findIndex((item) => item.status === "current");
@@ -137,7 +137,6 @@ export async function GET(request: NextRequest) {
           stationName: current.stationName || stations.get(current.stationCode)?.name || current.stationCode,
           bearing: routeBearing,
         } : null,
-        route,
         timeline: normalizedTimeline,
         coachPosition: Array.isArray(payload.data.coachPosition)
           ? payload.data.coachPosition

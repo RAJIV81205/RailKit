@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2172 724" role="img" aria-label="Indian Railways luggage brake car side view" style="display:block;width:100%;height:auto">
+<defs>
+  <linearGradient id="__SVG_ID__-body" x2="0" y2="1"><stop stop-color="#e0e4e8"/><stop offset=".48" stop-color="#adb7c0"/><stop offset="1" stop-color="#788590"/></linearGradient>
+  <linearGradient id="__SVG_ID__-roof" x2="0" y2="1"><stop stop-color="#f1f3f4"/><stop offset="1" stop-color="#8a959e"/></linearGradient>
+  <linearGradient id="__SVG_ID__-door" x2="0" y2="1"><stop stop-color="#c3cbd1"/><stop offset="1" stop-color="#89959f"/></linearGradient>
+  <linearGradient id="__SVG_ID__-glass" x2="0" y2="1"><stop stop-color="#536778"/><stop offset="1" stop-color="#1d2a35"/></linearGradient>
+</defs>
+<!-- Couplers, roof and shell -->
+<rect x="8" y="199" width="65" height="293" rx="12" fill="#30383f" stroke="#6e7982" stroke-width="6"/>
+<rect x="2099" y="199" width="65" height="293" rx="12" fill="#30383f" stroke="#6e7982" stroke-width="6"/>
+<path d="M75 177 Q92 143 145 140 H2027 Q2080 143 2097 177 V480 Q2097 497 2075 497 H97 Q75 497 75 480Z" fill="url(#__SVG_ID__-body)" stroke="#46525c" stroke-width="7"/>
+<path d="M94 178 Q107 129 160 120 H2012 Q2065 129 2078 178Z" fill="url(#__SVG_ID__-roof)" stroke="#63707a" stroke-width="6"/>
+<path d="M106 190 H2066" stroke="#f7f8f8" stroke-width="5" opacity=".7"/>
+<!-- Narrow railway livery stripes -->
+<path d="M88 379 H2084 V398 H88Z" fill="#b92b32"/>
+<path d="M88 398 H2084 V414 H88Z" fill="#324f72"/>
+<path d="M88 416 H2084 V481 H88Z" fill="#939fa9" opacity=".52"/>
+<!-- End service doors -->
+<rect x="141" y="213" width="152" height="252" rx="8" fill="#a9b3bb" stroke="#5f6c76" stroke-width="6"/>
+<rect x="180" y="246" width="73" height="70" rx="5" fill="url(#__SVG_ID__-glass)" stroke="#50606c" stroke-width="5"/>
+<path d="M182 267 H251 M182 290 H251" stroke="#b6c1c9" stroke-width="5"/>
+<circle cx="274" cy="353" r="8" fill="#3b464e"/>
+<rect x="1879" y="213" width="152" height="252" rx="8" fill="#a9b3bb" stroke="#5f6c76" stroke-width="6"/>
+<rect x="1918" y="246" width="73" height="70" rx="5" fill="url(#__SVG_ID__-glass)" stroke="#50606c" stroke-width="5"/>
+<path d="M1920 267 H1989 M1920 290 H1989" stroke="#b6c1c9" stroke-width="5"/>
+<circle cx="1898" cy="353" r="8" fill="#3b464e"/>
+<!-- Wide ribbed luggage doors -->
+<rect x="329" y="212" width="436" height="257" rx="7" fill="url(#__SVG_ID__-door)" stroke="#62707c" stroke-width="7"/>
+<path d="M350 244 H744 M350 273 H744 M350 302 H744 M350 331 H744 M350 360 H744 M350 389 H744 M350 418 H744 M350 447 H744" stroke="#74818b" stroke-width="5" opacity=".7"/>
+<path d="M548 220 V462" stroke="#56636d" stroke-width="5"/>
+<rect x="559" y="322" width="16" height="66" rx="5" fill="#4a5660"/>
+<rect x="1407" y="212" width="436" height="257" rx="7" fill="url(#__SVG_ID__-door)" stroke="#62707c" stroke-width="7"/>
+<path d="M1428 244 H1822 M1428 273 H1822 M1428 302 H1822 M1428 331 H1822 M1428 360 H1822 M1428 389 H1822 M1428 418 H1822 M1428 447 H1822" stroke="#74818b" stroke-width="5" opacity=".7"/>
+<path d="M1626 220 V462" stroke="#56636d" stroke-width="5"/>
+<rect x="1637" y="322" width="16" height="66" rx="5" fill="#4a5660"/>
+<!-- Identification sign: luggage car has no seat count -->
+<rect x="795" y="205" width="582" height="173" rx="12" fill="#28343f" stroke="#778692" stroke-width="5"/>
+<path d="M1086 219 V363" stroke="#81909c" stroke-width="3"/>
+<g font-family="Arial,Helvetica,sans-serif" text-anchor="middle">
+  <text x="940" y="251" fill="#dbe1e5" font-size="28" font-weight="700">COACH NUMBER</text>
+  <text id="__SVG_ID__-coach-serial" x="940" y="344" fill="#fff" font-size="78" font-weight="800">__COACH_NO__</text>
+  <text x="1231" y="251" fill="#dbe1e5" font-size="28" font-weight="700">COACH CODE</text>
+  <text id="__SVG_ID__-coach-number" x="1231" y="344" fill="#fff" font-size="78" font-weight="800">__COACH_CODE__</text>
+  <text x="1086" y="452" fill="#263441" font-size="39" font-weight="800" letter-spacing="4">LUGGAGE  ·  BRAKE CAR</text>
+</g>
+<!-- Underframe and bogies -->
+<path d="M101 497 H2071 V529 H101Z" fill="#303b44" stroke="#172029" stroke-width="5"/>
+<rect x="784" y="512" width="604" height="60" rx="5" fill="#394650" stroke="#1d2831" stroke-width="6"/>
+<path d="M815 526 H1357 M815 545 H1357" stroke="#64717a" stroke-width="4"/>
+<path d="M229 527 H655 L615 581 H269Z M1517 527 H1943 L1903 581 H1557Z" fill="#303a43" stroke="#171f26" stroke-width="7"/>
+<g fill="#202a33" stroke="#85919b" stroke-width="9"><circle cx="323" cy="576" r="55"/><circle cx="562" cy="576" r="55"/><circle cx="1610" cy="576" r="55"/><circle cx="1849" cy="576" r="55"/></g>
+<g fill="#687681" stroke="#1b252e" stroke-width="8"><circle cx="323" cy="576" r="23"/><circle cx="562" cy="576" r="23"/><circle cx="1610" cy="576" r="23"/><circle cx="1849" cy="576" r="23"/></g>
+</svg>

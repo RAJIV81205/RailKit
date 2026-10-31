@@ -1179,6 +1179,11 @@ const coachSvgTemplateCache = new Map<string, Promise<string>>();
 
 function coachSvgPath(trainType: string, coach: TrainCoachPosition, index: number, isLastCoach: boolean) {
   const category = liveTrainCategory(trainType);
+  const isRajdhani = /\bRAJDHANI\b/i.test(trainType);
+  if (isRajdhani) {
+    if (isLuggageCoach(coach)) return "/rail-atlas/coach-layouts/rajdhani/luggage.svg?v=1";
+    return "/rail-atlas/coach-layouts/rajdhani/coach.svg?v=5";
+  }
   const folder = category === "vandeBharat"
     ? "vande-bharat"
     : category.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
@@ -1190,6 +1195,10 @@ function coachSvgPath(trainType: string, coach: TrainCoachPosition, index: numbe
     return `/rail-atlas/coach-layouts/${folder}/driving-rear.svg?v=2`;
   }
   return `/rail-atlas/coach-layouts/${folder}/coach.svg?v=2`;
+}
+
+function isLuggageCoach(coach: TrainCoachPosition) {
+  return [coach.number, coach.type, coach.coachClass].some((value) => /^LPR$/i.test(String(value || "")));
 }
 
 function loadCoachSvgTemplate(path: string): Promise<string> {
@@ -1257,9 +1266,9 @@ function CoachCar({
       (result, [key, value]) => result.replaceAll(`__${key}__`, value),
       template,
     );
-  }, [template, svgId, coach.number, coach.coachNo, seats, trainName]);
+  }, [template, svgId, trainNo, coach.number, coach.coachNo, seats, trainName]);
 
-  const label = `${coach.number || "Coach"}, unique coach number ${coach.coachNo || "unavailable"}, ${seats} seats`;
+  const label = `${coach.number || "Coach"}, unique coach number ${coach.coachNo || "unavailable"}${isLuggageCoach(coach) ? ", luggage car" : `, ${seats} seats`}`;
   return (
     <div className="w-full select-none" role="img" aria-label={label}>
       {svgMarkup ? (
@@ -1343,7 +1352,7 @@ function CoachConsist({
     ? [
         ["Coach", activeCoach.number],
         ["Coach number", activeCoach.coachNo],
-        ["Seats", seatCount],
+        ...(!isLuggageCoach(activeCoach) ? [["Seats", seatCount] as const] : []),
         ["Type", activeCoach.type],
         ["Coach type", activeCoach.coachType],
         ["Position", activeCoach.position],
@@ -1542,7 +1551,9 @@ function TrainDetailsPanel({
   const [expandedSegments, setExpandedSegments] = useState<Set<string>>(
     new Set(),
   );
-  const isVandeBharat = liveTrainCategory(trainType) === "vandeBharat";
+  const hasCoachLayout =
+    liveTrainCategory(trainType) === "vandeBharat" ||
+    /\bRAJDHANI\b/i.test(trainType);
   const [detailsTab, setDetailsTab] = useState<"route" | "coaches">("route");
   const coachPositions = useMemo(() => {
     const entries = data?.coachPositionTimeline || [];
@@ -1672,7 +1683,7 @@ function TrainDetailsPanel({
         ) : null}
       </header>
 
-      {isVandeBharat && data ? (
+      {hasCoachLayout && data ? (
         <div className="flex shrink-0 border-b border-slate-700 px-3 pt-2" role="tablist" aria-label="Train details">
           {(["route", "coaches"] as const).map((tab) => {
             const active = detailsTab === tab;
@@ -1750,7 +1761,7 @@ function TrainDetailsPanel({
               Service cancelled today.
             </p>
           ) : null}
-          {isVandeBharat && detailsTab === "coaches" ? (
+          {hasCoachLayout && detailsTab === "coaches" ? (
             <CoachConsist
               coaches={coachPositions}
               trainNo={data.trainNo || selection.trainNo}

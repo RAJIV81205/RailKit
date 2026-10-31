@@ -26,8 +26,7 @@
 <rect x="1363" y="225" width="280" height="122" rx="6" fill="#8d9ba5" stroke="#5a6872" stroke-width="6"/>
 <g stroke="#5b6b76" stroke-width="9"><path d="M559 247 V327 M593 247 V327 M627 247 V327 M661 247 V327 M695 247 V327 M729 247 V327 M763 247 V327 M797 247 V327 M1392 247 V327 M1426 247 V327 M1460 247 V327 M1494 247 V327 M1528 247 V327 M1562 247 V327 M1596 247 V327 M1630 247 V327"/></g>
 <rect x="840" y="217" width="492" height="137" rx="10" fill="#263540" stroke="#75838e" stroke-width="5"/>
-<text x="1086" y="268" fill="#e8eef1" font-family="Arial,Helvetica,sans-serif" font-size="35" font-weight="700" text-anchor="middle" letter-spacing="4">INDIAN RAILWAYS</text>
-<text x="1086" y="326" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="49" font-weight="800" text-anchor="middle">ELECTRIC LOCOMOTIVE</text>
+<text x="1086" y="305" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="49" font-weight="800" text-anchor="middle" letter-spacing="4">INDIAN RAILWAYS</text>
 <!-- Headlamps and cab access. -->
 <circle cx="149" cy="402" r="19" fill="#f7eac2" stroke="#58636a" stroke-width="6"/>
 <circle cx="2023" cy="402" r="19" fill="#f7eac2" stroke="#58636a" stroke-width="6"/>

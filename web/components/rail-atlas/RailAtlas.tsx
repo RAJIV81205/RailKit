@@ -1178,7 +1178,7 @@ function StationDetailsPanel({
 const coachSvgTemplateCache = new Map<string, Promise<string>>();
 
 function coachSvgPath(trainType: string, coach: TrainCoachPosition, index: number, isLastCoach: boolean) {
-  if (isEngineCoach(coach)) return "/rail-atlas/coach-layouts/shared/electric-engine.svg?v=1";
+  if (isEngineCoach(coach)) return "/rail-atlas/coach-layouts/shared/electric-engine.svg?v=2";
   if (isLuggageCoach(coach)) return "/rail-atlas/coach-layouts/shared/luggage.svg?v=1";
   const category = liveTrainCategory(trainType);
   const isRajdhani = /\bRAJDHANI\b/i.test(trainType);

@@ -1,7 +1,0 @@
-{
-  "id": "moochi",
-  "displayName": "Moochi",
-  "description": "A compact black-and-white cow-pattern cat pet with a sweet face and readable whole-body silhouette.",
-  "spritesheetPath": "spritesheet.webp",
-  "kind": "animal"
-}

@@ -1,5 +1,6 @@
 .DS_Store
 /backend
+/web/
 test.js
 .vscode/settings.json
 temp-irctc-connect

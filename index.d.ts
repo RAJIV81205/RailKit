@@ -69,6 +69,12 @@ export function trackTrainV2(trainNumber: string, date: string): Promise<any>;
  */
 export function getTrainHistory(trainNumber: string, journeyDate: string): Promise<any>;
 
+/** Get current running-train positions and snapshot freshness. */
+export function getLiveTrainMap(): Promise<any>;
+
+/** Get station delay averages from completed runs in the last three months. */
+export function getTrainDelays(trainNumber: string): Promise<any>;
+
 /**
  * Get the list of upcoming trains at a station.
  * @param stationCode - Station code (e.g., 'NDLS' for New Delhi)

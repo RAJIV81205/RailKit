@@ -16,6 +16,8 @@ A comprehensive Node.js SDK for Indian Railways. Get real-time PNR status, train
 - 🎫 **PNR Status** — Real-time PNR status with full passenger details
 - 🚂 **Train Information** — Complete train details with station-by-station route
 - 📍 **Live Train Tracking** — Real-time position and delay info for any train
+- 🗺️ **Live Train Map** — Running train positions and snapshot freshness
+- 📊 **Train Delays** — Three-month station and whole-train delay averages
 - 🚉 **Live Station Board** — Upcoming trains at any station right now
 - 🔍 **Train Search** — Find all direct trains between two stations
 - 💺 **Seat Availability** — Check availability and fare for any class and quota
@@ -71,6 +73,8 @@ import {
   checkPNRStatus,
   getTrainInfo,
   trackTrain,
+  getLiveTrainMap,
+  getTrainDelays,
   liveAtStation,
   searchTrainBetweenStations,
   getAvailability,
@@ -95,6 +99,12 @@ const trainResult = await getTrainInfo('12301');
 
 // Track live train status (date required)
 const trackResult = await trackTrain('12301', '31-03-2026');
+
+// Running trains available for map display
+const mapResult = await getLiveTrainMap();
+
+// Historical delay averages by station
+const delaysResult = await getTrainDelays('12342');
 
 // Get live trains at a station
 const stationResult = await liveAtStation('NDLS');
@@ -397,7 +407,34 @@ if (result.success) {
 
 ---
 
-### 4. `getTrainHistory(trainNumber, journeyDate)`
+### 4. `getTrainDelays(trainNumber)`
+
+`getTrainDelays('12342')` calls `GET /api/v1/trains/:trainNo/delays` and returns delay statistics from completed journeys stored during the last three calendar months (IST). Train number must contain five digits. Returns `404` when no completed runs exist in that period.
+
+Response contains `data.period` (requested date window), `totalRuns` (journeys used), `averageDelayMinutes` (mean of each run's observed station arrival average), `averageDestinationArrivalDelayMinutes` (mean destination arrival delay), and per-station arrival/departure averages. Missing delays are excluded, not counted as zero. All averages use minutes; null means no valid sample.
+
+```javascript
+{
+  success: true,
+  data: {
+    trainNo: "12345",
+    trainName: "EXAMPLE EXPRESS",
+    period: { fromDate: "10-08-2026", toDate: "10-11-2026" },
+    summary: {
+      totalRuns: 2,
+      averageDelayMinutes: 27.5,
+      averageDestinationArrivalDelayMinutes: 30
+    },
+    stations: [
+      { stationCode: "NDLS", stationName: "NEW DELHI",
+        arrival: { averageDelayMinutes: null },
+        departure: { averageDelayMinutes: 2.5 } }
+    ]
+  }
+}
+```
+
+### 5. `getTrainHistory(trainNumber, journeyDate)`
 
 Get the completed journey history of a train for a specific journey date. The backend persists a `TrainHistory` record once a train has reached its destination, including the full station-by-station timeline, per-stop delays, and the final coach position.
 
@@ -770,6 +807,17 @@ today, yesterday, or tomorrow in `DD-MM-YYYY` format.
 ```javascript
 const result = await trainTimetableAtStation('ASN');
 // Or: await trainTimetableAtStation('ASN', '28-08-2026');
+```
+
+---
+
+### 16. `getLiveTrainMap()`
+
+Returns current running-train map snapshot from `GET /api/v1/trains/live-map`. Response includes `lastSweepAt`, `count`, `mappedCount`, `trains`, and `stale`. Each train may include current-station coordinates and upcoming station. `stale` becomes true when last sweep is older than five minutes or unavailable.
+
+```javascript
+const result = await getLiveTrainMap();
+if (result.success) console.log(result.data.trains);
 ```
 
 ---

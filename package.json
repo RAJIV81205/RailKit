@@ -1,6 +1,6 @@
 {
   "name": "railkit",
-  "version": "6.0.2",
+  "version": "6.0.3",
   "description": "🚂 Complete Node.js SDK for Indian Railways - Check PNR status, train schedules, live running status, seat availability, station information and more. Promise-based API with TypeScript support.",
   "keywords": [
     "railkit",
@@ -36,6 +36,11 @@
   "type": "module",
   "main": "index.obfuscated.js",
   "types": "index.d.ts",
+  "files": [
+    "index.obfuscated.js",
+    "index.d.ts",
+    "README.md"
+  ],
   "exports": {
     ".": {
       "types": "./index.d.ts",
@@ -47,6 +52,6 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon index.js",
-    "obfuscate": "npx javascript-obfuscator index.js --output index.obfuscated.js --compact true --string-array true --string-array-encoding base64 --rename-globals false --control-flow-flattening false --dead-code-injection false"
+    "obfuscate": "npx --yes javascript-obfuscator@5.10.0 index.js --output index.obfuscated.js --compact true --identifier-names-generator hexadecimal --transform-object-keys true --string-array true --string-array-threshold 1 --string-array-encoding rc4 --string-array-calls-transform true --string-array-calls-transform-threshold 1 --string-array-index-shift true --string-array-rotate true --string-array-shuffle true --string-array-wrappers-count 3 --string-array-wrappers-type function --split-strings true --split-strings-chunk-length 5 --control-flow-flattening true --control-flow-flattening-threshold 0.8 --dead-code-injection true --dead-code-injection-threshold 0.2 --numbers-to-expressions true --rename-globals false --rename-properties false"
   }
 }

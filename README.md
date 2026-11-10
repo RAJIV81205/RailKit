@@ -7,7 +7,9 @@
 <img width="1536" height="657" alt="RailKit Banner" src="https://github.com/user-attachments/assets/6bdcc05f-186d-4f6f-918d-a99a65026c97" />
 
 
-A comprehensive Node.js SDK for Indian Railways. Get real-time PNR status, train information, live tracking, station updates, train search, and seat availability — all through a single, clean API.
+A Node.js SDK for Indian railway data. Get PNR status, train information, live tracking, station updates, train search, and seat availability through a single API.
+
+RailKit is an independent service. It is not affiliated with IRCTC, CRIS, or Indian Railways.
 
 ---
 
